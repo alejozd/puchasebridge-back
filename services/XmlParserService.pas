@@ -28,8 +28,9 @@ type
 
   TXmlParserService = class
   private
-    class function GetNodeText(ANode: IXMLNode; const NodeName: string): string;
-    class function FindNodeRecursive(ANode: IXMLNode; const NodeName: string): IXMLNode;
+    class function FindNodeByLocalName(ANode: IXMLNode; const ALocalName: string): IXMLNode;
+    class function FindNodeByLocalNameRecursive(ANode: IXMLNode; const ALocalName: string): IXMLNode;
+    class function GetNodeTextByLocalName(ANode: IXMLNode; const ALocalName: string): string;
     class function CreateXMLDoc(const AXML: string): IXMLDocument;
   public
     class function Parse(const XMLContent: string): TParsedInvoice;
@@ -50,28 +51,43 @@ begin
   Result := LXMLDoc;
 end;
 
-class function TXmlParserService.FindNodeRecursive(ANode: IXMLNode; const NodeName: string): IXMLNode;
+class function TXmlParserService.FindNodeByLocalName(ANode: IXMLNode; const ALocalName: string): IXMLNode;
 var
   I: Integer;
 begin
-  Result := ANode.ChildNodes.FindNode(NodeName);
+  Result := nil;
+  for I := 0 to ANode.ChildNodes.Count - 1 do
+  begin
+    if SameText(ANode.ChildNodes[I].LocalName, ALocalName) then
+    begin
+      Result := ANode.ChildNodes[I];
+      Break;
+    end;
+  end;
+end;
+
+class function TXmlParserService.FindNodeByLocalNameRecursive(ANode: IXMLNode; const ALocalName: string): IXMLNode;
+var
+  I: Integer;
+begin
+  Result := FindNodeByLocalName(ANode, ALocalName);
   if Result <> nil then
     Exit;
 
   for I := 0 to ANode.ChildNodes.Count - 1 do
   begin
-    Result := FindNodeRecursive(ANode.ChildNodes[I], NodeName);
+    Result := FindNodeByLocalNameRecursive(ANode.ChildNodes[I], ALocalName);
     if Result <> nil then
       Exit;
   end;
 end;
 
-class function TXmlParserService.GetNodeText(ANode: IXMLNode; const NodeName: string): string;
+class function TXmlParserService.GetNodeTextByLocalName(ANode: IXMLNode; const ALocalName: string): string;
 var
   LNode: IXMLNode;
 begin
   Result := '';
-  LNode := ANode.ChildNodes.FindNode(NodeName);
+  LNode := FindNodeByLocalName(ANode, ALocalName);
   if LNode <> nil then
     Result := LNode.Text;
 end;
@@ -98,12 +114,13 @@ begin
   RootNode := XMLDoc.DocumentElement;
 
   // Handle AttachedDocument container
-  if SameText(RootNode.NodeName, 'AttachedDocument') then
+  // Use LocalName to be namespace-prefix agnostic
+  if SameText(RootNode.LocalName, 'AttachedDocument') then
   begin
-    AttachmentNode := FindNodeRecursive(RootNode, 'cac:Attachment');
+    AttachmentNode := FindNodeByLocalNameRecursive(RootNode, 'Attachment');
     if AttachmentNode <> nil then
     begin
-      DescriptionNode := FindNodeRecursive(AttachmentNode, 'cbc:Description');
+      DescriptionNode := FindNodeByLocalNameRecursive(AttachmentNode, 'Description');
       if DescriptionNode <> nil then
       begin
         InnerXML := DescriptionNode.Text;
@@ -118,47 +135,47 @@ begin
   end;
 
   // 1. Extract Provider NIT
-  // Path: cac:AccountingSupplierParty/cac:Party/cac:PartyTaxScheme/cbc:CompanyID
-  SupplierNode := RootNode.ChildNodes.FindNode('cac:AccountingSupplierParty');
+  // Path: AccountingSupplierParty / Party / PartyTaxScheme / CompanyID
+  SupplierNode := FindNodeByLocalName(RootNode, 'AccountingSupplierParty');
   if SupplierNode <> nil then
   begin
-    PartyNode := SupplierNode.ChildNodes.FindNode('cac:Party');
+    PartyNode := FindNodeByLocalName(SupplierNode, 'Party');
     if PartyNode <> nil then
     begin
-      TaxSchemeNode := PartyNode.ChildNodes.FindNode('cac:PartyTaxScheme');
+      TaxSchemeNode := FindNodeByLocalName(PartyNode, 'PartyTaxScheme');
       if TaxSchemeNode <> nil then
       begin
-        Result.Provider.NIT := GetNodeText(TaxSchemeNode, 'cbc:CompanyID');
+        Result.Provider.NIT := GetNodeTextByLocalName(TaxSchemeNode, 'CompanyID');
       end;
     end;
   end;
 
-  // Fallback: try to find cbc:CompanyID anywhere if not found in the expected path
+  // Fallback: try to find CompanyID anywhere if not found in the expected path
   if Result.Provider.NIT = '' then
   begin
-    Node := FindNodeRecursive(RootNode, 'cbc:CompanyID');
+    Node := FindNodeByLocalNameRecursive(RootNode, 'CompanyID');
     if Node <> nil then
       Result.Provider.NIT := Node.Text;
   end;
 
-  // 2. Extract Products from cac:InvoiceLine
+  // 2. Extract Products from InvoiceLine
   ProductList := TList<TProductInfo>.Create;
   try
     for I := 0 to RootNode.ChildNodes.Count - 1 do
     begin
       LineNode := RootNode.ChildNodes[I];
-      if SameText(LineNode.NodeName, 'cac:InvoiceLine') then
+      if SameText(LineNode.LocalName, 'InvoiceLine') then
       begin
-        ItemNode := LineNode.ChildNodes.FindNode('cac:Item');
+        ItemNode := FindNodeByLocalName(LineNode, 'Item');
         if ItemNode <> nil then
         begin
-          Product.Descripcion := GetNodeText(ItemNode, 'cbc:Description');
+          Product.Descripcion := GetNodeTextByLocalName(ItemNode, 'Description');
 
           Product.Referencia := '';
-          Node := ItemNode.ChildNodes.FindNode('cac:SellersItemIdentification');
+          Node := FindNodeByLocalName(ItemNode, 'SellersItemIdentification');
           if Node <> nil then
           begin
-            Product.Referencia := GetNodeText(Node, 'cbc:ID');
+            Product.Referencia := GetNodeTextByLocalName(Node, 'ID');
           end;
 
           ProductList.Add(Product);
