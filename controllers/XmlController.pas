@@ -12,8 +12,88 @@ uses
   System.SysUtils,
   System.IOUtils,
   System.Classes,
+  System.Generics.Collections,
+  System.Generics.Defaults,
+  System.Types,
   Web.HTTPApp,
   Web.ReqFiles;
+
+type
+  TFileInfo = record
+    FileName: string;
+    Size: Int64;
+    LastModified: TDateTime;
+  end;
+
+procedure List(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+var
+  LPath: string;
+  LFiles: TStringDynArray;
+  LFile: string;
+  LJSONList: TJSONArray;
+  LJSONObj: TJSONObject;
+  LFileInfoList: TList<TFileInfo>;
+  LFileInfo: TFileInfo;
+begin
+  try
+    LPath := TPath.Combine('PurchaseBridge', 'Input');
+    if not TDirectory.Exists(LPath) then
+    begin
+      Res.Send(TJSONArray.Create);
+      Exit;
+    end;
+
+    LFiles := TDirectory.GetFiles(LPath, '*.xml');
+
+    LFileInfoList := TList<TFileInfo>.Create;
+    try
+      for LFile in LFiles do
+      begin
+        LFileInfo.FileName := TPath.GetFileName(LFile);
+        LFileInfo.Size := TFile.GetSize(LFile);
+        LFileInfo.LastModified := TFile.GetLastWriteTime(LFile);
+        LFileInfoList.Add(LFileInfo);
+      end;
+
+      LFileInfoList.Sort(TComparer<TFileInfo>.Construct(
+        function(const Left, Right: TFileInfo): Integer
+        begin
+          if Left.LastModified < Right.LastModified then
+            Result := 1
+          else if Left.LastModified > Right.LastModified then
+            Result := -1
+          else
+            Result := 0;
+        end));
+
+      LJSONList := TJSONArray.Create;
+      try
+        for LFileInfo in LFileInfoList do
+        begin
+          LJSONObj := TJSONObject.Create;
+          LJSONObj.AddPair('fileName', LFileInfo.FileName);
+          LJSONObj.AddPair('size', TJSONNumber.Create(LFileInfo.Size));
+          LJSONObj.AddPair('lastModified', FormatDateTime('yyyy-mm-dd HH:nn:ss', LFileInfo.LastModified));
+          LJSONList.AddElement(LJSONObj);
+        end;
+        Res.Send(LJSONList);
+      except
+        LJSONList.Free;
+        raise;
+      end;
+    finally
+      LFileInfoList.Free;
+    end;
+  except
+    on E: Exception do
+    begin
+      LJSONObj := TJSONObject.Create;
+      LJSONObj.AddPair('success', TJSONBool.Create(False));
+      LJSONObj.AddPair('message', E.Message);
+      Res.Status(500).Send(LJSONObj);
+    end;
+  end;
+end;
 
 procedure Upload(Req: THorseRequest; Res: THorseResponse; Next: TProc);
 var
@@ -90,6 +170,7 @@ end;
 
 procedure Registry;
 begin
+  THorse.Get('/xml/list', List);
   THorse.Post('/xml/upload', Upload);
 end;
 

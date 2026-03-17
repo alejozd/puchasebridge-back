@@ -79,6 +79,26 @@ Sube un archivo XML al servidor para su posterior procesamiento.
   }
   ```
 
+### 4. Listar Archivos XML
+Retorna una lista de todos los archivos XML que han sido cargados en el servidor, ordenados por fecha de modificación descendente.
+
+- **GET** `/xml/list`
+- **Respuesta**:
+  ```json
+  [
+    {
+      "fileName": "factura1.xml",
+      "size": 24567,
+      "lastModified": "2026-03-17 14:30:00"
+    },
+    {
+      "fileName": "factura2.xml",
+      "size": 19876,
+      "lastModified": "2026-03-17 15:10:00"
+    }
+  ]
+  ```
+
 ## Pruebas con Postman
 
 1. Importa el archivo `PurchaseBridge.postman_collection.json` en Postman.
