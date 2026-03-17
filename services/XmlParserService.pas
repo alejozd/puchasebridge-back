@@ -7,7 +7,7 @@ uses
   System.Classes,
   System.Generics.Collections,
   Xml.XMLDoc,
-  Xml.adomxml,
+  Xml.adomxmldom,
   Xml.XMLIntf;
 
 type
