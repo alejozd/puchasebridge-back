@@ -17,7 +17,7 @@ uses
 
 procedure Upload(Req: THorseRequest; Res: THorseResponse; Next: TProc);
 var
-  LFile: TWebRequestFile;
+  LFile: TAbstractWebRequestFile;
   LPath, LFileName, LFullFile: string;
   LResponse: TJSONObject;
   I: Integer;
