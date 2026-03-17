@@ -16,7 +16,8 @@ uses
   ProductoRepository in 'repositories\ProductoRepository.pas',
   XMLFacturaService in 'services\XMLFacturaService.pas',
   ImportController in 'controllers\ImportController.pas',
-  ProveedorController in 'controllers\ProveedorController.pas';
+  ProveedorController in 'controllers\ProveedorController.pas',
+  XmlController in 'controllers\XmlController.pas';
 
 begin
   // Initialize configuration at startup
@@ -46,6 +47,7 @@ begin
 
   ImportController.Registry;
   ProveedorController.Registry;
+  XmlController.Registry;
 
   THorse.Listen(9000,
     procedure

@@ -26,6 +26,36 @@
 			"response": []
 		},
 		{
+			"name": "Subir Archivo XML",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "file",
+							"type": "file",
+							"src": []
+						}
+					]
+				},
+				"url": {
+					"raw": "http://localhost:9000/xml/upload",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "9000",
+					"path": [
+						"xml",
+						"upload"
+					]
+				}
+			},
+			"response": []
+		},
+		{
 			"name": "Validar Proveedor",
 			"request": {
 				"method": "GET",
