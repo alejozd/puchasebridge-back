@@ -13,22 +13,31 @@ uses
 
 type
   TProductInfo = record
+    IDLinea: string;
     Descripcion: string;
     Referencia: string;
+    ReferenciaEstandar: string;
     Cantidad: Double;
+    Unidad: string;
+    PrecioBase: Double;
     ValorUnitario: Double;
     ValorTotal: Double;
     Impuesto: Double;
+    ImpuestoPorcentaje: Double;
   end;
 
   TProviderInfo = record
     NIT: string;
     Nombre: string;
+    NombreLegal: string;
+    TipoIdentificacion: string;
     Direccion: string;
   end;
 
   TInvoiceTotals = record
     Subtotal: Double;
+    TaxExclusiveAmount: Double;
+    TaxInclusiveAmount: Double;
     ImpuestoTotal: Double;
     Total: Double;
   end;
@@ -45,7 +54,12 @@ type
     class function FindNodeByLocalNameRecursive(ANode: IXMLNode; const ALocalName: string): IXMLNode;
     class function GetNodeTextByLocalName(ANode: IXMLNode; const ALocalName: string): string;
     class function GetNodeDoubleByLocalName(ANode: IXMLNode; const ALocalName: string): Double;
+    class function GetNodeAttributeValue(ANode: IXMLNode; const AAttributeName: string): string;
     class function CreateXMLDoc(const AXML: string): IXMLDocument;
+
+    class function ParseProveedor(ARootNode: IXMLNode): TProviderInfo;
+    class function ParseProductos(ARootNode: IXMLNode): TArray<TProductInfo>;
+    class function ParseTotales(ARootNode: IXMLNode): TInvoiceTotals;
   public
     class function Parse(const XMLContent: string): TParsedInvoice;
   end;
@@ -120,6 +134,171 @@ begin
   end;
 end;
 
+class function TXmlParserService.GetNodeAttributeValue(ANode: IXMLNode; const AAttributeName: string): string;
+var
+  LAttr: IXMLNode;
+begin
+  Result := '';
+  if ANode <> nil then
+  begin
+    LAttr := ANode.AttributeNodes.FindNode(AAttributeName);
+    if LAttr <> nil then
+      Result := LAttr.Text;
+  end;
+end;
+
+class function TXmlParserService.ParseProveedor(ARootNode: IXMLNode): TProviderInfo;
+var
+  SupplierNode, PartyNode, Node, AddressNode, TaxSchemeNode: IXMLNode;
+begin
+  Result := Default(TProviderInfo);
+  SupplierNode := FindNodeByLocalName(ARootNode, 'AccountingSupplierParty');
+  if SupplierNode = nil then
+    Exit;
+
+  PartyNode := FindNodeByLocalName(SupplierNode, 'Party');
+  if PartyNode = nil then
+    Exit;
+
+  // NIT y Tipo de identificación
+  TaxSchemeNode := FindNodeByLocalName(PartyNode, 'PartyTaxScheme');
+  if TaxSchemeNode <> nil then
+  begin
+    Node := FindNodeByLocalName(TaxSchemeNode, 'CompanyID');
+    if Node <> nil then
+    begin
+      Result.NIT := Node.Text;
+      Result.TipoIdentificacion := GetNodeAttributeValue(Node, 'schemeName');
+      if Result.TipoIdentificacion = '' then
+        Result.TipoIdentificacion := GetNodeAttributeValue(Node, 'schemeID');
+    end;
+    Result.NombreLegal := GetNodeTextByLocalName(TaxSchemeNode, 'RegistrationName');
+  end;
+
+  // Nombre
+  Node := FindNodeByLocalName(PartyNode, 'PartyName');
+  if Node <> nil then
+    Result.Nombre := GetNodeTextByLocalName(Node, 'Name');
+
+  Node := FindNodeByLocalName(PartyNode, 'PartyLegalEntity');
+  if Node <> nil then
+  begin
+    if Result.Nombre = '' then
+      Result.Nombre := GetNodeTextByLocalName(Node, 'RegistrationName');
+    if Result.NombreLegal = '' then
+      Result.NombreLegal := GetNodeTextByLocalName(Node, 'RegistrationName');
+  end;
+
+  // Direccion
+  AddressNode := FindNodeByLocalName(PartyNode, 'PhysicalLocation');
+  if AddressNode <> nil then
+    AddressNode := FindNodeByLocalName(AddressNode, 'Address');
+
+  if AddressNode = nil then
+  begin
+    if TaxSchemeNode <> nil then
+      AddressNode := FindNodeByLocalName(TaxSchemeNode, 'RegistrationAddress');
+  end;
+
+  if AddressNode <> nil then
+  begin
+    Node := FindNodeByLocalName(AddressNode, 'AddressLine');
+    if Node <> nil then
+      Result.Direccion := GetNodeTextByLocalName(Node, 'Line');
+  end;
+end;
+
+class function TXmlParserService.ParseProductos(ARootNode: IXMLNode): TArray<TProductInfo>;
+var
+  I, J: Integer;
+  LineNode, ItemNode, Node, TaxTotalNode, TaxSubtotalNode, TaxCategoryNode: IXMLNode;
+  ProductList: TList<TProductInfo>;
+  Product: TProductInfo;
+begin
+  ProductList := TList<TProductInfo>.Create;
+  try
+    for I := 0 to ARootNode.ChildNodes.Count - 1 do
+    begin
+      LineNode := ARootNode.ChildNodes[I];
+      if SameText(LineNode.LocalName, 'InvoiceLine') then
+      begin
+        Product := Default(TProductInfo);
+
+        Product.IDLinea := GetNodeTextByLocalName(LineNode, 'ID');
+
+        Node := FindNodeByLocalName(LineNode, 'InvoicedQuantity');
+        if Node <> nil then
+        begin
+          Product.Cantidad := GetNodeDoubleByLocalName(LineNode, 'InvoicedQuantity');
+          Product.Unidad := GetNodeAttributeValue(Node, 'unitCode');
+        end;
+
+        Product.ValorTotal := GetNodeDoubleByLocalName(LineNode, 'LineExtensionAmount');
+
+        // Impuestos de la linea
+        TaxTotalNode := FindNodeByLocalName(LineNode, 'TaxTotal');
+        if TaxTotalNode <> nil then
+        begin
+          Product.Impuesto := GetNodeDoubleByLocalName(TaxTotalNode, 'TaxAmount');
+          TaxSubtotalNode := FindNodeByLocalName(TaxTotalNode, 'TaxSubtotal');
+          if TaxSubtotalNode <> nil then
+          begin
+            TaxCategoryNode := FindNodeByLocalName(TaxSubtotalNode, 'TaxCategory');
+            if TaxCategoryNode <> nil then
+              Product.ImpuestoPorcentaje := GetNodeDoubleByLocalName(TaxCategoryNode, 'Percent');
+          end;
+        end;
+
+        ItemNode := FindNodeByLocalName(LineNode, 'Item');
+        if ItemNode <> nil then
+        begin
+          Product.Descripcion := GetNodeTextByLocalName(ItemNode, 'Description');
+
+          Node := FindNodeByLocalName(ItemNode, 'SellersItemIdentification');
+          if Node <> nil then
+            Product.Referencia := GetNodeTextByLocalName(Node, 'ID');
+
+          Node := FindNodeByLocalName(ItemNode, 'StandardItemIdentification');
+          if Node <> nil then
+            Product.ReferenciaEstandar := GetNodeTextByLocalName(Node, 'ID');
+        end;
+
+        // Valor Unitario
+        Node := FindNodeByLocalName(LineNode, 'Price');
+        if Node <> nil then
+        begin
+          Product.ValorUnitario := GetNodeDoubleByLocalName(Node, 'PriceAmount');
+          Product.PrecioBase := GetNodeDoubleByLocalName(Node, 'PriceAmount');
+        end;
+
+        ProductList.Add(Product);
+      end;
+    end;
+    Result := ProductList.ToArray;
+  finally
+    ProductList.Free;
+  end;
+end;
+
+class function TXmlParserService.ParseTotales(ARootNode: IXMLNode): TInvoiceTotals;
+var
+  LegalTotalNode, TaxTotalNode: IXMLNode;
+begin
+  Result := Default(TInvoiceTotals);
+  LegalTotalNode := FindNodeByLocalName(ARootNode, 'LegalMonetaryTotal');
+  if LegalTotalNode <> nil then
+  begin
+    Result.Subtotal := GetNodeDoubleByLocalName(LegalTotalNode, 'LineExtensionAmount');
+    Result.TaxExclusiveAmount := GetNodeDoubleByLocalName(LegalTotalNode, 'TaxExclusiveAmount');
+    Result.TaxInclusiveAmount := GetNodeDoubleByLocalName(LegalTotalNode, 'TaxInclusiveAmount');
+    Result.Total := GetNodeDoubleByLocalName(LegalTotalNode, 'PayableAmount');
+  end;
+
+  TaxTotalNode := FindNodeByLocalName(ARootNode, 'TaxTotal');
+  if TaxTotalNode <> nil then
+    Result.ImpuestoTotal := GetNodeDoubleByLocalName(TaxTotalNode, 'TaxAmount');
+end;
+
 class function TXmlParserService.Parse(const XMLContent: string): TParsedInvoice;
 var
   XMLDoc: IXMLDocument;
@@ -127,15 +306,6 @@ var
   AttachmentNode: IXMLNode;
   DescriptionNode: IXMLNode;
   InnerXML: string;
-  I, J: Integer;
-  ProductList: TList<TProductInfo>;
-  Product: TProductInfo;
-  LineNode: IXMLNode;
-  ItemNode: IXMLNode;
-  SupplierNode: IXMLNode;
-  PartyNode: IXMLNode;
-  TaxSchemeNode: IXMLNode;
-  Node, TaxTotalNode, LegalTotalNode, AddressNode: IXMLNode;
 begin
   Result := Default(TParsedInvoice);
   XMLDoc := CreateXMLDoc(XMLContent);
@@ -160,106 +330,9 @@ begin
     end;
   end;
 
-  // 1. Extract Provider Info
-  SupplierNode := FindNodeByLocalName(RootNode, 'AccountingSupplierParty');
-  if SupplierNode <> nil then
-  begin
-    PartyNode := FindNodeByLocalName(SupplierNode, 'Party');
-    if PartyNode <> nil then
-    begin
-      // NIT
-      TaxSchemeNode := FindNodeByLocalName(PartyNode, 'PartyTaxScheme');
-      if TaxSchemeNode <> nil then
-        Result.Provider.NIT := GetNodeTextByLocalName(TaxSchemeNode, 'CompanyID');
-
-      // Nombre
-      Node := FindNodeByLocalName(PartyNode, 'PartyName');
-      if Node <> nil then
-        Result.Provider.Nombre := GetNodeTextByLocalName(Node, 'Name');
-
-      if Result.Provider.Nombre = '' then
-      begin
-        Node := FindNodeByLocalName(PartyNode, 'PartyLegalEntity');
-        if Node <> nil then
-          Result.Provider.Nombre := GetNodeTextByLocalName(Node, 'RegistrationName');
-      end;
-
-      // Direccion
-      AddressNode := FindNodeByLocalName(PartyNode, 'PhysicalLocation');
-      if AddressNode <> nil then
-        AddressNode := FindNodeByLocalName(AddressNode, 'Address');
-
-      if AddressNode = nil then
-      begin
-        Node := FindNodeByLocalName(PartyNode, 'PartyTaxScheme');
-        if Node <> nil then
-          AddressNode := FindNodeByLocalName(Node, 'RegistrationAddress');
-      end;
-
-      if AddressNode <> nil then
-      begin
-        Node := FindNodeByLocalName(AddressNode, 'AddressLine');
-        if Node <> nil then
-          Result.Provider.Direccion := GetNodeTextByLocalName(Node, 'Line');
-      end;
-    end;
-  end;
-
-  // 2. Extract Products from InvoiceLine
-  ProductList := TList<TProductInfo>.Create;
-  try
-    for I := 0 to RootNode.ChildNodes.Count - 1 do
-    begin
-      LineNode := RootNode.ChildNodes[I];
-      if SameText(LineNode.LocalName, 'InvoiceLine') then
-      begin
-        Product := Default(TProductInfo);
-
-        // Cantidad
-        Product.Cantidad := GetNodeDoubleByLocalName(LineNode, 'InvoicedQuantity');
-
-        // Valor Total Linea
-        Product.ValorTotal := GetNodeDoubleByLocalName(LineNode, 'LineExtensionAmount');
-
-        // Impuestos de la linea
-        TaxTotalNode := FindNodeByLocalName(LineNode, 'TaxTotal');
-        if TaxTotalNode <> nil then
-          Product.Impuesto := GetNodeDoubleByLocalName(TaxTotalNode, 'TaxAmount');
-
-        ItemNode := FindNodeByLocalName(LineNode, 'Item');
-        if ItemNode <> nil then
-        begin
-          Product.Descripcion := GetNodeTextByLocalName(ItemNode, 'Description');
-
-          Node := FindNodeByLocalName(ItemNode, 'SellersItemIdentification');
-          if Node <> nil then
-            Product.Referencia := GetNodeTextByLocalName(Node, 'ID');
-        end;
-
-        // Valor Unitario
-        Node := FindNodeByLocalName(LineNode, 'Price');
-        if Node <> nil then
-          Product.ValorUnitario := GetNodeDoubleByLocalName(Node, 'PriceAmount');
-
-        ProductList.Add(Product);
-      end;
-    end;
-    Result.Products := ProductList.ToArray;
-  finally
-    ProductList.Free;
-  end;
-
-  // 3. Totales de la Factura
-  LegalTotalNode := FindNodeByLocalName(RootNode, 'LegalMonetaryTotal');
-  if LegalTotalNode <> nil then
-  begin
-    Result.Totals.Subtotal := GetNodeDoubleByLocalName(LegalTotalNode, 'LineExtensionAmount');
-    Result.Totals.Total := GetNodeDoubleByLocalName(LegalTotalNode, 'PayableAmount');
-  end;
-
-  TaxTotalNode := FindNodeByLocalName(RootNode, 'TaxTotal');
-  if TaxTotalNode <> nil then
-    Result.Totals.ImpuestoTotal := GetNodeDoubleByLocalName(TaxTotalNode, 'TaxAmount');
+  Result.Provider := ParseProveedor(RootNode);
+  Result.Products := ParseProductos(RootNode);
+  Result.Totals := ParseTotales(RootNode);
 end;
 
 end.
