@@ -26,6 +26,26 @@
 			"response": []
 		},
 		{
+			"name": "Listar Archivos XML",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:9000/xml/list",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "9000",
+					"path": [
+						"xml",
+						"list"
+					]
+				}
+			},
+			"response": []
+		},
+		{
 			"name": "Subir Archivo XML",
 			"request": {
 				"method": "POST",
