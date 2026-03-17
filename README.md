@@ -116,21 +116,32 @@ Extrae la información relevante (Proveedor y Productos) de un archivo XML previ
     "proveedor": {
       "nit": "860002536",
       "nombre": "COMPAÑIA COLOMBIANA DE CERAMICA S A S",
+      "nombreLegal": "COMPAÑIA COLOMBIANA DE CERAMICA S A S",
+      "tipoIdentificacion": "31",
       "direccion": "CL 100 8 A 55 TO C P 9"
     },
     "productos": [
       {
-        "descripcion": "LAVAMANOS ALUVIA 60 CM",
+        "idLinea": "1",
+        "descripcion": "LAVAMANOS ALUVIA 60 CM BNE EN CJ 7704372060916",
         "referencia": "O60691031",
-        "cantidad": 5.0,
+        "referenciaEstandar": "7704372060916",
+        "cantidad": 5,
+        "unidad": "94",
+        "precioBase": 277247.8,
         "valorUnitario": 277247.8,
-        "valorTotal": 1386239.0,
-        "impuesto": 263385.41
+        "valorTotal": 1386239,
+        "impuesto": 263385.41,
+        "porcentajeImpuesto": 19
       }
     ],
-    "subtotal": 1386239.0,
-    "impuestoTotal": 263385.41,
-    "total": 1649624.41
+    "totales": {
+      "subtotal": 1386239.0,
+      "taxExclusiveAmount": 1386239.0,
+      "taxInclusiveAmount": 1649624.41,
+      "impuestoTotal": 263385.41,
+      "total": 1649624.41
+    }
   }
   ```
 
