@@ -116,7 +116,7 @@ begin
   if LStr <> '' then
   begin
     LFormatSettings := TFormatSettings.Invariant;
-    TryTextToFloat(LStr.Replace(',', ''), Result, LFormatSettings);
+    TryStrToFloat(LStr.Replace(',', ''), Result, LFormatSettings);
   end;
 end;
 
