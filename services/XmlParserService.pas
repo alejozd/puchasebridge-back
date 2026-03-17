@@ -44,7 +44,7 @@ var
   LXMLDoc: TXMLDocument;
 begin
   LXMLDoc := TXMLDocument.Create(nil);
-  LXMLDoc.DOMVendor := GetDOMVendor('ADOM XML');
+  LXMLDoc.DOMVendor := GetDOMVendor(sAdom4XmlVendor);
   LXMLDoc.LoadFromXML(AXML);
   LXMLDoc.Active := True;
   Result := LXMLDoc;
