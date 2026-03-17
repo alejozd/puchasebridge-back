@@ -12,7 +12,8 @@ uses
   System.SysUtils,
   System.IOUtils,
   System.Classes,
-  Web.HTTPApp;
+  Web.HTTPApp,
+  Web.ReqFiles;
 
 procedure Upload(Req: THorseRequest; Res: THorseResponse; Next: TProc);
 var
