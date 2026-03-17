@@ -1,0 +1,85 @@
+{
+	"info": {
+		"_postman_id": "a1b2c3d4-e5f6-7890-abcd-1234567890ab",
+		"name": "PurchaseBridge",
+		"description": "Colección para pruebas de integración con Helisa y DIAN XML.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Ping",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:9000/ping",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "9000",
+					"path": [
+						"ping"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Validar Proveedor",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:9000/proveedor/860002536?anio=2026",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "9000",
+					"path": [
+						"proveedor",
+						"860002536"
+					],
+					"query": [
+						{
+							"key": "anio",
+							"value": "2026"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Procesar Factura XML",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/xml",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<Invoice xmlns:cac=\"urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2\" xmlns:cbc=\"urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2\" xmlns:ds=\"http://www.w3.org/2000/09/xmldsig#\" xmlns:ext=\"urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2\" xmlns:sts=\"dian:gov:co:facturaelectronica:Structures-2-1\" xmlns:xades=\"http://uri.etsi.org/01903/v1.3.2#\" xmlns:xades141=\"http://uri.etsi.org/01903/v1.4.1#\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">\n    <cbc:IssueDate>2026-05-22</cbc:IssueDate>\n    <cac:AccountingSupplierParty>\n        <cac:Party>\n            <cac:PartyTaxScheme>\n                <cbc:CompanyID schemeAgencyID=\"195\" schemeID=\"5\" schemeName=\"31\">860002536</cbc:CompanyID>\n            </cac:PartyTaxScheme>\n        </cac:Party>\n    </cac:AccountingSupplierParty>\n    <cac:InvoiceLine>\n        <cbc:ID>1</cbc:ID>\n        <cac:Item>\n            <cbc:Description>LAVAMANOS ALUVIA 60 CM BNE EN CJ 7704372060916</cbc:Description>\n            <cac:SellersItemIdentification>\n                <cbc:ID>O60691031</cbc:ID>\n            </cac:SellersItemIdentification>\n        </cac:Item>\n    </cac:InvoiceLine>\n</Invoice>"
+				},
+				"url": {
+					"raw": "http://localhost:9000/factura/xml",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "9000",
+					"path": [
+						"factura",
+						"xml"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

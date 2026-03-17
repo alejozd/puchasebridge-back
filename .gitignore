@@ -1,0 +1,40 @@
+# Archivos binarios de Delphi
+*.dcu
+*.exe
+*.dll
+*.bpl
+*.dcp
+*.ocx
+*.rsm
+
+# Archivos de compilación
+__history/
+__recovery/
+*.identcache
+*.local
+*.map
+*.dsk
+*.cfg
+*.bak
+*.tvsconfig
+*.stat
+*.log
+
+# Archivos generados
+*.res
+*.~*
+*.groupproj.local
+*.tvsconfig
+*.obj
+*.pch
+*.tds
+
+# Configuración de usuario en proyectos
+*.identcache
+*.local
+*.dproj.local
+*.bdsproj.local
+
+# Carpeta de salida
+Win32/
+Win64/

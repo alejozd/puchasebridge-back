@@ -1,0 +1,16 @@
+{
+	"name": "PurchaseBridge",
+	"description": "",
+	"version": "1.0.0",
+	"homepage": "",
+	"mainsrc": "./",
+	"projects": [],
+	"dependencies": {
+		"github.com/HashLoad/handle-exception": "^0.2.0",
+		"github.com/HashLoad/horse": "^3.1.9",
+		"github.com/HashLoad/horse-cors": "^1.0.7",
+		"github.com/HashLoad/horse-logger": "^2.0.9",
+		"github.com/HashLoad/horse-octet-stream": "^1.9.12",
+		"github.com/HashLoad/jhonson": "^1.2.1"
+	}
+}
