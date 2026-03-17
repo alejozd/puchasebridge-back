@@ -192,6 +192,7 @@ begin
       Exit;
     end;
 
+    LFileName := TPath.GetFileName(LFileName);
     LPath := TPath.Combine('PurchaseBridge', 'Input');
     LFullFile := TPath.Combine(LPath, LFileName);
 
@@ -231,23 +232,28 @@ begin
     end;
 
     LResponse := TJSONObject.Create;
-    LResponse.AddPair('success', TJSONBool.Create(True));
+    try
+      LResponse.AddPair('success', TJSONBool.Create(True));
 
-    LProveedorObj := TJSONObject.Create;
-    LProveedorObj.AddPair('nit', LParsedInvoice.Provider.NIT);
-    LResponse.AddPair('proveedor', LProveedorObj);
+      LProveedorObj := TJSONObject.Create;
+      LProveedorObj.AddPair('nit', LParsedInvoice.Provider.NIT);
+      LResponse.AddPair('proveedor', LProveedorObj);
 
-    LProductosArr := TJSONArray.Create;
-    for I := 0 to Length(LParsedInvoice.Products) - 1 do
-    begin
-      LProductoObj := TJSONObject.Create;
-      LProductoObj.AddPair('descripcion', LParsedInvoice.Products[I].Descripcion);
-      LProductoObj.AddPair('referencia', LParsedInvoice.Products[I].Referencia);
-      LProductosArr.AddElement(LProductoObj);
+      LProductosArr := TJSONArray.Create;
+      for I := 0 to Length(LParsedInvoice.Products) - 1 do
+      begin
+        LProductoObj := TJSONObject.Create;
+        LProductoObj.AddPair('descripcion', LParsedInvoice.Products[I].Descripcion);
+        LProductoObj.AddPair('referencia', LParsedInvoice.Products[I].Referencia);
+        LProductosArr.AddElement(LProductoObj);
+      end;
+      LResponse.AddPair('productos', LProductosArr);
+
+      Res.Send(LResponse);
+    except
+      LResponse.Free;
+      raise;
     end;
-    LResponse.AddPair('productos', LProductosArr);
-
-    Res.Send(LResponse);
   except
     on E: Exception do
     begin

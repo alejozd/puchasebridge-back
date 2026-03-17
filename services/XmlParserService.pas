@@ -7,6 +7,7 @@ uses
   System.Classes,
   System.Generics.Collections,
   Xml.XMLDoc,
+  Xml.adomxml,
   Xml.XMLIntf;
 
 type
@@ -66,6 +67,14 @@ class function TXmlParserService.Parse(const XMLContent: string): TParsedInvoice
 var
   XMLDoc: IXMLDocument;
   RootNode: IXMLNode;
+
+  function LoadXMLWithADOM(const AXML: string): IXMLDocument;
+  begin
+    Result := NewXMLDocument;
+    Result.DOMVendor := GetDOMVendor('ADOM XML');
+    Result.LoadFromXML(AXML);
+    Result.Active := True;
+  end;
   AttachmentNode: IXMLNode;
   DescriptionNode: IXMLNode;
   InnerXML: string;
@@ -80,8 +89,7 @@ var
   Node: IXMLNode;
 begin
   Result := Default(TParsedInvoice);
-  XMLDoc := LoadXMLData(XMLContent);
-  XMLDoc.Active := True;
+  XMLDoc := LoadXMLWithADOM(XMLContent);
   RootNode := XMLDoc.DocumentElement;
 
   // Handle AttachedDocument container
@@ -97,8 +105,7 @@ begin
         if InnerXML.Contains('<Invoice') then
         begin
           // Load the inner Invoice XML
-          XMLDoc := LoadXMLData(InnerXML);
-          XMLDoc.Active := True;
+          XMLDoc := LoadXMLWithADOM(InnerXML);
           RootNode := XMLDoc.DocumentElement;
         end;
       end;
