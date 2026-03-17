@@ -99,6 +99,32 @@ Retorna una lista de todos los archivos XML que han sido cargados en el servidor
   ]
   ```
 
+### 5. Parsear Archivo XML
+Extrae la información relevante (Proveedor y Productos) de un archivo XML previamente cargado en el servidor.
+
+- **POST** `/xml/parse`
+- **Body**:
+  ```json
+  {
+    "fileName": "factura.xml"
+  }
+  ```
+- **Respuesta**:
+  ```json
+  {
+    "success": true,
+    "proveedor": {
+      "nit": "860002536"
+    },
+    "productos": [
+      {
+        "descripcion": "LAVAMANOS ALUVIA 60 CM",
+        "referencia": "O60691031"
+      }
+    ]
+  }
+  ```
+
 ## Pruebas con Postman
 
 1. Importa el archivo `PurchaseBridge.postman_collection.json` en Postman.

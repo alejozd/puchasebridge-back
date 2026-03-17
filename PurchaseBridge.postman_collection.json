@@ -130,6 +130,36 @@
 				}
 			},
 			"response": []
+		},
+		{
+			"name": "Parsear Archivo XML",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"fileName\": \"ad086000253602726330020260314073312852.xml\"\n}"
+				},
+				"url": {
+					"raw": "http://localhost:9000/xml/parse",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "9000",
+					"path": [
+						"xml",
+						"parse"
+					]
+				}
+			},
+			"response": []
 		}
 	]
 }

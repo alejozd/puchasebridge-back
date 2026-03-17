@@ -16,7 +16,8 @@ uses
   System.Generics.Defaults,
   System.Types,
   Web.HTTPApp,
-  Web.ReqFiles;
+  Web.ReqFiles,
+  XmlParserService;
 
 type
   TFileInfo = record
@@ -168,10 +169,101 @@ begin
   end;
 end;
 
+procedure Parse(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+var
+  LBody: TJSONObject;
+  LFileName, LPath, LFullFile: string;
+  LXMLContent: string;
+  LParsedInvoice: TParsedInvoice;
+  LResponse: TJSONObject;
+  LProveedorObj: TJSONObject;
+  LProductosArr: TJSONArray;
+  LProductoObj: TJSONObject;
+  I: Integer;
+begin
+  try
+    LBody := Req.Body<TJSONObject>;
+    if (LBody = nil) or not LBody.TryGetValue('fileName', LFileName) then
+    begin
+      LResponse := TJSONObject.Create;
+      LResponse.AddPair('success', TJSONBool.Create(False));
+      LResponse.AddPair('message', 'fileName is required in the body');
+      Res.Status(400).Send(LResponse);
+      Exit;
+    end;
+
+    LPath := TPath.Combine('PurchaseBridge', 'Input');
+    LFullFile := TPath.Combine(LPath, LFileName);
+
+    if not TFile.Exists(LFullFile) then
+    begin
+      LResponse := TJSONObject.Create;
+      LResponse.AddPair('success', TJSONBool.Create(False));
+      LResponse.AddPair('message', 'Archivo no encontrado');
+      Res.Status(404).Send(LResponse);
+      Exit;
+    end;
+
+    try
+      LXMLContent := TFile.ReadAllText(LFullFile, TEncoding.UTF8);
+    except
+      on E: Exception do
+      begin
+        LResponse := TJSONObject.Create;
+        LResponse.AddPair('success', TJSONBool.Create(False));
+        LResponse.AddPair('message', 'Error reading file: ' + E.Message);
+        Res.Status(500).Send(LResponse);
+        Exit;
+      end;
+    end;
+
+    try
+      LParsedInvoice := TXmlParserService.Parse(LXMLContent);
+    except
+      on E: Exception do
+      begin
+        LResponse := TJSONObject.Create;
+        LResponse.AddPair('success', TJSONBool.Create(False));
+        LResponse.AddPair('message', 'XML inválido');
+        Res.Status(422).Send(LResponse);
+        Exit;
+      end;
+    end;
+
+    LResponse := TJSONObject.Create;
+    LResponse.AddPair('success', TJSONBool.Create(True));
+
+    LProveedorObj := TJSONObject.Create;
+    LProveedorObj.AddPair('nit', LParsedInvoice.Provider.NIT);
+    LResponse.AddPair('proveedor', LProveedorObj);
+
+    LProductosArr := TJSONArray.Create;
+    for I := 0 to Length(LParsedInvoice.Products) - 1 do
+    begin
+      LProductoObj := TJSONObject.Create;
+      LProductoObj.AddPair('descripcion', LParsedInvoice.Products[I].Descripcion);
+      LProductoObj.AddPair('referencia', LParsedInvoice.Products[I].Referencia);
+      LProductosArr.AddElement(LProductoObj);
+    end;
+    LResponse.AddPair('productos', LProductosArr);
+
+    Res.Send(LResponse);
+  except
+    on E: Exception do
+    begin
+      LResponse := TJSONObject.Create;
+      LResponse.AddPair('success', TJSONBool.Create(False));
+      LResponse.AddPair('message', 'Unexpected error: ' + E.Message);
+      Res.Status(500).Send(LResponse);
+    end;
+  end;
+end;
+
 procedure Registry;
 begin
   THorse.Get('/xml/list', List);
   THorse.Post('/xml/upload', Upload);
+  THorse.Post('/xml/parse', Parse);
 end;
 
 end.
