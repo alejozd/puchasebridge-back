@@ -8,6 +8,7 @@ uses
   System.Generics.Collections,
   Xml.XMLDoc,
   Xml.adomxmldom,
+  Xml.xmldom,
   Xml.XMLIntf;
 
 type
@@ -29,6 +30,7 @@ type
   private
     class function GetNodeText(ANode: IXMLNode; const NodeName: string): string;
     class function FindNodeRecursive(ANode: IXMLNode; const NodeName: string): IXMLNode;
+    class function CreateXMLDoc(const AXML: string): IXMLDocument;
   public
     class function Parse(const XMLContent: string): TParsedInvoice;
   end;
@@ -36,6 +38,17 @@ type
 implementation
 
 { TXmlParserService }
+
+class function TXmlParserService.CreateXMLDoc(const AXML: string): IXMLDocument;
+var
+  LXMLDoc: TXMLDocument;
+begin
+  LXMLDoc := TXMLDocument.Create(nil);
+  LXMLDoc.DOMVendor := GetDOMVendor('ADOM XML');
+  LXMLDoc.LoadFromXML(AXML);
+  LXMLDoc.Active := True;
+  Result := LXMLDoc;
+end;
 
 class function TXmlParserService.FindNodeRecursive(ANode: IXMLNode; const NodeName: string): IXMLNode;
 var
@@ -67,14 +80,6 @@ class function TXmlParserService.Parse(const XMLContent: string): TParsedInvoice
 var
   XMLDoc: IXMLDocument;
   RootNode: IXMLNode;
-
-  function LoadXMLWithADOM(const AXML: string): IXMLDocument;
-  begin
-    Result := NewXMLDocument;
-    Result.DOMVendor := GetDOMVendor('ADOM XML');
-    Result.LoadFromXML(AXML);
-    Result.Active := True;
-  end;
   AttachmentNode: IXMLNode;
   DescriptionNode: IXMLNode;
   InnerXML: string;
@@ -89,7 +94,7 @@ var
   Node: IXMLNode;
 begin
   Result := Default(TParsedInvoice);
-  XMLDoc := LoadXMLWithADOM(XMLContent);
+  XMLDoc := CreateXMLDoc(XMLContent);
   RootNode := XMLDoc.DocumentElement;
 
   // Handle AttachedDocument container
@@ -105,7 +110,7 @@ begin
         if InnerXML.Contains('<Invoice') then
         begin
           // Load the inner Invoice XML
-          XMLDoc := LoadXMLWithADOM(InnerXML);
+          XMLDoc := CreateXMLDoc(InnerXML);
           RootNode := XMLDoc.DocumentElement;
         end;
       end;
