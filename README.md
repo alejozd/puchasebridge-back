@@ -114,14 +114,23 @@ Extrae la información relevante (Proveedor y Productos) de un archivo XML previ
   {
     "success": true,
     "proveedor": {
-      "nit": "860002536"
+      "nit": "860002536",
+      "nombre": "COMPAÑIA COLOMBIANA DE CERAMICA S A S",
+      "direccion": "CL 100 8 A 55 TO C P 9"
     },
     "productos": [
       {
         "descripcion": "LAVAMANOS ALUVIA 60 CM",
-        "referencia": "O60691031"
+        "referencia": "O60691031",
+        "cantidad": 5.0,
+        "valorUnitario": 277247.8,
+        "valorTotal": 1386239.0,
+        "impuesto": 263385.41
       }
-    ]
+    ],
+    "subtotal": 1386239.0,
+    "impuestoTotal": 263385.41,
+    "total": 1649624.41
   }
   ```
 

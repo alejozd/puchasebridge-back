@@ -237,6 +237,8 @@ begin
 
       LProveedorObj := TJSONObject.Create;
       LProveedorObj.AddPair('nit', LParsedInvoice.Provider.NIT);
+      LProveedorObj.AddPair('nombre', LParsedInvoice.Provider.Nombre);
+      LProveedorObj.AddPair('direccion', LParsedInvoice.Provider.Direccion);
       LResponse.AddPair('proveedor', LProveedorObj);
 
       LProductosArr := TJSONArray.Create;
@@ -245,9 +247,17 @@ begin
         LProductoObj := TJSONObject.Create;
         LProductoObj.AddPair('descripcion', LParsedInvoice.Products[I].Descripcion);
         LProductoObj.AddPair('referencia', LParsedInvoice.Products[I].Referencia);
+        LProductoObj.AddPair('cantidad', TJSONNumber.Create(LParsedInvoice.Products[I].Cantidad));
+        LProductoObj.AddPair('valorUnitario', TJSONNumber.Create(LParsedInvoice.Products[I].ValorUnitario));
+        LProductoObj.AddPair('valorTotal', TJSONNumber.Create(LParsedInvoice.Products[I].ValorTotal));
+        LProductoObj.AddPair('impuesto', TJSONNumber.Create(LParsedInvoice.Products[I].Impuesto));
         LProductosArr.AddElement(LProductoObj);
       end;
       LResponse.AddPair('productos', LProductosArr);
+
+      LResponse.AddPair('subtotal', TJSONNumber.Create(LParsedInvoice.Totals.Subtotal));
+      LResponse.AddPair('impuestoTotal', TJSONNumber.Create(LParsedInvoice.Totals.ImpuestoTotal));
+      LResponse.AddPair('total', TJSONNumber.Create(LParsedInvoice.Totals.Total));
 
       Res.Send(LResponse);
     except
