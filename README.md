@@ -63,6 +63,22 @@ Analiza un XML de la DIAN y valida el proveedor y cada uno de los productos.
   }
   ```
 
+### 3. Subir Archivo XML
+Sube un archivo XML al servidor para su posterior procesamiento.
+
+- **POST** `/xml/upload`
+- **Body**: `multipart/form-data`
+  - `file`: Archivo XML a subir.
+- **Respuesta**:
+  ```json
+  {
+    "success": true,
+    "message": "XML uploaded successfully",
+    "fileName": "factura.xml",
+    "path": "PurchaseBridge/Input/factura.xml"
+  }
+  ```
+
 ## Pruebas con Postman
 
 1. Importa el archivo `PurchaseBridge.postman_collection.json` en Postman.
