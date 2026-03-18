@@ -10,11 +10,12 @@ uses
   Horse,
   System.JSON,
   System.SysUtils,
+  FireDAC.Comp.Client,
   ProductoRepository;
 
 procedure GetProductos(Req: THorseRequest; Res: THorseResponse; Next: TProc);
 var
-  LFiltro, LAnio: string;
+  LFiltro, LAnio, LLimiteStr: string;
   LLimite: Integer;
   LQ: TFDQuery;
   LResponse: TJSONObject;
@@ -34,7 +35,9 @@ begin
       Exit;
     end;
 
-    if not Req.Query.TryGetValue('limite', LLimite) then
+    if Req.Query.TryGetValue('limite', LLimiteStr) then
+      LLimite := StrToIntDef(LLimiteStr, 20)
+    else
       LLimite := 20;
 
     if not Req.Query.TryGetValue('anio', LAnio) then
@@ -62,9 +65,12 @@ begin
       Res.Send(LResponse);
     finally
       // Manual cleanup of both Query and its Connection (since it has no owner)
-      if Assigned(LQ.Connection) then
-        LQ.Connection.Free;
-      LQ.Free;
+      if Assigned(LQ) then
+      begin
+        if Assigned(LQ.Connection) then
+          LQ.Connection.Free;
+        LQ.Free;
+      end;
     end;
 
   except
