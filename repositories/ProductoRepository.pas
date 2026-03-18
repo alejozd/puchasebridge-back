@@ -20,8 +20,8 @@ var
   Q: TFDQuery;
   TableName: string;
 begin
-  Anio := ValidarAnio(Anio);
-  TableName := 'INMA' + Anio;
+  // Los productos en Helisa están en la tabla INMAXXXX (independiente del año)
+  TableName := 'INMAXXXX';
   
   Conn := CrearConexionParticular('0');
   Q := TFDQuery.Create(nil);
@@ -43,18 +43,11 @@ var
   TableName: string;
   LConn: TFDConnection;
 begin
-  TableName := 'INMA' + ValidarAnio(AAnio);
+  // Los productos en Helisa están en la tabla INMAXXXX (independiente del año)
+  TableName := 'INMAXXXX';
 
   Result := TFDQuery.Create(nil);
   try
-    // Para asegurar que la conexión se libere con el Query, debemos pasar el Query como Owner
-    // Pero CrearConexionParticular no permite pasar un Owner.
-    // Usaremos un truco común en Delphi: insertar el componente si no podemos pasarlo al constructor,
-    // pero eso requiere acceso a métodos protegidos o más complejidad.
-
-    // Mejor solución: Seguir el patrón de FirebirdConnection.pas y crear la conexión aquí mismo.
-    // Pero para no duplicar lógica de HConfig, usaré la conexión y la liberaré en el controller.
-
     LConn := CrearConexionParticular('0');
     Result.Connection := LConn;
 
