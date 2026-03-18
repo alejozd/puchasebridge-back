@@ -173,6 +173,10 @@ begin
                   LDetalles[J].VrIva := LParsedInvoice.Products[J].Impuesto;
                   LDetalles[J].TfDescuento := LParsedInvoice.Products[J].DescuentoPorcentaje;
                   LDetalles[J].VrDescuento := LParsedInvoice.Products[J].Descuento;
+                  LDetalles[J].VrIca := 0;
+                  LDetalles[J].VrReteIca := 0;
+                  LDetalles[J].VrReteIva := 0;
+                  LDetalles[J].VrReteFuente := 0;
                   LDetalles[J].Total := LDetalles[J].Cantidad * LDetalles[J].Precio;
 
                   LEquivalencia := BuscarEquivalencia(LParsedInvoice.Products[J].Referencia, LParsedInvoice.Products[J].Unidad);

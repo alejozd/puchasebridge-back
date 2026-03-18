@@ -27,7 +27,9 @@ uses
   XmlValidationController in 'controllers\XmlValidationController.pas',
   EquivalenciaController in 'controllers\EquivalenciaController.pas',
   HelisaController in 'controllers\HelisaController.pas',
-  DocumentosController in 'controllers\DocumentosController.pas';
+  DocumentosController in 'controllers\DocumentosController.pas',
+  AuthService in 'services\AuthService.pas',
+  AuthController in 'controllers\AuthController.pas';
 
 begin
   // Initialize configuration at startup
@@ -62,6 +64,7 @@ begin
   EquivalenciaController.Registry;
   HelisaController.Registry;
   DocumentosController.Registry;
+  AuthController.Registry;
 
   THorse.Listen(9000,
     procedure

@@ -12,6 +12,7 @@ type
     RutaArchivos: string;
     Servidor: string;
     Tipo: string;
+    Empresa: string;
   end;
 
   THConfig = class
@@ -33,7 +34,9 @@ implementation
 
 uses
   System.Win.Registry,
-  Winapi.Windows;
+  Winapi.Windows,
+  System.IniFiles,
+  System.IOUtils;
 
 { THConfig }
 
@@ -61,6 +64,8 @@ procedure THConfig.Load;
 var
   Reg: TRegistry;
   Clave: string;
+  Ini: TIniFile;
+  AppPath: string;
 begin
   Reg := TRegistry.Create(KEY_READ);
   try
@@ -77,6 +82,14 @@ begin
     FConfig.Tipo := Reg.ReadString('Tipo');
   finally
     Reg.Free;
+  end;
+
+  AppPath := TPath.GetDirectoryName(GetModuleName(HInstance));
+  Ini := TIniFile.Create(TPath.Combine(AppPath, 'config.ini'));
+  try
+    FConfig.Empresa := Ini.ReadString('HELISA', 'Empresa', '0');
+  finally
+    Ini.Free;
   end;
 end;
 

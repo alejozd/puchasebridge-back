@@ -36,6 +36,10 @@ type
     VrIva: Double;
     TfDescuento: Double;
     VrDescuento: Double;
+    VrIca: Double;
+    VrReteIca: Double;
+    VrReteIva: Double;
+    VrReteFuente: Double;
   end;
 
 function GuardarDocumento(AHeader: TDocumentoHeader; ADetalles: TArray<TDocumentoDetalle>): string;
@@ -125,6 +129,10 @@ begin
           LHEDetalles[I].VrIva := ADetalles[I].VrIva;
           LHEDetalles[I].TfDescuento := ADetalles[I].TfDescuento;
           LHEDetalles[I].VrDescuento := ADetalles[I].VrDescuento;
+          LHEDetalles[I].VrIca := ADetalles[I].VrIca;
+          LHEDetalles[I].VrReteIca := ADetalles[I].VrReteIca;
+          LHEDetalles[I].VrReteIva := ADetalles[I].VrReteIva;
+          LHEDetalles[I].VrReteFuente := ADetalles[I].VrReteFuente;
         end;
 
         LDocumentoERP := HelisaService.InsertarOrdenCompra(LHEHeader, LHEDetalles);
