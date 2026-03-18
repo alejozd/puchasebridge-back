@@ -10,7 +10,60 @@ uses
   Horse,
   System.JSON,
   System.SysUtils,
+  FireDAC.Comp.Client,
   EquivalenciaService;
+
+procedure List(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+var
+  LRefP, LUniP, LLimiteStr: string;
+  LLimite: Integer;
+  LQ: TFDQuery;
+  LResponse: TJSONObject;
+  LEquivalenciasArr: TJSONArray;
+  LEquivalenciaObj: TJSONObject;
+begin
+  try
+    if not Req.Query.TryGetValue('referenciaP', LRefP) then LRefP := '';
+    if not Req.Query.TryGetValue('unidadP', LUniP) then LUniP := '';
+
+    if Req.Query.TryGetValue('limite', LLimiteStr) then
+      LLimite := StrToIntDef(LLimiteStr, 50)
+    else
+      LLimite := 50;
+
+    LQ := EquivalenciaService.ListarEquivalencias(LRefP, LUniP, LLimite);
+    try
+      LResponse := TJSONObject.Create;
+      LEquivalenciasArr := TJSONArray.Create;
+
+      while not LQ.Eof do
+      begin
+        LEquivalenciaObj := TJSONObject.Create;
+        LEquivalenciaObj.AddPair('codigoH', TJSONNumber.Create(LQ.FieldByName('CODIGOH').AsInteger));
+        LEquivalenciaObj.AddPair('subcodigoH', TJSONNumber.Create(LQ.FieldByName('SUBCODIGOH').AsInteger));
+        LEquivalenciaObj.AddPair('nombreH', LQ.FieldByName('NOMBREH').AsString);
+        LEquivalenciaObj.AddPair('referenciaH', LQ.FieldByName('REFERENCIAH').AsString);
+        LEquivalenciaObj.AddPair('unidadH', LQ.FieldByName('UNIDADH').AsString);
+        LEquivalenciaObj.AddPair('referenciaP', LQ.FieldByName('REFERENCIAP').AsString);
+        LEquivalenciaObj.AddPair('unidadP', LQ.FieldByName('UNIDADP').AsString);
+        LEquivalenciaObj.AddPair('factor', TJSONNumber.Create(LQ.FieldByName('FACTOR').AsFloat));
+
+        LEquivalenciasArr.AddElement(LEquivalenciaObj);
+        LQ.Next;
+      end;
+
+      LResponse.AddPair('equivalencias', LEquivalenciasArr);
+      Res.Send(LResponse);
+    finally
+      LQ.Free;
+    end;
+  except
+    on E: Exception do
+    begin
+      Res.Status(500).Send(TJSONObject.Create.AddPair('error', E.Message));
+    end;
+  end;
+end;
 
 procedure Create(Req: THorseRequest; Res: THorseResponse; Next: TProc);
 var
@@ -117,9 +170,48 @@ begin
   end;
 end;
 
+procedure Delete(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+var
+  LRefP, LUniP: string;
+  LSuccess: Boolean;
+  LResponse: TJSONObject;
+begin
+  try
+    if not Req.Query.TryGetValue('referenciaP', LRefP) or LRefP.Trim.IsEmpty then
+    begin
+      Res.Status(400).Send(TJSONObject.Create.AddPair('error', 'El parámetro "referenciaP" es obligatorio'));
+      Exit;
+    end;
+
+    if not Req.Query.TryGetValue('unidadP', LUniP) or LUniP.Trim.IsEmpty then
+    begin
+      Res.Status(400).Send(TJSONObject.Create.AddPair('error', 'El parámetro "unidadP" es obligatorio'));
+      Exit;
+    end;
+
+    LSuccess := EquivalenciaService.EliminarEquivalencia(LRefP, LUniP);
+
+    LResponse := TJSONObject.Create;
+    LResponse.AddPair('success', LSuccess);
+    if LSuccess then
+      LResponse.AddPair('message', 'Equivalencia eliminada correctamente')
+    else
+      LResponse.AddPair('message', 'No se encontró la equivalencia para eliminar');
+
+    Res.Send(LResponse);
+  except
+    on E: Exception do
+    begin
+      Res.Status(500).Send(TJSONObject.Create.AddPair('error', E.Message));
+    end;
+  end;
+end;
+
 procedure Registry;
 begin
+  THorse.Get('/equivalencias', List);
   THorse.Post('/equivalencia', Create);
+  THorse.Delete('/equivalencia', Delete);
 end;
 
 end.

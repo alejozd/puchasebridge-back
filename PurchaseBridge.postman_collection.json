@@ -156,35 +156,6 @@
 					"path": [
 						"xml",
 						"parse"
-					]
-				}
-			},
-			"response": [
-				{
-					"name": "Respuesta Exitosa",
-					"originalRequest": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json",
-								"type": "text"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"fileName\": \"ad086000253602726330020260314073312852.xml\"\n}"
-						},
-						"url": {
-							"raw": "http://localhost:9000/xml/parse",
-							"protocol": "http",
-							"host": [
-								"localhost"
-							],
-							"port": "9000",
-							"path": [
-								"xml",
-								"parse"
 							]
 						}
 					},
@@ -378,6 +349,144 @@
 					],
 					"cookie": [],
 					"body": "{\n  \"success\": false,\n  \"message\": \"La equivalencia ya existe\"\n}"
+				}
+			]
+		},
+		{
+			"name": "Listar Equivalencias",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:9000/equivalencias?referenciaP=O60691031&limite=50",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "9000",
+					"path": [
+						"equivalencias"
+					],
+					"query": [
+						{
+							"key": "referenciaP",
+							"value": "O60691031"
+						},
+						{
+							"key": "limite",
+							"value": "50"
+						}
+					]
+				}
+			},
+			"response": [
+				{
+					"name": "Éxito",
+					"originalRequest": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:9000/equivalencias?referenciaP=O60691031&limite=50",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "9000",
+							"path": [
+								"equivalencias"
+							],
+							"query": [
+								{
+									"key": "referenciaP",
+									"value": "O60691031"
+								},
+								{
+									"key": "limite",
+									"value": "50"
+								}
+							]
+						}
+					},
+					"status": "OK",
+					"code": 200,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n    \"equivalencias\": [\n        {\n            \"codigoH\": 4032,\n            \"subcodigoH\": 1,\n            \"nombreH\": \"LAVAMANOS MARSELLA\",\n            \"referenciaH\": \"O23011001\",\n            \"unidadH\": \"MTR\",\n            \"referenciaP\": \"O60691031\",\n            \"unidadP\": \"94\",\n            \"factor\": 1.4\n        }\n    ]\n}"
+				}
+			]
+		},
+		{
+			"name": "Eliminar Equivalencia",
+			"request": {
+				"method": "DELETE",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:9000/equivalencia?referenciaP=O60691031&unidadP=94",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "9000",
+					"path": [
+						"equivalencia"
+					],
+					"query": [
+						{
+							"key": "referenciaP",
+							"value": "O60691031"
+						},
+						{
+							"key": "unidadP",
+							"value": "94"
+						}
+					]
+				}
+			},
+			"response": [
+				{
+					"name": "Éxito",
+					"originalRequest": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:9000/equivalencia?referenciaP=O60691031&unidadP=94",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "9000",
+							"path": [
+								"equivalencia"
+							],
+							"query": [
+								{
+									"key": "referenciaP",
+									"value": "O60691031"
+								},
+								{
+									"key": "unidadP",
+									"value": "94"
+								}
+							]
+						}
+					},
+					"status": "OK",
+					"code": 200,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n    \"success\": true,\n    \"message\": \"Equivalencia eliminada correctamente\"\n}"
 				}
 			]
 		},

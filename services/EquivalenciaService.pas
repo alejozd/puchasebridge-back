@@ -23,6 +23,10 @@ procedure CrearEquivalencia(
 );
 function ObtenerEquivalenciaJSON(AReferenciaP: string; AUnidadP: string): string;
 
+// Nuevas funciones
+function ListarEquivalencias(const AReferenciaP, AUnidadP: string; ALimite: Integer): TFDQuery;
+function EliminarEquivalencia(const AReferenciaP, AUnidadP: string): Boolean;
+
 implementation
 
 function BuscarEquivalencia(AReferenciaP: string; AUnidadP: string): TFDQuery;
@@ -113,6 +117,52 @@ begin
         JSON.Free;
       end;
     end;
+  finally
+    Q.Free;
+  end;
+end;
+
+function ListarEquivalencias(const AReferenciaP, AUnidadP: string; ALimite: Integer): TFDQuery;
+var
+  SQL: string;
+begin
+  Result := GetBridgeQuery;
+  try
+    SQL := 'SELECT FIRST :LIMIT * FROM EQUIVALENCIA WHERE 1=1';
+
+    if not AReferenciaP.Trim.IsEmpty then
+      SQL := SQL + ' AND REFERENCIAP = :REFP';
+
+    if not AUnidadP.Trim.IsEmpty then
+      SQL := SQL + ' AND UNIDADP = :UNIP';
+
+    Result.SQL.Text := SQL;
+    Result.ParamByName('LIMIT').AsInteger := ALimite;
+
+    if not AReferenciaP.Trim.IsEmpty then
+      Result.ParamByName('REFP').AsString := AReferenciaP;
+
+    if not AUnidadP.Trim.IsEmpty then
+      Result.ParamByName('UNIP').AsString := AUnidadP;
+
+    Result.Open;
+  except
+    Result.Free;
+    raise;
+  end;
+end;
+
+function EliminarEquivalencia(const AReferenciaP, AUnidadP: string): Boolean;
+var
+  Q: TFDQuery;
+begin
+  Q := GetBridgeQuery;
+  try
+    Q.SQL.Text := 'DELETE FROM EQUIVALENCIA WHERE REFERENCIAP = :REFP AND UNIDADP = :UNIP';
+    Q.ParamByName('REFP').AsString := AReferenciaP;
+    Q.ParamByName('UNIP').AsString := AUnidadP;
+    Q.ExecSQL;
+    Result := Q.RowsAffected > 0;
   finally
     Q.Free;
   end;
