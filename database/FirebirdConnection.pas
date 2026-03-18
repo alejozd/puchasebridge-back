@@ -30,8 +30,6 @@ begin
   // Cargar credenciales desde variables de entorno.
   // Los valores hardcodeados se han eliminado para evitar fallos de CI (GitGuardian).
   User := GetEnvironmentVariable('HELISA_DB_USER');
-  if User = '' then User := 'HELISAADMON';
-
   Pass := GetEnvironmentVariable('HELISA_DB_PASS');
 
   Result := TFDConnection.Create(nil);
@@ -63,8 +61,6 @@ begin
   Config := THConfig.GetInstance.Config;
 
   User := GetEnvironmentVariable('HELISA_DB_USER');
-  if User = '' then User := 'HELISAADMON';
-
   Pass := GetEnvironmentVariable('HELISA_DB_PASS');
 
   Result := TFDConnection.Create(nil);
@@ -105,8 +101,6 @@ begin
   if Path = '' then Path := 'F:\Proyectos\delphi_backend\purchasebridge\backend\database\purchasebridge.fdb';
 
   User := GetEnvironmentVariable('BRIDGE_DB_USER');
-  if User = '' then User := 'SYSDBA';
-
   Pass := GetEnvironmentVariable('BRIDGE_DB_PASS');
 
   Result := TFDConnection.Create(nil);
@@ -131,7 +125,6 @@ var
 begin
   Config := THConfig.GetInstance.Config;
   User := GetEnvironmentVariable('HELISA_DB_USER');
-  if User = '' then User := 'HELISAADMON';
   Pass := GetEnvironmentVariable('HELISA_DB_PASS');
 
   Result := TFDQuery.Create(nil);
@@ -167,7 +160,6 @@ begin
     Path := GetEnvironmentVariable('BRIDGE_DB_PATH');
     if Path = '' then Path := 'F:\Proyectos\delphi_backend\purchasebridge\backend\database\purchasebridge.fdb';
     User := GetEnvironmentVariable('BRIDGE_DB_USER');
-    if User = '' then User := 'SYSDBA';
     Pass := GetEnvironmentVariable('BRIDGE_DB_PASS');
 
     Conn.DriverName := 'FB';
