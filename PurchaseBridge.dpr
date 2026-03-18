@@ -18,12 +18,14 @@ uses
   XmlParserService in 'services\XmlParserService.pas',
   EquivalenciaService in 'services\EquivalenciaService.pas',
   ValidationService in 'services\ValidationService.pas',
+  DocumentoService in 'services\DocumentoService.pas',
   ImportController in 'controllers\ImportController.pas',
   ProveedorController in 'controllers\ProveedorController.pas',
   XmlController in 'controllers\XmlController.pas',
   XmlValidationController in 'controllers\XmlValidationController.pas',
   EquivalenciaController in 'controllers\EquivalenciaController.pas',
-  HelisaController in 'controllers\HelisaController.pas';
+  HelisaController in 'controllers\HelisaController.pas',
+  DocumentosController in 'controllers\DocumentosController.pas';
 
 begin
   // Initialize configuration at startup
@@ -57,6 +59,7 @@ begin
   XmlValidationController.Registry;
   EquivalenciaController.Registry;
   HelisaController.Registry;
+  DocumentosController.Registry;
 
   THorse.Listen(9000,
     procedure
