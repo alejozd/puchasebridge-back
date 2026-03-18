@@ -30,10 +30,10 @@ begin
     LQUser.Open;
 
     if LQUser.IsEmpty then
-      raise EHorseException.Create(THTTPStatus.Unauthorized, 'Usuario no encontrado');
+      raise EHorseException.New.Status(THTTPStatus.Unauthorized).Error('Usuario no encontrado');
 
     if LQUser.FieldByName('CLAVE').AsString <> AClave then
-      raise EHorseException.Create(THTTPStatus.Unauthorized, 'Clave incorrecta');
+      raise EHorseException.New.Status(THTTPStatus.Unauthorized).Error('Clave incorrecta');
 
     LUserObj := TJSONObject.Create;
     LUserObj.AddPair('codigo', TJSONNumber.Create(LQUser.FieldByName('CODIGO').AsInteger));

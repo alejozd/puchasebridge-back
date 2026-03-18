@@ -21,10 +21,10 @@ begin
   try
     LBody := Req.Body<TJSONObject>;
     if not Assigned(LBody) then
-      raise EHorseException.Create(THTTPStatus.BadRequest, 'Cuerpo de solicitud inválido');
+      raise EHorseException.New.Status(THTTPStatus.BadRequest).Error('Cuerpo de solicitud inválido');
 
     if not LBody.TryGetValue('usuario', LUsuario) or not LBody.TryGetValue('clave', LClave) then
-      raise EHorseException.Create(THTTPStatus.BadRequest, 'Parámetros "usuario" y "clave" son obligatorios');
+      raise EHorseException.New.Status(THTTPStatus.BadRequest).Error('Parámetros "usuario" y "clave" son obligatorios');
 
     LResponse := AuthService.Login(LUsuario, LClave);
     Res.Send<TJSONObject>(LResponse);
