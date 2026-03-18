@@ -16,6 +16,7 @@ uses
   ProductoRepository in 'repositories\ProductoRepository.pas',
   XMLFacturaService in 'services\XMLFacturaService.pas',
   XmlParserService in 'services\XmlParserService.pas',
+  EquivalenciaService in 'services\EquivalenciaService.pas',
   ValidationService in 'services\ValidationService.pas',
   ImportController in 'controllers\ImportController.pas',
   ProveedorController in 'controllers\ProveedorController.pas',
