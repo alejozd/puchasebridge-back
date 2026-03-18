@@ -11,6 +11,7 @@ uses
   System.JSON,
   System.SysUtils,
   System.IOUtils,
+  System.Generics.Collections,
   XmlParserService,
   ValidationService;
 
@@ -63,35 +64,29 @@ begin
   end;
 end;
 
-procedure Validate(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+function InternalValidateFile(const AFileName: string): TJSONObject;
 var
-  LBody: TJSONObject;
-  LFileName, LPath, LFullFile, LXMLContent, LParsedJSONStr, LValidationResult: string;
+  LPath, LFullFile, LXMLContent, LParsedJSONStr, LValidationResult: string;
   LParsedInvoice: TParsedInvoice;
-  LErrorResponse: TJSONObject;
+  LResultJSON: TJSONObject;
+  LErroresArray: TJSONArray;
+  LVal: TJSONValue;
 begin
   try
-    LBody := Req.Body<TJSONObject>;
-    if (LBody = nil) or not LBody.TryGetValue('fileName', LFileName) then
-    begin
-      LErrorResponse := TJSONObject.Create;
-      LErrorResponse.AddPair('success', TJSONBool.Create(False));
-      LErrorResponse.AddPair('message', 'fileName is required in the body');
-      Res.Status(400).Send(LErrorResponse);
-      Exit;
-    end;
-
-    LFileName := TPath.GetFileName(LFileName);
     LPath := TPath.Combine('PurchaseBridge', 'Input');
-    LFullFile := TPath.Combine(LPath, LFileName);
+    LFullFile := TPath.Combine(LPath, AFileName);
 
     if not TFile.Exists(LFullFile) then
     begin
-      LErrorResponse := TJSONObject.Create;
-      LErrorResponse.AddPair('success', TJSONBool.Create(False));
-      LErrorResponse.AddPair('message', 'Archivo no encontrado');
-      Res.Status(404).Send(LErrorResponse);
-      Exit;
+      LResultJSON := TJSONObject.Create;
+      LResultJSON.AddPair('fileName', AFileName);
+      LResultJSON.AddPair('valido', TJSONBool.Create(False));
+      LResultJSON.AddPair('requiereHomologacion', TJSONBool.Create(False));
+      LResultJSON.AddPair('proveedorExiste', TJSONBool.Create(False));
+      LErroresArray := TJSONArray.Create;
+      LErroresArray.Add('Archivo no encontrado');
+      LResultJSON.AddPair('errores', LErroresArray);
+      Exit(LResultJSON);
     end;
 
     try
@@ -99,11 +94,15 @@ begin
     except
       on E: Exception do
       begin
-        LErrorResponse := TJSONObject.Create;
-        LErrorResponse.AddPair('success', TJSONBool.Create(False));
-        LErrorResponse.AddPair('message', 'Error reading file: ' + E.Message);
-        Res.Status(500).Send(LErrorResponse);
-        Exit;
+        LResultJSON := TJSONObject.Create;
+        LResultJSON.AddPair('fileName', AFileName);
+        LResultJSON.AddPair('valido', TJSONBool.Create(False));
+        LResultJSON.AddPair('requiereHomologacion', TJSONBool.Create(False));
+        LResultJSON.AddPair('proveedorExiste', TJSONBool.Create(False));
+        LErroresArray := TJSONArray.Create;
+        LErroresArray.Add('Error al leer el archivo: ' + E.Message);
+        LResultJSON.AddPair('errores', LErroresArray);
+        Exit(LResultJSON);
       end;
     end;
 
@@ -113,40 +112,162 @@ begin
     except
       on E: Exception do
       begin
-        LErrorResponse := TJSONObject.Create;
-        LErrorResponse.AddPair('success', TJSONBool.Create(False));
-        LErrorResponse.AddPair('message', 'XML inválido o error en parseo: ' + E.Message);
-        Res.Status(422).Send(LErrorResponse);
-        Exit;
+        LResultJSON := TJSONObject.Create;
+        LResultJSON.AddPair('fileName', AFileName);
+        LResultJSON.AddPair('valido', TJSONBool.Create(False));
+        LResultJSON.AddPair('requiereHomologacion', TJSONBool.Create(False));
+        LResultJSON.AddPair('proveedorExiste', TJSONBool.Create(False));
+        LErroresArray := TJSONArray.Create;
+        LErroresArray.Add('XML inválido o error en parseo: ' + E.Message);
+        LResultJSON.AddPair('errores', LErroresArray);
+        Exit(LResultJSON);
       end;
     end;
 
     try
       LValidationResult := ValidarDocumento(LParsedJSONStr);
-      Res.Send<TJSONObject>(TJSONObject.ParseJSONValue(LValidationResult) as TJSONObject);
+      LVal := TJSONObject.ParseJSONValue(LValidationResult);
+      if LVal is TJSONObject then
+      begin
+        LResultJSON := LVal as TJSONObject;
+        LResultJSON.AddPair('fileName', AFileName);
+      end
+      else
+      begin
+        if Assigned(LVal) then LVal.Free;
+        LResultJSON := TJSONObject.Create;
+        LResultJSON.AddPair('fileName', AFileName);
+        LResultJSON.AddPair('valido', TJSONBool.Create(False));
+        LResultJSON.AddPair('requiereHomologacion', TJSONBool.Create(False));
+        LResultJSON.AddPair('proveedorExiste', TJSONBool.Create(False));
+        LErroresArray := TJSONArray.Create;
+        LErroresArray.Add('Error al procesar el resultado de validación');
+        LResultJSON.AddPair('errores', LErroresArray);
+      end;
+      Result := LResultJSON;
     except
       on E: Exception do
       begin
-        LErrorResponse := TJSONObject.Create;
-        LErrorResponse.AddPair('success', TJSONBool.Create(False));
-        LErrorResponse.AddPair('message', 'Error en validación: ' + E.Message);
-        Res.Status(500).Send(LErrorResponse);
+        LResultJSON := TJSONObject.Create;
+        LResultJSON.AddPair('fileName', AFileName);
+        LResultJSON.AddPair('valido', TJSONBool.Create(False));
+        LResultJSON.AddPair('requiereHomologacion', TJSONBool.Create(False));
+        LResultJSON.AddPair('proveedorExiste', TJSONBool.Create(False));
+        LErroresArray := TJSONArray.Create;
+        LErroresArray.Add('Error en validación: ' + E.Message);
+        LResultJSON.AddPair('errores', LErroresArray);
+        Result := LResultJSON;
       end;
     end;
   except
     on E: Exception do
     begin
-      LErrorResponse := TJSONObject.Create;
-      LErrorResponse.AddPair('success', TJSONBool.Create(False));
-      LErrorResponse.AddPair('message', 'Unexpected error: ' + E.Message);
-      Res.Status(500).Send(LErrorResponse);
+      LResultJSON := TJSONObject.Create;
+      LResultJSON.AddPair('fileName', AFileName);
+      LResultJSON.AddPair('valido', TJSONBool.Create(False));
+      LResultJSON.AddPair('requiereHomologacion', TJSONBool.Create(False));
+      LResultJSON.AddPair('proveedorExiste', TJSONBool.Create(False));
+      LErroresArray := TJSONArray.Create;
+      LErroresArray.Add('Error inesperado: ' + E.Message);
+      LResultJSON.AddPair('errores', LErroresArray);
+      Result := LResultJSON;
     end;
+  end;
+end;
+
+procedure Validate(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+var
+  LBody: TJSONObject;
+  LFileName: string;
+  LResultJSON: TJSONObject;
+begin
+  LBody := Req.Body<TJSONObject>;
+  if (LBody = nil) or not LBody.TryGetValue('fileName', LFileName) then
+  begin
+    LResultJSON := TJSONObject.Create;
+    LResultJSON.AddPair('success', TJSONBool.Create(False));
+    LResultJSON.AddPair('message', 'fileName is required in the body');
+    Res.Status(400).Send(LResultJSON);
+    Exit;
+  end;
+
+  LFileName := TPath.GetFileName(LFileName);
+  LResultJSON := InternalValidateFile(LFileName);
+
+  // To preserve original behavior where some errors result in different HTTP status codes,
+  // we would need more detailed return from InternalValidateFile.
+  // For now, let's keep it consistent with the batch behavior which returns results in a list.
+  Res.Send<TJSONObject>(LResultJSON);
+end;
+
+procedure ValidateBatch(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+var
+  LBody: TJSONObject;
+  LFilesArr: TJSONArray;
+  LFiles: TStringList;
+  LFileName, LPath: string;
+  LOutputJSON, LSummary: TJSONObject;
+  LDocumentsArr: TJSONArray;
+  LResultDoc: TJSONObject;
+  LValido, LProveedorExiste: Boolean;
+  LTotal, LValidos, LConErrores: Integer;
+  I: Integer;
+begin
+  LFiles := TStringList.Create;
+  try
+    LBody := Req.Body<TJSONObject>;
+    if Assigned(LBody) and LBody.TryGetValue('files', LFilesArr) then
+    begin
+      for I := 0 to LFilesArr.Count - 1 do
+        LFiles.Add(TPath.GetFileName(LFilesArr.Items[I].Value));
+    end
+    else
+    begin
+      // Take all XML files from Input folder
+      LPath := TPath.Combine('PurchaseBridge', 'Input');
+      if TDirectory.Exists(LPath) then
+      begin
+        for LFileName in TDirectory.GetFiles(LPath, '*.xml') do
+          LFiles.Add(TPath.GetFileName(LFileName));
+      end;
+    end;
+
+    LOutputJSON := TJSONObject.Create;
+    LDocumentsArr := TJSONArray.Create;
+    LTotal := LFiles.Count;
+    LValidos := 0;
+    LConErrores := 0;
+
+    for I := 0 to LFiles.Count - 1 do
+    begin
+      LResultDoc := InternalValidateFile(LFiles[I]);
+
+      if LResultDoc.TryGetValue('valido', LValido) and LValido then
+        Inc(LValidos)
+      else
+        Inc(LConErrores);
+
+      LDocumentsArr.Add(LResultDoc);
+    end;
+
+    LOutputJSON.AddPair('documentos', LDocumentsArr);
+
+    LSummary := TJSONObject.Create;
+    LSummary.AddPair('total', TJSONNumber.Create(LTotal));
+    LSummary.AddPair('validos', TJSONNumber.Create(LValidos));
+    LSummary.AddPair('conErrores', TJSONNumber.Create(LConErrores));
+    LOutputJSON.AddPair('resumen', LSummary);
+
+    Res.Send<TJSONObject>(LOutputJSON);
+  finally
+    LFiles.Free;
   end;
 end;
 
 procedure Registry;
 begin
   THorse.Post('/xml/validate', Validate);
+  THorse.Post('/xml/validate/batch', ValidateBatch);
 end;
 
 end.
