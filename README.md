@@ -17,6 +17,27 @@ El objetivo principal es procesar facturas electrónicas de la DIAN (Colombia) e
 - **Boss** (Dependency Manager para Delphi).
 - **Firebird 3.0+**.
 
+## Configuración del Sistema
+
+Para evitar la exposición de credenciales sensibles, el sistema utiliza un archivo de configuración `config.ini` que debe ubicarse en la misma carpeta que el ejecutable.
+
+### Archivo config.ini
+
+Crea un archivo llamado `config.ini` con la siguiente estructura:
+
+```ini
+[HELISA]
+User=HELISAADMON
+Pass=tu_password_helisa
+
+[BRIDGE]
+User=SYSDBA
+Pass=tu_password_bridge
+Path=F:\Proyectos\delphi_backend\purchasebridge\backend\database\purchasebridge.fdb
+```
+
+> **Nota:** El archivo `config.ini` está incluido en el `.gitignore` para prevenir que tus contraseñas se suban al repositorio.
+
 ## Estructura del Proyecto
 
 - `config/`: Gestión de configuración (Singleton).

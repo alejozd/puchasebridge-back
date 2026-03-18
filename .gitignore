@@ -38,3 +38,6 @@ __recovery/
 # Carpeta de salida
 Win32/
 Win64/
+
+# Configuración sensible local
+config.ini

@@ -10,6 +10,7 @@ uses
   ProveedorRepository; // For ValidarAnio
 
 function ExisteProducto(Referencia, Nombre, Anio: string): Boolean;
+function BuscarProductos(const AFiltro: string; ALimite: Integer; const AAnio: string): TFDQuery;
 
 implementation
 
@@ -19,8 +20,8 @@ var
   Q: TFDQuery;
   TableName: string;
 begin
-  Anio := ValidarAnio(Anio);
-  TableName := 'INMA' + Anio;
+  // Los productos en Helisa están en la tabla INMAXXXX (independiente del año)
+  TableName := 'INMAXXXX';
   
   Conn := CrearConexionParticular('0');
   Q := TFDQuery.Create(nil);
@@ -34,6 +35,38 @@ begin
   finally
     Q.Free;
     Conn.Free;
+  end;
+end;
+
+function BuscarProductos(const AFiltro: string; ALimite: Integer; const AAnio: string): TFDQuery;
+var
+  TableName: string;
+  LConn: TFDConnection;
+begin
+  // Los productos en Helisa están en la tabla INMAXXXX (independiente del año)
+  TableName := 'INMAXXXX';
+
+  Result := TFDQuery.Create(nil);
+  try
+    LConn := CrearConexionParticular('0');
+    Result.Connection := LConn;
+
+    // Firebird 3.0+ uses FIRST SKIP or ROWS to limit
+    // NOTA: Se usa SUBCODIGO como UNIDAD temporalmente mientras se determina el campo real de unidad.
+    Result.SQL.Text := Format(
+      'SELECT FIRST :LIMIT CODIGO, SUBCODIGO, NOMBRE, REFERENCIA, SUBCODIGO as UNIDAD ' +
+      'FROM %s ' +
+      'WHERE NOMBRE LIKE :FILTRO OR REFERENCIA LIKE :FILTRO ' +
+      'ORDER BY NOMBRE', [TableName]);
+
+    Result.ParamByName('LIMIT').AsInteger := ALimite;
+    Result.ParamByName('FILTRO').AsString := '%' + AFiltro.ToUpper + '%';
+    Result.Open;
+  except
+    if Assigned(Result.Connection) then
+      Result.Connection.Free;
+    Result.Free;
+    raise;
   end;
 end;
 
