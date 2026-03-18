@@ -33,23 +33,49 @@ Debes configurar las siguientes variables en tu servidor o entorno de desarrollo
 
 ### Cómo configurar las variables
 
-#### Windows (CMD)
+Tienes dos formas principales de configurar estas variables:
+
+#### Opción 1: Variables de Entorno del Sistema (Recomendado)
+
+Esta opción es la más segura y es la que utiliza actualmente `GetEnvironmentVariable`.
+
+**Windows (CMD):**
 ```cmd
+setx HELISA_DB_USER "HELISAADMON"
 setx HELISA_DB_PASS "tu_password"
+setx BRIDGE_DB_USER "SYSDBA"
 setx BRIDGE_DB_PASS "tu_password"
 setx BRIDGE_DB_PATH "F:\Proyectos\...\purchasebridge.fdb"
 ```
 *Nota: Es necesario reiniciar el IDE o la terminal para que los cambios surtan efecto.*
 
-#### Windows (PowerShell)
+**Windows (PowerShell):**
 ```powershell
 [System.Environment]::SetEnvironmentVariable('HELISA_DB_PASS', 'tu_password', 'User')
 ```
 
-#### Linux / Bash
+**Linux / Bash:**
 ```bash
 export HELISA_DB_PASS='tu_password'
 ```
+
+#### Opción 2: Archivo .env (Para Desarrollo)
+
+Si prefieres usar un archivo `.env` en la raíz del proyecto, debes crear un archivo llamado `.env` (sin extensión) con el siguiente contenido:
+
+```ini
+HELISA_DB_USER=HELISAADMON
+HELISA_DB_PASS=tu_password_helisa
+BRIDGE_DB_USER=SYSDBA
+BRIDGE_DB_PASS=tu_password_bridge
+BRIDGE_DB_PATH=F:\Proyectos\delphi_backend\purchasebridge\backend\database\purchasebridge.fdb
+```
+
+> **Importante:** Para que Delphi lea este archivo automáticamente mediante `GetEnvironmentVariable`, se recomienda instalar la librería `dotenv-delphi` vía Boss:
+> ```bash
+> boss install github.com/hashload/dotenv
+> ```
+> Y cargarla en el `.dpr` al inicio: `TDotEnv.Load;`
 
 ## Estructura del Proyecto
 
