@@ -6,6 +6,7 @@ uses
   System.SysUtils,
   System.Classes,
   System.Generics.Collections,
+  System.DateUtils,
   Xml.XMLDoc,
   Xml.adomxmldom,
   Xml.xmldom,
@@ -354,8 +355,12 @@ begin
   DescriptionNode := FindNodeByLocalName(RootNode, 'IssueDate');
   if DescriptionNode <> nil then
   begin
-    if not TryStrToDate(DescriptionNode.Text, Result.FechaEmision, TFormatSettings.Invariant) then
-       Result.FechaEmision := Now;
+    try
+      Result.FechaEmision := ISO8601ToDate(DescriptionNode.Text);
+    except
+      if not TryStrToDate(DescriptionNode.Text, Result.FechaEmision, TFormatSettings.Invariant) then
+         Result.FechaEmision := Now;
+    end;
   end
   else
     Result.FechaEmision := Now;

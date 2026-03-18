@@ -5,15 +5,39 @@ interface
 uses
   System.JSON,
   System.SysUtils,
+  System.Generics.Collections,
+  System.SyncObjs,
   Horse,
   FireDAC.Comp.Client,
   FireDAC.Stan.Param,
   FirebirdConnection,
   HConfig;
 
+type
+  TSessionInfo = record
+    Codigo: Integer;
+    Nombre: string;
+  end;
+
+  TSessionInfoObj = class
+  public
+    Data: TSessionInfo;
+    constructor Create(AData: TSessionInfo);
+  end;
+
 function Login(const AUsuario, AClave: string): TJSONObject;
+function ValidateToken(const AToken: string): TSessionInfo;
 
 implementation
+
+var
+  Sessions: TDictionary<string, TSessionInfo>;
+  SessionLock: TCriticalSection;
+
+constructor TSessionInfoObj.Create(AData: TSessionInfo);
+begin
+  Data := AData;
+end;
 
 function Login(const AUsuario, AClave: string): TJSONObject;
 var
@@ -67,7 +91,21 @@ begin
     end;
 
     Result.AddPair('success', TJSONBool.Create(True));
-    Result.AddPair('token', 'abc123'); // Token placeholder as requested
+
+    // Generar Token
+    var LToken := TGuid.NewGuid.ToString.Replace('{', '').Replace('}', '');
+    var LSession: TSessionInfo;
+    LSession.Codigo := LQUser.FieldByName('CODIGO').AsInteger;
+    LSession.Nombre := LQUser.FieldByName('NOMBRE').AsString;
+
+    SessionLock.Enter;
+    try
+      Sessions.AddOrSetValue(LToken, LSession);
+    finally
+      SessionLock.Leave;
+    end;
+
+    Result.AddPair('token', LToken);
   finally
     // GetHelisaQuery returns a query with an unowned connection, cleanup handled by query destruction
     // unless the connection was explicitly created. FirebirdConnection.pas says GetHelisaQuery
@@ -75,5 +113,24 @@ begin
     LQUser.Free;
   end;
 end;
+
+function ValidateToken(const AToken: string): TSessionInfo;
+begin
+  SessionLock.Enter;
+  try
+    if not Sessions.TryGetValue(AToken, Result) then
+      raise EHorseException.New.Status(THTTPStatus.Unauthorized).Error('Token inválido');
+  finally
+    SessionLock.Leave;
+  end;
+end;
+
+initialization
+  Sessions := TDictionary<string, TSessionInfo>.Create;
+  SessionLock := TCriticalSection.Create;
+
+finalization
+  Sessions.Free;
+  SessionLock.Free;
 
 end.

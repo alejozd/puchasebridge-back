@@ -16,6 +16,8 @@ uses
   ValidationService,
   DocumentoService,
   EquivalenciaService,
+  AuthService,
+  AuthMiddleware,
   FireDAC.Comp.Client;
 
 function ParsedInvoiceToJSONObject(const AParsedInvoice: TParsedInvoice): TJSONObject;
@@ -85,6 +87,7 @@ var
   LFactor: Double;
   LFilesValue, LValidoVal: TJSONValue;
   LDocumentoERP, LAnio: string;
+  LSession: TSessionInfo;
 begin
   LProcesadosArr := TJSONArray.Create;
   LErroresArr := TJSONArray.Create;
@@ -138,6 +141,8 @@ begin
 
             LValidationResult := ValidarDocumento(LParsedJSONStr);
             LValidationObj := TJSONObject.ParseJSONValue(LValidationResult) as TJSONObject;
+            if not Assigned(LValidationObj) then
+               raise Exception.Create('Error parseando resultado de validación');
             try
               LValido := False;
               LValidoVal := LValidationObj.GetValue('valido');
@@ -153,14 +158,16 @@ begin
               begin
                 LAnio := FormatDateTime('yyyy', LParsedInvoice.FechaEmision);
 
+                LSession := Req.Session<TSessionInfoObj>.Data;
+
                 LHeader.Proveedor := LParsedInvoice.Provider.NIT;
                 LHeader.CodigoTercero := LValidationObj.GetValue('codigoTercero').Value;
                 LHeader.Fecha := LParsedInvoice.FechaEmision;
                 LHeader.Total := LParsedInvoice.Totals.Total;
                 LHeader.Estado := 'PROCESADO';
                 LHeader.XMLFileName := LFileName;
-                LHeader.NombreUsuario := 'SYS'; // Placeholder or extract from Auth
-                LHeader.CodigoUsuario := '0';   // Placeholder
+                LHeader.NombreUsuario := LSession.Nombre;
+                LHeader.CodigoUsuario := LSession.Codigo.ToString;
                 LHeader.Anio := LAnio;
 
                 SetLength(LDetalles, Length(LParsedInvoice.Products));

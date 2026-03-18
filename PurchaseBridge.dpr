@@ -29,7 +29,8 @@ uses
   HelisaController in 'controllers\HelisaController.pas',
   DocumentosController in 'controllers\DocumentosController.pas',
   AuthService in 'services\AuthService.pas',
-  AuthController in 'controllers\AuthController.pas';
+  AuthController in 'controllers\AuthController.pas',
+  AuthMiddleware in 'middleware\AuthMiddleware.pas';
 
 begin
   // Initialize configuration at startup
@@ -50,6 +51,8 @@ begin
     .Use(OctetStream)
     .Use(HandleException)
     .Use(THorseLoggerManager.HorseCallback());
+
+  THorse.Use(Auth);
 
   THorse.Get('/ping',
     procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
