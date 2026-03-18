@@ -24,6 +24,8 @@ type
     ValorTotal: Double;
     Impuesto: Double;
     ImpuestoPorcentaje: Double;
+    Descuento: Double;
+    DescuentoPorcentaje: Double;
   end;
 
   TProviderInfo = record
@@ -46,6 +48,7 @@ type
     Provider: TProviderInfo;
     Products: TArray<TProductInfo>;
     Totals: TInvoiceTotals;
+    FechaEmision: TDateTime;
   end;
 
   TXmlParserService = class
@@ -212,6 +215,7 @@ class function TXmlParserService.ParseProductos(ARootNode: IXMLNode): TArray<TPr
 var
   I, J: Integer;
   LineNode, ItemNode, Node, TaxTotalNode, TaxSubtotalNode, TaxCategoryNode: IXMLNode;
+  AllowanceNode: IXMLNode;
   ProductList: TList<TProductInfo>;
   Product: TProductInfo;
 begin
@@ -234,6 +238,18 @@ begin
         end;
 
         Product.ValorTotal := GetNodeDoubleByLocalName(LineNode, 'LineExtensionAmount');
+
+        // Descuentos de la linea
+        AllowanceNode := FindNodeByLocalName(LineNode, 'AllowanceCharge');
+        if AllowanceNode <> nil then
+        begin
+          Node := FindNodeByLocalName(AllowanceNode, 'ChargeIndicator');
+          if (Node <> nil) and SameText(Node.Text, 'false') then
+          begin
+            Product.Descuento := GetNodeDoubleByLocalName(AllowanceNode, 'Amount');
+            Product.DescuentoPorcentaje := GetNodeDoubleByLocalName(AllowanceNode, 'MultiplierFactorNumeric');
+          end;
+        end;
 
         // Impuestos de la linea
         TaxTotalNode := FindNodeByLocalName(LineNode, 'TaxTotal');
@@ -333,6 +349,16 @@ begin
   Result.Provider := ParseProveedor(RootNode);
   Result.Products := ParseProductos(RootNode);
   Result.Totals := ParseTotales(RootNode);
+
+  // Extract IssueDate
+  DescriptionNode := FindNodeByLocalName(RootNode, 'IssueDate');
+  if DescriptionNode <> nil then
+  begin
+    if not TryStrToDate(DescriptionNode.Text, Result.FechaEmision, TFormatSettings.Invariant) then
+       Result.FechaEmision := Now;
+  end
+  else
+    Result.FechaEmision := Now;
 end;
 
 end.

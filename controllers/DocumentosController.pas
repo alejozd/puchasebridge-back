@@ -84,6 +84,7 @@ var
   LEquivalencia: TFDQuery;
   LFactor: Double;
   LFilesValue, LValidoVal: TJSONValue;
+  LDocumentoERP, LAnio: string;
 begin
   LProcesadosArr := TJSONArray.Create;
   LErroresArr := TJSONArray.Create;
@@ -150,11 +151,17 @@ begin
 
               if LValido and not LRequiereHomologacion then
               begin
+                LAnio := FormatDateTime('yyyy', LParsedInvoice.FechaEmision);
+
                 LHeader.Proveedor := LParsedInvoice.Provider.NIT;
-                LHeader.Fecha := Now;
+                LHeader.CodigoTercero := LValidationObj.GetValue('codigoTercero').Value;
+                LHeader.Fecha := LParsedInvoice.FechaEmision;
                 LHeader.Total := LParsedInvoice.Totals.Total;
                 LHeader.Estado := 'PROCESADO';
                 LHeader.XMLFileName := LFileName;
+                LHeader.NombreUsuario := 'SYS'; // Placeholder or extract from Auth
+                LHeader.CodigoUsuario := '0';   // Placeholder
+                LHeader.Anio := LAnio;
 
                 SetLength(LDetalles, Length(LParsedInvoice.Products));
                 for J := 0 to Length(LParsedInvoice.Products) - 1 do
@@ -162,6 +169,11 @@ begin
                   LDetalles[J].CodigoProducto := LParsedInvoice.Products[J].Referencia;
                   LDetalles[J].Cantidad := LParsedInvoice.Products[J].Cantidad;
                   LDetalles[J].Precio := LParsedInvoice.Products[J].ValorUnitario;
+                  LDetalles[J].TfIva := LParsedInvoice.Products[J].ImpuestoPorcentaje;
+                  LDetalles[J].VrIva := LParsedInvoice.Products[J].Impuesto;
+                  LDetalles[J].TfDescuento := LParsedInvoice.Products[J].DescuentoPorcentaje;
+                  LDetalles[J].VrDescuento := LParsedInvoice.Products[J].Descuento;
+                  LDetalles[J].Total := LDetalles[J].Cantidad * LDetalles[J].Precio;
 
                   LEquivalencia := BuscarEquivalencia(LParsedInvoice.Products[J].Referencia, LParsedInvoice.Products[J].Unidad);
                   try
@@ -171,6 +183,8 @@ begin
                       if LFactor = 0 then LFactor := 1;
                       LDetalles[J].CodigoProducto := LEquivalencia.FieldByName('REFERENCIAH').AsString;
                       LDetalles[J].Cantidad := LDetalles[J].Cantidad * LFactor;
+                      LDetalles[J].CodigoConcepto := LEquivalencia.FieldByName('CODIGOH').AsInteger;
+                      LDetalles[J].Subcodigo := LEquivalencia.FieldByName('SUBCODIGOH').AsInteger;
                     end;
                   finally
                     LEquivalencia.Free;
@@ -180,14 +194,14 @@ begin
                 end;
 
                 try
-                  J := GuardarDocumento(LHeader, LDetalles);
+                  LDocumentoERP := GuardarDocumento(LHeader, LDetalles);
 
                   TFile.Move(TPath.Combine(LPath, LFileName), TPath.Combine(LProcessedPath, LFileName));
 
                   LProcesadoObj := TJSONObject.Create;
                   LProcesadoObj.AddPair('fileName', LFileName);
                   LProcesadoObj.AddPair('status', 'OK');
-                  LProcesadoObj.AddPair('documentoId', TJSONNumber.Create(J));
+                  LProcesadoObj.AddPair('documento', LDocumentoERP);
                   LProcesadosArr.Add(LProcesadoObj);
                 except
                   on E: Exception do

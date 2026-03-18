@@ -16,6 +16,8 @@ uses
   ProductoRepository in 'repositories\ProductoRepository.pas',
   XMLFacturaService in 'services\XMLFacturaService.pas',
   XmlParserService in 'services\XmlParserService.pas',
+  HelisaUtils in 'utils\HelisaUtils.pas',
+  HelisaService in 'services\HelisaService.pas',
   EquivalenciaService in 'services\EquivalenciaService.pas',
   ValidationService in 'services\ValidationService.pas',
   DocumentoService in 'services\DocumentoService.pas',

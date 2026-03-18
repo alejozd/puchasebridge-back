@@ -47,7 +47,9 @@ begin
       end;
 
       if not LProveedorExiste then
-        LErroresArray.Add('Proveedor no existe en Helisa');
+        LErroresArray.Add('Proveedor no existe en Helisa')
+      else
+        LOutputJSON.AddPair('codigoTercero', LProveedorInfo.Codigo);
 
       // B. Validar productos
       LTodosProductosExisten := True;
