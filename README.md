@@ -26,9 +26,9 @@ Para evitar la exposición de credenciales sensibles, el sistema utiliza un arch
 Crea un archivo llamado `config.ini` con la siguiente estructura:
 
 ```ini
-[HELISA]
-User=HELISAADMON
-Pass=tu_password_helisa
+[ERP]
+User=USUARIO-ERP
+Pass=tu_password_ERP
 
 [BRIDGE]
 User=SYSDBA
