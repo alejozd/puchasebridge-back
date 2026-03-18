@@ -47,11 +47,17 @@ begin
 
   Result := TFDQuery.Create(nil);
   try
+    // Para asegurar que la conexión se libere con el Query, debemos pasar el Query como Owner
+    // Pero CrearConexionParticular no permite pasar un Owner.
+    // Usaremos un truco común en Delphi: insertar el componente si no podemos pasarlo al constructor,
+    // pero eso requiere acceso a métodos protegidos o más complejidad.
+
+    // Mejor solución: Seguir el patrón de FirebirdConnection.pas y crear la conexión aquí mismo.
+    // Pero para no duplicar lógica de HConfig, usaré la conexión y la liberaré en el controller.
+
     LConn := CrearConexionParticular('0');
-    LConn.Owner := Result; // Ensure connection is freed with query
     Result.Connection := LConn;
 
-    // Firebird 3.0+ uses FIRST SKIP or ROWS to limit
     Result.SQL.Text := Format(
       'SELECT FIRST :LIMIT CODIGO, SUBCODIGO, NOMBRE, REFERENCIA, CODUND as UNIDAD ' +
       'FROM %s ' +
@@ -62,6 +68,8 @@ begin
     Result.ParamByName('FILTRO').AsString := '%' + AFiltro.ToUpper + '%';
     Result.Open;
   except
+    if Assigned(Result.Connection) then
+      Result.Connection.Free;
     Result.Free;
     raise;
   end;

@@ -61,6 +61,9 @@ begin
       LResponse.AddPair('productos', LProductosArr);
       Res.Send(LResponse);
     finally
+      // Manual cleanup of both Query and its Connection (since it has no owner)
+      if Assigned(LQ.Connection) then
+        LQ.Connection.Free;
       LQ.Free;
     end;
 
