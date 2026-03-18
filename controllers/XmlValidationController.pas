@@ -11,17 +11,18 @@ uses
   System.JSON,
   System.SysUtils,
   System.IOUtils,
+  System.Classes,
   System.Generics.Collections,
   XmlParserService,
   ValidationService;
 
-function ParsedInvoiceToJSONString(AParsedInvoice: TParsedInvoice): string;
+function ParsedInvoiceToJSONObject(const AParsedInvoice: TParsedInvoice): TJSONObject;
 var
-  LJSON, LProveedor, LTotales, LProducto: TJSONObject;
+  LProveedor, LTotales, LProducto: TJSONObject;
   LProductosArr: TJSONArray;
   I: Integer;
 begin
-  LJSON := TJSONObject.Create;
+  Result := TJSONObject.Create;
   try
     LProveedor := TJSONObject.Create;
     LProveedor.AddPair('nit', AParsedInvoice.Provider.NIT);
@@ -29,7 +30,7 @@ begin
     LProveedor.AddPair('nombreLegal', AParsedInvoice.Provider.NombreLegal);
     LProveedor.AddPair('tipoIdentificacion', AParsedInvoice.Provider.TipoIdentificacion);
     LProveedor.AddPair('direccion', AParsedInvoice.Provider.Direccion);
-    LJSON.AddPair('proveedor', LProveedor);
+    Result.AddPair('proveedor', LProveedor);
 
     LProductosArr := TJSONArray.Create;
     for I := 0 to Length(AParsedInvoice.Products) - 1 do
@@ -48,7 +49,7 @@ begin
       LProducto.AddPair('porcentajeImpuesto', TJSONNumber.Create(AParsedInvoice.Products[I].ImpuestoPorcentaje));
       LProductosArr.Add(LProducto);
     end;
-    LJSON.AddPair('productos', LProductosArr);
+    Result.AddPair('productos', LProductosArr);
 
     LTotales := TJSONObject.Create;
     LTotales.AddPair('subtotal', TJSONNumber.Create(AParsedInvoice.Totals.Subtotal));
@@ -56,11 +57,13 @@ begin
     LTotales.AddPair('taxInclusiveAmount', TJSONNumber.Create(AParsedInvoice.Totals.TaxInclusiveAmount));
     LTotales.AddPair('impuestoTotal', TJSONNumber.Create(AParsedInvoice.Totals.ImpuestoTotal));
     LTotales.AddPair('total', TJSONNumber.Create(AParsedInvoice.Totals.Total));
-    LJSON.AddPair('totales', LTotales);
-
-    Result := LJSON.ToJSON;
-  finally
-    LJSON.Free;
+    Result.AddPair('totales', LTotales);
+  except
+    on E: Exception do
+    begin
+      Result.Free;
+      raise;
+    end;
   end;
 end;
 
@@ -68,8 +71,8 @@ function InternalValidateFile(const AFileName: string): TJSONObject;
 var
   LPath, LFullFile, LXMLContent, LParsedJSONStr, LValidationResult: string;
   LParsedInvoice: TParsedInvoice;
-  LResultJSON: TJSONObject;
-  LErroresArray: TJSONArray;
+  LResultJSON, LParsedObj: TJSONObject;
+  LErroresArray, LEmptyProductos: TJSONArray;
   LVal: TJSONValue;
 begin
   try
@@ -83,6 +86,7 @@ begin
       LResultJSON.AddPair('valido', TJSONBool.Create(False));
       LResultJSON.AddPair('requiereHomologacion', TJSONBool.Create(False));
       LResultJSON.AddPair('proveedorExiste', TJSONBool.Create(False));
+      LResultJSON.AddPair('productos', TJSONArray.Create);
       LErroresArray := TJSONArray.Create;
       LErroresArray.Add('Archivo no encontrado');
       LResultJSON.AddPair('errores', LErroresArray);
@@ -99,6 +103,7 @@ begin
         LResultJSON.AddPair('valido', TJSONBool.Create(False));
         LResultJSON.AddPair('requiereHomologacion', TJSONBool.Create(False));
         LResultJSON.AddPair('proveedorExiste', TJSONBool.Create(False));
+        LResultJSON.AddPair('productos', TJSONArray.Create);
         LErroresArray := TJSONArray.Create;
         LErroresArray.Add('Error al leer el archivo: ' + E.Message);
         LResultJSON.AddPair('errores', LErroresArray);
@@ -108,7 +113,12 @@ begin
 
     try
       LParsedInvoice := TXmlParserService.Parse(LXMLContent);
-      LParsedJSONStr := ParsedInvoiceToJSONString(LParsedInvoice);
+      LParsedObj := ParsedInvoiceToJSONObject(LParsedInvoice);
+      try
+        LParsedJSONStr := LParsedObj.ToJSON;
+      finally
+        LParsedObj.Free;
+      end;
     except
       on E: Exception do
       begin
@@ -117,6 +127,7 @@ begin
         LResultJSON.AddPair('valido', TJSONBool.Create(False));
         LResultJSON.AddPair('requiereHomologacion', TJSONBool.Create(False));
         LResultJSON.AddPair('proveedorExiste', TJSONBool.Create(False));
+        LResultJSON.AddPair('productos', TJSONArray.Create);
         LErroresArray := TJSONArray.Create;
         LErroresArray.Add('XML inválido o error en parseo: ' + E.Message);
         LResultJSON.AddPair('errores', LErroresArray);
@@ -140,6 +151,7 @@ begin
         LResultJSON.AddPair('valido', TJSONBool.Create(False));
         LResultJSON.AddPair('requiereHomologacion', TJSONBool.Create(False));
         LResultJSON.AddPair('proveedorExiste', TJSONBool.Create(False));
+        LResultJSON.AddPair('productos', TJSONArray.Create);
         LErroresArray := TJSONArray.Create;
         LErroresArray.Add('Error al procesar el resultado de validación');
         LResultJSON.AddPair('errores', LErroresArray);
@@ -153,6 +165,7 @@ begin
         LResultJSON.AddPair('valido', TJSONBool.Create(False));
         LResultJSON.AddPair('requiereHomologacion', TJSONBool.Create(False));
         LResultJSON.AddPair('proveedorExiste', TJSONBool.Create(False));
+        LResultJSON.AddPair('productos', TJSONArray.Create);
         LErroresArray := TJSONArray.Create;
         LErroresArray.Add('Error en validación: ' + E.Message);
         LResultJSON.AddPair('errores', LErroresArray);
@@ -167,6 +180,7 @@ begin
       LResultJSON.AddPair('valido', TJSONBool.Create(False));
       LResultJSON.AddPair('requiereHomologacion', TJSONBool.Create(False));
       LResultJSON.AddPair('proveedorExiste', TJSONBool.Create(False));
+      LResultJSON.AddPair('productos', TJSONArray.Create);
       LErroresArray := TJSONArray.Create;
       LErroresArray.Add('Error inesperado: ' + E.Message);
       LResultJSON.AddPair('errores', LErroresArray);
@@ -194,9 +208,6 @@ begin
   LFileName := TPath.GetFileName(LFileName);
   LResultJSON := InternalValidateFile(LFileName);
 
-  // To preserve original behavior where some errors result in different HTTP status codes,
-  // we would need more detailed return from InternalValidateFile.
-  // For now, let's keep it consistent with the batch behavior which returns results in a list.
   Res.Send<TJSONObject>(LResultJSON);
 end;
 
@@ -209,19 +220,26 @@ var
   LOutputJSON, LSummary: TJSONObject;
   LDocumentsArr: TJSONArray;
   LResultDoc: TJSONObject;
-  LValido, LProveedorExiste: Boolean;
+  LValido: Boolean;
   LTotal, LValidos, LConErrores: Integer;
   I: Integer;
+  LFilesValue: TJSONValue;
 begin
   LFiles := TStringList.Create;
   try
     LBody := Req.Body<TJSONObject>;
-    if Assigned(LBody) and LBody.TryGetValue('files', LFilesArr) then
+    if Assigned(LBody) then
     begin
-      for I := 0 to LFilesArr.Count - 1 do
-        LFiles.Add(TPath.GetFileName(LFilesArr.Items[I].Value));
-    end
-    else
+      LFilesValue := LBody.GetValue('files');
+      if (LFilesValue <> nil) and (LFilesValue is TJSONArray) then
+      begin
+        LFilesArr := LFilesValue as TJSONArray;
+        for I := 0 to LFilesArr.Count - 1 do
+          LFiles.Add(TPath.GetFileName(LFilesArr.Items[I].Value));
+      end;
+    end;
+
+    if LFiles.Count = 0 then
     begin
       // Take all XML files from Input folder
       LPath := TPath.Combine('PurchaseBridge', 'Input');
@@ -242,7 +260,11 @@ begin
     begin
       LResultDoc := InternalValidateFile(LFiles[I]);
 
-      if LResultDoc.TryGetValue('valido', LValido) and LValido then
+      LValido := False;
+      if (LResultDoc.GetValue('valido') <> nil) and (LResultDoc.GetValue('valido') is TJSONBool) then
+        LValido := (LResultDoc.GetValue('valido') as TJSONBool).AsBoolean;
+
+      if LValido then
         Inc(LValidos)
       else
         Inc(LConErrores);
