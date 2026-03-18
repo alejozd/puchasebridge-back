@@ -18,19 +18,47 @@ function TestBridgeConnection: Boolean;
 implementation
 
 uses
-  System.SysUtils, HConfig;
+  System.SysUtils, System.IniFiles, System.IOUtils, HConfig;
+
+type
+  TDBConfig = record
+    User: string;
+    Pass: string;
+    Path: string;
+  end;
+
+function LoadDBConfig(const Section: string): TDBConfig;
+var
+  Ini: TIniFile;
+  AppPath: string;
+begin
+  AppPath := TPath.GetDirectoryName(GetModuleName(HInstance));
+  Ini := TIniFile.Create(TPath.Combine(AppPath, 'config.ini'));
+  try
+    if Section = 'HELISA' then
+    begin
+      Result.User := Ini.ReadString('HELISA', 'User', 'HELISAADMON');
+      Result.Pass := Ini.ReadString('HELISA', 'Pass', '');
+      Result.Path := '';
+    end
+    else if Section = 'BRIDGE' then
+    begin
+      Result.User := Ini.ReadString('BRIDGE', 'User', 'SYSDBA');
+      Result.Pass := Ini.ReadString('BRIDGE', 'Pass', '');
+      Result.Path := Ini.ReadString('BRIDGE', 'Path', 'F:\Proyectos\delphi_backend\purchasebridge\backend\database\purchasebridge.fdb');
+    end;
+  finally
+    Ini.Free;
+  end;
+end;
 
 function CrearConexionGlobal: TFDConnection;
 var
   Config: THelisaConfig;
-  User, Pass: string;
+  DBConfig: TDBConfig;
 begin
   Config := THConfig.GetInstance.Config;
-
-  // Cargar credenciales desde variables de entorno.
-  // Los valores hardcodeados se han eliminado para evitar fallos de CI (GitGuardian).
-  User := GetEnvironmentVariable('HELISA_DB_USER');
-  Pass := GetEnvironmentVariable('HELISA_DB_PASS');
+  DBConfig := LoadDBConfig('HELISA');
 
   Result := TFDConnection.Create(nil);
   try
@@ -41,8 +69,8 @@ begin
     else
       Result.Params.Database := Config.Servidor + ':' + Config.RutaBaseDatos + '\helisabd.hgw';
 
-    Result.Params.UserName := User;
-    Result.Params.Password := Pass;
+    Result.Params.UserName := DBConfig.User;
+    Result.Params.Password := DBConfig.Pass;
     Result.LoginPrompt := False;
 
     Result.Connected := True;
@@ -56,12 +84,10 @@ function CrearConexionParticular(pCodEmpresa: string): TFDConnection;
 var
   Config: THelisaConfig;
   vBasedeDatos : string;
-  User, Pass: string;
+  DBConfig: TDBConfig;
 begin
   Config := THConfig.GetInstance.Config;
-
-  User := GetEnvironmentVariable('HELISA_DB_USER');
-  Pass := GetEnvironmentVariable('HELISA_DB_PASS');
+  DBConfig := LoadDBConfig('HELISA');
 
   Result := TFDConnection.Create(nil);
   try
@@ -77,8 +103,8 @@ begin
       else
         Result.Params.Database := Config.Servidor + ':' + Config.RutaBaseDatos + '\' + vBasedeDatos;
 
-    Result.Params.UserName := User;
-    Result.Params.Password := Pass;
+    Result.Params.UserName := DBConfig.User;
+    Result.Params.Password := DBConfig.Pass;
     Result.LoginPrompt := False;
 
     Result.Connected := True;
@@ -95,20 +121,16 @@ end;
 
 function GetBridgeConnection: TFDConnection;
 var
-  Path, User, Pass: string;
+  DBConfig: TDBConfig;
 begin
-  Path := GetEnvironmentVariable('BRIDGE_DB_PATH');
-  if Path = '' then Path := 'F:\Proyectos\delphi_backend\purchasebridge\backend\database\purchasebridge.fdb';
-
-  User := GetEnvironmentVariable('BRIDGE_DB_USER');
-  Pass := GetEnvironmentVariable('BRIDGE_DB_PASS');
+  DBConfig := LoadDBConfig('BRIDGE');
 
   Result := TFDConnection.Create(nil);
   try
     Result.DriverName := 'FB';
-    Result.Params.Database := Path;
-    Result.Params.UserName := User;
-    Result.Params.Password := Pass;
+    Result.Params.Database := DBConfig.Path;
+    Result.Params.UserName := DBConfig.User;
+    Result.Params.Password := DBConfig.Pass;
     Result.LoginPrompt := False;
     Result.Connected := True;
   except
@@ -120,24 +142,22 @@ end;
 function GetHelisaQuery: TFDQuery;
 var
   Config: THelisaConfig;
-  User, Pass: string;
+  DBConfig: TDBConfig;
   Conn: TFDConnection;
 begin
   Config := THConfig.GetInstance.Config;
-  User := GetEnvironmentVariable('HELISA_DB_USER');
-  Pass := GetEnvironmentVariable('HELISA_DB_PASS');
+  DBConfig := LoadDBConfig('HELISA');
 
   Result := TFDQuery.Create(nil);
   try
-    // La conexión se crea pasando el Query como Owner para liberación automática.
     Conn := TFDConnection.Create(Result);
     Conn.DriverName := 'FB';
     if Config.Tipo = 'S' then
       Conn.Params.Database := Config.RutaBaseDatos + '\helisabd.hgw'
     else
       Conn.Params.Database := Config.Servidor + ':' + Config.RutaBaseDatos + '\helisabd.hgw';
-    Conn.Params.UserName := User;
-    Conn.Params.Password := Pass;
+    Conn.Params.UserName := DBConfig.User;
+    Conn.Params.Password := DBConfig.Pass;
     Conn.LoginPrompt := False;
     Conn.Connected := True;
     Result.Connection := Conn;
@@ -150,25 +170,19 @@ end;
 function GetBridgeQuery: TFDQuery;
 var
   Conn: TFDConnection;
-  Path, User, Pass: string;
+  DBConfig: TDBConfig;
 begin
+  DBConfig := LoadDBConfig('BRIDGE');
+
   Result := TFDQuery.Create(nil);
   try
-    // Se crea la conexión con el Query como Owner.
     Conn := TFDConnection.Create(Result);
-
-    Path := GetEnvironmentVariable('BRIDGE_DB_PATH');
-    if Path = '' then Path := 'F:\Proyectos\delphi_backend\purchasebridge\backend\database\purchasebridge.fdb';
-    User := GetEnvironmentVariable('BRIDGE_DB_USER');
-    Pass := GetEnvironmentVariable('BRIDGE_DB_PASS');
-
     Conn.DriverName := 'FB';
-    Conn.Params.Database := Path;
-    Conn.Params.UserName := User;
-    Conn.Params.Password := Pass;
+    Conn.Params.Database := DBConfig.Path;
+    Conn.Params.UserName := DBConfig.User;
+    Conn.Params.Password := DBConfig.Pass;
     Conn.LoginPrompt := False;
     Conn.Connected := True;
-
     Result.Connection := Conn;
   except
     Result.Free;

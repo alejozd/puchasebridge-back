@@ -17,65 +17,26 @@ El objetivo principal es procesar facturas electrónicas de la DIAN (Colombia) e
 - **Boss** (Dependency Manager para Delphi).
 - **Firebird 3.0+**.
 
-## Configuración de Variables de Entorno
+## Configuración del Sistema
 
-Para mayor seguridad y para evitar la exposición de credenciales en el código fuente (especialmente para entornos de CI como GitHub Actions), el sistema utiliza variables de entorno para las conexiones a las bases de datos.
+Para evitar la exposición de credenciales sensibles, el sistema utiliza un archivo de configuración `config.ini` que debe ubicarse en la misma carpeta que el ejecutable.
 
-Debes configurar las siguientes variables en tu servidor o entorno de desarrollo:
+### Archivo config.ini
 
-| Variable | Descripción | Valor Ejemplo |
-|----------|-------------|---------------|
-| `HELISA_DB_USER` | Usuario de la BD Helisa | `HELISAADMON` |
-| `HELISA_DB_PASS` | Contraseña de la BD Helisa | `********` |
-| `BRIDGE_DB_USER` | Usuario de la BD PurchaseBridge | `SYSDBA` |
-| `BRIDGE_DB_PASS` | Contraseña de la BD PurchaseBridge | `********` |
-| `BRIDGE_DB_PATH` | Ruta absoluta al archivo .fdb de Bridge | `C:\database\purchasebridge.fdb` |
-
-### Cómo configurar las variables
-
-Tienes dos formas principales de configurar estas variables:
-
-#### Opción 1: Variables de Entorno del Sistema (Recomendado)
-
-Esta opción es la más segura y es la que utiliza actualmente `GetEnvironmentVariable`.
-
-**Windows (CMD):**
-```cmd
-setx HELISA_DB_USER "HELISAADMON"
-setx HELISA_DB_PASS "tu_password"
-setx BRIDGE_DB_USER "SYSDBA"
-setx BRIDGE_DB_PASS "tu_password"
-setx BRIDGE_DB_PATH "F:\Proyectos\...\purchasebridge.fdb"
-```
-*Nota: Es necesario reiniciar el IDE o la terminal para que los cambios surtan efecto.*
-
-**Windows (PowerShell):**
-```powershell
-[System.Environment]::SetEnvironmentVariable('HELISA_DB_PASS', 'tu_password', 'User')
-```
-
-**Linux / Bash:**
-```bash
-export HELISA_DB_PASS='tu_password'
-```
-
-#### Opción 2: Archivo .env (Para Desarrollo)
-
-Si prefieres usar un archivo `.env` en la raíz del proyecto, debes crear un archivo llamado `.env` (sin extensión) con el siguiente contenido:
+Crea un archivo llamado `config.ini` con la siguiente estructura:
 
 ```ini
-HELISA_DB_USER=HELISAADMON
-HELISA_DB_PASS=tu_password_helisa
-BRIDGE_DB_USER=SYSDBA
-BRIDGE_DB_PASS=tu_password_bridge
-BRIDGE_DB_PATH=F:\Proyectos\delphi_backend\purchasebridge\backend\database\purchasebridge.fdb
+[HELISA]
+User=HELISAADMON
+Pass=tu_password_helisa
+
+[BRIDGE]
+User=SYSDBA
+Pass=tu_password_bridge
+Path=F:\Proyectos\delphi_backend\purchasebridge\backend\database\purchasebridge.fdb
 ```
 
-> **Importante:** Para que Delphi lea este archivo automáticamente mediante `GetEnvironmentVariable`, se recomienda instalar la librería `dotenv-delphi` vía Boss:
-> ```bash
-> boss install github.com/hashload/dotenv
-> ```
-> Y cargarla en el `.dpr` al inicio: `TDotEnv.Load;`
+> **Nota:** El archivo `config.ini` está incluido en el `.gitignore` para prevenir que tus contraseñas se suban al repositorio.
 
 ## Estructura del Proyecto
 
