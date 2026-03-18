@@ -17,6 +17,40 @@ El objetivo principal es procesar facturas electrónicas de la DIAN (Colombia) e
 - **Boss** (Dependency Manager para Delphi).
 - **Firebird 3.0+**.
 
+## Configuración de Variables de Entorno
+
+Para mayor seguridad y para evitar la exposición de credenciales en el código fuente (especialmente para entornos de CI como GitHub Actions), el sistema utiliza variables de entorno para las conexiones a las bases de datos.
+
+Debes configurar las siguientes variables en tu servidor o entorno de desarrollo:
+
+| Variable | Descripción | Valor Ejemplo |
+|----------|-------------|---------------|
+| `HELISA_DB_USER` | Usuario de la BD Helisa | `HELISAADMON` |
+| `HELISA_DB_PASS` | Contraseña de la BD Helisa | `********` |
+| `BRIDGE_DB_USER` | Usuario de la BD PurchaseBridge | `SYSDBA` |
+| `BRIDGE_DB_PASS` | Contraseña de la BD PurchaseBridge | `********` |
+| `BRIDGE_DB_PATH` | Ruta absoluta al archivo .fdb de Bridge | `C:\database\purchasebridge.fdb` |
+
+### Cómo configurar las variables
+
+#### Windows (CMD)
+```cmd
+setx HELISA_DB_PASS "tu_password"
+setx BRIDGE_DB_PASS "tu_password"
+setx BRIDGE_DB_PATH "F:\Proyectos\...\purchasebridge.fdb"
+```
+*Nota: Es necesario reiniciar el IDE o la terminal para que los cambios surtan efecto.*
+
+#### Windows (PowerShell)
+```powershell
+[System.Environment]::SetEnvironmentVariable('HELISA_DB_PASS', 'tu_password', 'User')
+```
+
+#### Linux / Bash
+```bash
+export HELISA_DB_PASS='tu_password'
+```
+
 ## Estructura del Proyecto
 
 - `config/`: Gestión de configuración (Singleton).
