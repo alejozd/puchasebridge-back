@@ -22,7 +22,8 @@ uses
   ProveedorController in 'controllers\ProveedorController.pas',
   XmlController in 'controllers\XmlController.pas',
   XmlValidationController in 'controllers\XmlValidationController.pas',
-  EquivalenciaController in 'controllers\EquivalenciaController.pas';
+  EquivalenciaController in 'controllers\EquivalenciaController.pas',
+  HelisaController in 'controllers\HelisaController.pas';
 
 begin
   // Initialize configuration at startup
@@ -55,6 +56,7 @@ begin
   XmlController.Registry;
   XmlValidationController.Registry;
   EquivalenciaController.Registry;
+  HelisaController.Registry;
 
   THorse.Listen(9000,
     procedure

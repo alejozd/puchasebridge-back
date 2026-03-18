@@ -380,6 +380,77 @@
 					"body": "{\n  \"success\": false,\n  \"message\": \"La equivalencia ya existe\"\n}"
 				}
 			]
+		},
+		{
+			"name": "Buscar Productos Helisa",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:9000/helisa/productos?filtro=lavamanos&limite=10",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "9000",
+					"path": [
+						"helisa",
+						"productos"
+					],
+					"query": [
+						{
+							"key": "filtro",
+							"value": "lavamanos"
+						},
+						{
+							"key": "limite",
+							"value": "10"
+						}
+					]
+				}
+			},
+			"response": [
+				{
+					"name": "Éxito",
+					"originalRequest": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:9000/helisa/productos?filtro=lavamanos&limite=10",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "9000",
+							"path": [
+								"helisa",
+								"productos"
+							],
+							"query": [
+								{
+									"key": "filtro",
+									"value": "lavamanos"
+								},
+								{
+									"key": "limite",
+									"value": "10"
+								}
+							]
+						}
+					},
+					"status": "OK",
+					"code": 200,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n    \"productos\": [\n        {\n            \"codigo\": 123,\n            \"subcodigo\": 1,\n            \"nombre\": \"LAVAMANOS ALUVIA\",\n            \"referencia\": \"O60691031\",\n            \"unidad\": \"MTR\"\n        }\n    ]\n}"
+				}
+			]
 		}
 	]
 }
