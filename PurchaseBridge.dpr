@@ -16,9 +16,11 @@ uses
   ProductoRepository in 'repositories\ProductoRepository.pas',
   XMLFacturaService in 'services\XMLFacturaService.pas',
   XmlParserService in 'services\XmlParserService.pas',
+  ValidationService in 'services\ValidationService.pas',
   ImportController in 'controllers\ImportController.pas',
   ProveedorController in 'controllers\ProveedorController.pas',
-  XmlController in 'controllers\XmlController.pas';
+  XmlController in 'controllers\XmlController.pas',
+  XmlValidationController in 'controllers\XmlValidationController.pas';
 
 begin
   // Initialize configuration at startup
@@ -49,6 +51,7 @@ begin
   ImportController.Registry;
   ProveedorController.Registry;
   XmlController.Registry;
+  XmlValidationController.Registry;
 
   THorse.Listen(9000,
     procedure

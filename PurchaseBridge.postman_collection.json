@@ -201,6 +201,77 @@
 					"body": "{\n  \"success\": true,\n  \"proveedor\": {\n    \"nit\": \"860002536\",\n    \"nombre\": \"COMPAÑIA COLOMBIANA DE CERAMICA S A S\",\n    \"nombreLegal\": \"COMPAÑIA COLOMBIANA DE CERAMICA S A S\",\n    \"tipoIdentificacion\": \"31\",\n    \"direccion\": \"CL 100 8 A 55 TO C P 9\"\n  },\n  \"productos\": [\n    {\n      \"idLinea\": \"1\",\n      \"descripcion\": \"LAVAMANOS ALUVIA 60 CM BNE EN CJ 7704372060916\",\n      \"referencia\": \"O60691031\",\n      \"referenciaEstandar\": \"7704372060916\",\n      \"cantidad\": 5,\n      \"unidad\": \"94\",\n      \"precioBase\": 277247.8,\n      \"valorUnitario\": 277247.8,\n      \"valorTotal\": 1386239,\n      \"impuesto\": 263385.41,\n      \"porcentajeImpuesto\": 19\n    }\n  ],\n  \"totales\": {\n    \"subtotal\": 1386239.0,\n    \"taxExclusiveAmount\": 1386239.0,\n    \"taxInclusiveAmount\": 1649624.41,\n    \"impuestoTotal\": 263385.41,\n    \"total\": 1649624.41\n  }\n}"
 				}
 			]
+		},
+		{
+			"name": "Validar Archivo XML",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"fileName\": \"ad086000253602726330020260314073312852.xml\"\n}"
+				},
+				"url": {
+					"raw": "http://localhost:9000/xml/validate",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "9000",
+					"path": [
+						"xml",
+						"validate"
+					]
+				}
+			},
+			"response": [
+				{
+					"name": "Respuesta Exitosa",
+					"originalRequest": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"fileName\": \"ad086000253602726330020260314073312852.xml\"\n}"
+						},
+						"url": {
+							"raw": "http://localhost:9000/xml/validate",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "9000",
+							"path": [
+								"xml",
+								"validate"
+							]
+						}
+					},
+					"status": "OK",
+					"code": 200,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n    \"valido\": true,\n    \"requiereHomologacion\": false,\n    \"proveedorExiste\": true,\n    \"productos\": [\n        {\n            \"referencia\": \"O60691031\",\n            \"unidad\": \"94\",\n            \"existeEquivalencia\": true\n        }\n    ],\n    \"errores\": []\n}"
+				}
+			]
 		}
 	]
 }
