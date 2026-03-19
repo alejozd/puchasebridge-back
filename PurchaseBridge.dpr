@@ -95,11 +95,17 @@ begin
     .Use(OctetStream)
     .Use(Auth);
 
-  THorse.Options('/*',
+  THorse.All('/auth/login',
     procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
     begin
-      ApplyCORSHeaders(Req, Res);
-      Res.Status(THTTPStatus.OK).Send('');
+      if SameText(Req.RawWebRequest.Method, 'OPTIONS') then
+      begin
+        ApplyCORSHeaders(Req, Res);
+        Res.Status(THTTPStatus.OK).Send('');
+        Exit;
+      end;
+
+      Next();
     end);
 
   THorse.Get('/ping',
