@@ -112,6 +112,27 @@ begin
       Res.Send('pong');
     end);
 
+  THorse.Options('/xml/list',
+    procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
+    begin
+      ApplyCORSHeaders(Req, Res);
+      Res.Status(THTTPStatus.OK).Send('');
+    end);
+
+  THorse.Options('/xml/upload',
+    procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
+    begin
+      ApplyCORSHeaders(Req, Res);
+      Res.Status(THTTPStatus.OK).Send('');
+    end);
+
+  THorse.Options('/xml/parse',
+    procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
+    begin
+      ApplyCORSHeaders(Req, Res);
+      Res.Status(THTTPStatus.OK).Send('');
+    end);
+
   ImportController.Registry;
   ProveedorController.Registry;
   XmlController.Registry;
