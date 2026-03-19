@@ -5,6 +5,7 @@ interface
 uses
   Horse,
   System.SysUtils,
+  System.JSON,
   AuthService;
 
 procedure Auth(Req: THorseRequest; Res: THorseResponse; Next: TProc);
@@ -23,6 +24,7 @@ var
   LToken: string;
   LSession: TSessionInfo;
   LPath: string;
+  LResponse: TJSONObject;
 begin
   if SameText(Req.RawWebRequest.Method, 'OPTIONS') then
   begin
@@ -41,10 +43,22 @@ begin
   LToken := Req.Headers['Authorization'];
 
   if LToken.IsEmpty then
-    raise EHorseException.New.Status(THTTPStatus.Unauthorized).Error('Token requerido');
+  begin
+    LResponse := TJSONObject.Create;
+    LResponse.AddPair('success', TJSONBool.Create(False));
+    LResponse.AddPair('message', 'Token requerido');
+    Res.Status(THTTPStatus.Unauthorized).Send(LResponse);
+    Exit;
+  end;
 
   if not LToken.StartsWith('Bearer ', True) then
-    raise EHorseException.New.Status(THTTPStatus.Unauthorized).Error('Token inválido');
+  begin
+    LResponse := TJSONObject.Create;
+    LResponse.AddPair('success', TJSONBool.Create(False));
+    LResponse.AddPair('message', 'Token inválido');
+    Res.Status(THTTPStatus.Unauthorized).Send(LResponse);
+    Exit;
+  end;
 
   LToken := LToken.Replace('Bearer ', '', [rfReplaceAll, rfIgnoreCase]).Trim;
 
