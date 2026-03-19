@@ -6,6 +6,7 @@ uses
   Horse,
   Horse.Jhonson,
   Horse.OctetStream,
+  Horse.Exception,
   Horse.HandleException,
   System.SysUtils,
   System.StrUtils,
@@ -76,7 +77,7 @@ begin
         if SameText(Req.RawWebRequest.Method, 'OPTIONS') then
         begin
           Res.Status(THTTPStatus.OK).Send('');
-          Exit;
+          raise EHorseCallbackInterrupted.Create;
         end;
 
         Next();
