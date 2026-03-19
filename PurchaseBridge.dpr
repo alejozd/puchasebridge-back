@@ -6,6 +6,7 @@ uses
   Horse,
   Horse.Jhonson,
   Horse.OctetStream,
+  Horse.Exception,
   Horse.HandleException,
   System.SysUtils,
   System.StrUtils,
@@ -39,8 +40,6 @@ end;
 procedure ApplyCORSHeaders(const Req: THorseRequest; const Res: THorseResponse);
 var
   LOrigin: string;
-  LRequestHeaders: string;
-  LRequestMethod: string;
 begin
   LOrigin := Req.Headers['Origin'];
   if IsAllowedOrigin(LOrigin) then
@@ -50,17 +49,10 @@ begin
 
   Res.RawWebResponse.SetCustomHeader('Vary', 'Origin');
   Res.RawWebResponse.SetCustomHeader('Access-Control-Allow-Credentials', 'true');
-
-  LRequestHeaders := Req.Headers['Access-Control-Request-Headers'];
-  if LRequestHeaders.IsEmpty then
-    LRequestHeaders := 'Content-Type, Authorization, X-Requested-With';
-  Res.RawWebResponse.SetCustomHeader('Access-Control-Allow-Headers', LRequestHeaders);
-
-  LRequestMethod := Req.Headers['Access-Control-Request-Method'];
-  if LRequestMethod.IsEmpty then
-    LRequestMethod := 'GET, POST, PUT, PATCH, DELETE, OPTIONS';
-  Res.RawWebResponse.SetCustomHeader('Access-Control-Allow-Methods', LRequestMethod);
+  Res.RawWebResponse.SetCustomHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
+  Res.RawWebResponse.SetCustomHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
   Res.RawWebResponse.SetCustomHeader('Access-Control-Max-Age', '86400');
+  Res.RawWebResponse.SetCustomHeader('Access-Control-Expose-Headers', 'Content-Disposition, Content-Type');
 end;
 
 begin
@@ -77,7 +69,6 @@ begin
   end;
 
   THorse
-    .Use(HandleException)
     .Use(
       procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
       begin
@@ -86,27 +77,15 @@ begin
         if SameText(Req.RawWebRequest.Method, 'OPTIONS') then
         begin
           Res.Status(THTTPStatus.OK).Send('');
-          Exit;
+          raise EHorseCallbackInterrupted.Create;
         end;
 
         Next();
       end)
+    .Use(HandleException)
     .Use(Jhonson())
     .Use(OctetStream)
     .Use(Auth);
-
-  THorse.All('/auth/login',
-    procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
-    begin
-      if SameText(Req.RawWebRequest.Method, 'OPTIONS') then
-      begin
-        ApplyCORSHeaders(Req, Res);
-        Res.Status(THTTPStatus.OK).Send('');
-        Exit;
-      end;
-
-      Next();
-    end);
 
   THorse.Get('/ping',
     procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
