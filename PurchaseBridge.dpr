@@ -7,7 +7,6 @@ uses
   Horse.Jhonson,
   Horse.OctetStream,
   Horse.HandleException,
-  Horse.Logger,
   System.SysUtils,
   System.StrUtils,
   HConfig in 'config\HConfig.pas',
@@ -37,6 +36,33 @@ begin
   Result := MatchText(AOrigin, ['http://localhost:5173', 'http://127.0.0.1:5173']);
 end;
 
+procedure ApplyCORSHeaders(const Req: THorseRequest; const Res: THorseResponse);
+var
+  LOrigin: string;
+  LRequestHeaders: string;
+  LRequestMethod: string;
+begin
+  LOrigin := Req.Headers['Origin'];
+  if IsAllowedOrigin(LOrigin) then
+    Res.RawWebResponse.SetCustomHeader('Access-Control-Allow-Origin', LOrigin)
+  else
+    Res.RawWebResponse.SetCustomHeader('Access-Control-Allow-Origin', 'http://localhost:5173');
+
+  Res.RawWebResponse.SetCustomHeader('Vary', 'Origin');
+  Res.RawWebResponse.SetCustomHeader('Access-Control-Allow-Credentials', 'true');
+
+  LRequestHeaders := Req.Headers['Access-Control-Request-Headers'];
+  if LRequestHeaders.IsEmpty then
+    LRequestHeaders := 'Content-Type, Authorization, X-Requested-With';
+  Res.RawWebResponse.SetCustomHeader('Access-Control-Allow-Headers', LRequestHeaders);
+
+  LRequestMethod := Req.Headers['Access-Control-Request-Method'];
+  if LRequestMethod.IsEmpty then
+    LRequestMethod := 'GET, POST, PUT, PATCH, DELETE, OPTIONS';
+  Res.RawWebResponse.SetCustomHeader('Access-Control-Allow-Methods', LRequestMethod);
+  Res.RawWebResponse.SetCustomHeader('Access-Control-Max-Age', '86400');
+end;
+
 begin
   // Initialize configuration at startup
   try
@@ -52,31 +78,10 @@ begin
 
   THorse
     .Use(HandleException)
-    .Use(THorseLoggerManager.HorseCallback())
     .Use(
       procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
-      var
-        LOrigin: string;
-        LRequestHeaders: string;
-        LRequestMethod: string;
       begin
-        LOrigin := Req.Headers['Origin'];
-        if IsAllowedOrigin(LOrigin) then
-          Res.RawWebResponse.SetCustomHeader('Access-Control-Allow-Origin', LOrigin);
-
-        Res.RawWebResponse.SetCustomHeader('Vary', 'Origin');
-        Res.RawWebResponse.SetCustomHeader('Access-Control-Allow-Credentials', 'true');
-
-        LRequestHeaders := Req.Headers['Access-Control-Request-Headers'];
-        if LRequestHeaders.IsEmpty then
-          LRequestHeaders := 'Content-Type, Authorization, X-Requested-With';
-        Res.RawWebResponse.SetCustomHeader('Access-Control-Allow-Headers', LRequestHeaders);
-
-        LRequestMethod := Req.Headers['Access-Control-Request-Method'];
-        if LRequestMethod.IsEmpty then
-          LRequestMethod := 'GET, POST, PUT, PATCH, DELETE, OPTIONS';
-        Res.RawWebResponse.SetCustomHeader('Access-Control-Allow-Methods', LRequestMethod);
-        Res.RawWebResponse.SetCustomHeader('Access-Control-Max-Age', '86400');
+        ApplyCORSHeaders(Req, Res);
 
         if SameText(Req.RawWebRequest.Method, 'OPTIONS') then
         begin
@@ -89,6 +94,13 @@ begin
     .Use(Jhonson())
     .Use(OctetStream)
     .Use(Auth);
+
+  THorse.Options('/*',
+    procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
+    begin
+      ApplyCORSHeaders(Req, Res);
+      Res.Status(THTTPStatus.OK).Send('');
+    end);
 
   THorse.Get('/ping',
     procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
