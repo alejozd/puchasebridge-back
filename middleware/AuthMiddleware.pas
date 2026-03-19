@@ -26,13 +26,6 @@ var
   LPath: string;
   LResponse: TJSONObject;
 begin
-  if SameText(Req.RawWebRequest.Method, 'OPTIONS') or
-     (not Req.Headers['Access-Control-Request-Method'].IsEmpty) then
-  begin
-    Res.Status(THTTPStatus.OK).Send('');
-    Exit;
-  end;
-
   LPath := NormalizePath(Req.RawWebRequest.PathInfo);
   if (LPath = '/auth/login') or
      (LPath = '/ping') then
