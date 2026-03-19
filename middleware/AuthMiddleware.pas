@@ -26,6 +26,13 @@ var
   LPath: string;
   LResponse: TJSONObject;
 begin
+  // CRITICO: nunca bloquear preflight en autenticacion
+  if SameText(Req.RawWebRequest.Method, 'OPTIONS') then
+  begin
+    Next();
+    Exit;
+  end;
+
   LPath := NormalizePath(Req.RawWebRequest.PathInfo);
   if (LPath = '/auth/login') or
      (LPath = '/ping') then

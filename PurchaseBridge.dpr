@@ -75,7 +75,7 @@ begin
 
         if SameText(Req.RawWebRequest.Method, 'OPTIONS') then
         begin
-          Res.Status(THTTPStatus.NoContent).Send('');
+          Res.Status(THTTPStatus.OK).Send('');
           Exit;
         end;
 
