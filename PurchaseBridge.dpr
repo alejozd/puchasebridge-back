@@ -9,6 +9,7 @@ uses
   Horse.HandleException,
   Horse.Logger,
   System.SysUtils,
+  System.StrUtils,
   HConfig in 'config\HConfig.pas',
   FirebirdConnection in 'database\FirebirdConnection.pas',
   ProveedorRepository in 'repositories\ProveedorRepository.pas',
@@ -31,6 +32,11 @@ uses
   AuthController in 'controllers\AuthController.pas',
   AuthMiddleware in 'middleware\AuthMiddleware.pas';
 
+function IsAllowedOrigin(const AOrigin: string): Boolean;
+begin
+  Result := MatchText(AOrigin, ['http://localhost:5173', 'http://127.0.0.1:5173']);
+end;
+
 begin
   // Initialize configuration at startup
   try
@@ -49,16 +55,32 @@ begin
     .Use(THorseLoggerManager.HorseCallback())
     .Use(
       procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
+      var
+        LOrigin: string;
+        LRequestHeaders: string;
+        LRequestMethod: string;
       begin
-        Res.RawWebResponse.SetCustomHeader('Access-Control-Allow-Origin', 'http://localhost:5173');
+        LOrigin := Req.Headers['Origin'];
+        if IsAllowedOrigin(LOrigin) then
+          Res.RawWebResponse.SetCustomHeader('Access-Control-Allow-Origin', LOrigin);
+
         Res.RawWebResponse.SetCustomHeader('Vary', 'Origin');
         Res.RawWebResponse.SetCustomHeader('Access-Control-Allow-Credentials', 'true');
-        Res.RawWebResponse.SetCustomHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-        Res.RawWebResponse.SetCustomHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+
+        LRequestHeaders := Req.Headers['Access-Control-Request-Headers'];
+        if LRequestHeaders.IsEmpty then
+          LRequestHeaders := 'Content-Type, Authorization, X-Requested-With';
+        Res.RawWebResponse.SetCustomHeader('Access-Control-Allow-Headers', LRequestHeaders);
+
+        LRequestMethod := Req.Headers['Access-Control-Request-Method'];
+        if LRequestMethod.IsEmpty then
+          LRequestMethod := 'GET, POST, PUT, PATCH, DELETE, OPTIONS';
+        Res.RawWebResponse.SetCustomHeader('Access-Control-Allow-Methods', LRequestMethod);
+        Res.RawWebResponse.SetCustomHeader('Access-Control-Max-Age', '86400');
 
         if SameText(Req.RawWebRequest.Method, 'OPTIONS') then
         begin
-          Res.Status(THTTPStatus.NoContent).Send('');
+          Res.Status(THTTPStatus.OK).Send('');
           Exit;
         end;
 
