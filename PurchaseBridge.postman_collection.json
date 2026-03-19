@@ -7,6 +7,77 @@
 	},
 	"item": [
 		{
+			"name": "Login Helisa",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"usuario\": \"ADMIN\",\n  \"clave\": \"1234\"\n}"
+				},
+				"url": {
+					"raw": "http://localhost:9000/auth/login",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "9000",
+					"path": [
+						"auth",
+						"login"
+					]
+				}
+			},
+			"response": [
+				{
+					"name": "Éxito",
+					"originalRequest": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"usuario\": \"ADMIN\",\n  \"clave\": \"1234\"\n}"
+						},
+						"url": {
+							"raw": "http://localhost:9000/auth/login",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "9000",
+							"path": [
+								"auth",
+								"login"
+							]
+						}
+					},
+					"status": "OK",
+					"code": 200,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n  \"success\": true,\n  \"usuario\": {\n    \"codigo\": 1,\n    \"nombre\": \"ADMIN\"\n  },\n  \"empresa\": {\n    \"codigo\": 0,\n    \"nombre\": \"EMPRESA DEMO\",\n    \"identidad\": \"900123456\",\n    \"anoActual\": 2026,\n    \"tarifaReteCree\": 0.4\n  },\n  \"token\": \"abc123\"\n}"
+				}
+			]
+		},
+		{
 			"name": "Ping",
 			"request": {
 				"method": "GET",
@@ -413,7 +484,7 @@
 						}
 					],
 					"cookie": [],
-					"body": "{\n    \"procesados\": [\n        {\n            \"fileName\": \"factura1.xml\",\n            \"status\": \"OK\",\n            \"documentoId\": 123\n        }\n    ],\n    \"errores\": [\n        {\n            \"fileName\": \"factura3.xml\",\n            \"error\": \"Archivo no encontrado\"\n        }\n    ]\n}"
+					"body": "{\n    \"procesados\": [\n        {\n            \"fileName\": \"factura1.xml\",\n            \"status\": \"OK\",\n            \"documento\": \"OC  00001234\"\n        }\n    ],\n    \"errores\": [\n        {\n            \"fileName\": \"factura3.xml\",\n            \"error\": \"Archivo no encontrado\"\n        }\n    ]\n}"
 				}
 			]
 		},

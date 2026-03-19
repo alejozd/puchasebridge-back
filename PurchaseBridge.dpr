@@ -16,6 +16,8 @@ uses
   ProductoRepository in 'repositories\ProductoRepository.pas',
   XMLFacturaService in 'services\XMLFacturaService.pas',
   XmlParserService in 'services\XmlParserService.pas',
+  HelisaUtils in 'utils\HelisaUtils.pas',
+  HelisaService in 'services\HelisaService.pas',
   EquivalenciaService in 'services\EquivalenciaService.pas',
   ValidationService in 'services\ValidationService.pas',
   DocumentoService in 'services\DocumentoService.pas',
@@ -25,7 +27,10 @@ uses
   XmlValidationController in 'controllers\XmlValidationController.pas',
   EquivalenciaController in 'controllers\EquivalenciaController.pas',
   HelisaController in 'controllers\HelisaController.pas',
-  DocumentosController in 'controllers\DocumentosController.pas';
+  DocumentosController in 'controllers\DocumentosController.pas',
+  AuthService in 'services\AuthService.pas',
+  AuthController in 'controllers\AuthController.pas',
+  AuthMiddleware in 'middleware\AuthMiddleware.pas';
 
 begin
   // Initialize configuration at startup
@@ -47,6 +52,8 @@ begin
     .Use(HandleException)
     .Use(THorseLoggerManager.HorseCallback());
 
+  THorse.Use(Auth);
+
   THorse.Get('/ping',
     procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
     begin
@@ -60,6 +67,7 @@ begin
   EquivalenciaController.Registry;
   HelisaController.Registry;
   DocumentosController.Registry;
+  AuthController.Registry;
 
   THorse.Listen(9000,
     procedure
