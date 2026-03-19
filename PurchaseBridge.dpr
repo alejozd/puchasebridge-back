@@ -40,7 +40,6 @@ procedure ApplyCORSHeaders(const Req: THorseRequest; const Res: THorseResponse);
 var
   LOrigin: string;
   LRequestHeaders: string;
-  LRequestMethod: string;
 begin
   LOrigin := Req.Headers['Origin'];
   if IsAllowedOrigin(LOrigin) then
@@ -56,10 +55,7 @@ begin
     LRequestHeaders := 'Content-Type, Authorization, X-Requested-With';
   Res.RawWebResponse.SetCustomHeader('Access-Control-Allow-Headers', LRequestHeaders);
 
-  LRequestMethod := Req.Headers['Access-Control-Request-Method'];
-  if LRequestMethod.IsEmpty then
-    LRequestMethod := 'GET, POST, PUT, PATCH, DELETE, OPTIONS';
-  Res.RawWebResponse.SetCustomHeader('Access-Control-Allow-Methods', LRequestMethod);
+  Res.RawWebResponse.SetCustomHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
   Res.RawWebResponse.SetCustomHeader('Access-Control-Max-Age', '86400');
 end;
 
@@ -82,7 +78,8 @@ begin
       begin
         ApplyCORSHeaders(Req, Res);
 
-        if SameText(Req.RawWebRequest.Method, 'OPTIONS') then
+        if SameText(Req.RawWebRequest.Method, 'OPTIONS') or
+           (not Req.Headers['Access-Control-Request-Method'].IsEmpty) then
         begin
           Res.Status(THTTPStatus.OK).Send('');
           Exit;
@@ -98,7 +95,8 @@ begin
   THorse.All('/auth/login',
     procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
     begin
-      if SameText(Req.RawWebRequest.Method, 'OPTIONS') then
+      if SameText(Req.RawWebRequest.Method, 'OPTIONS') or
+         (not Req.Headers['Access-Control-Request-Method'].IsEmpty) then
       begin
         ApplyCORSHeaders(Req, Res);
         Res.Status(THTTPStatus.OK).Send('');
