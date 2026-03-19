@@ -4,12 +4,11 @@ program PurchaseBridge;
 
 uses
   Horse,
-  Horse.CORS,
   Horse.Jhonson,
   Horse.OctetStream,
   Horse.HandleException,
-  Horse.Logger,
   System.SysUtils,
+  System.StrUtils,
   HConfig in 'config\HConfig.pas',
   FirebirdConnection in 'database\FirebirdConnection.pas',
   ProveedorRepository in 'repositories\ProveedorRepository.pas',
@@ -32,6 +31,38 @@ uses
   AuthController in 'controllers\AuthController.pas',
   AuthMiddleware in 'middleware\AuthMiddleware.pas';
 
+function IsAllowedOrigin(const AOrigin: string): Boolean;
+begin
+  Result := MatchText(AOrigin, ['http://localhost:5173', 'http://127.0.0.1:5173']);
+end;
+
+procedure ApplyCORSHeaders(const Req: THorseRequest; const Res: THorseResponse);
+var
+  LOrigin: string;
+  LRequestHeaders: string;
+  LRequestMethod: string;
+begin
+  LOrigin := Req.Headers['Origin'];
+  if IsAllowedOrigin(LOrigin) then
+    Res.RawWebResponse.SetCustomHeader('Access-Control-Allow-Origin', LOrigin)
+  else
+    Res.RawWebResponse.SetCustomHeader('Access-Control-Allow-Origin', 'http://localhost:5173');
+
+  Res.RawWebResponse.SetCustomHeader('Vary', 'Origin');
+  Res.RawWebResponse.SetCustomHeader('Access-Control-Allow-Credentials', 'true');
+
+  LRequestHeaders := Req.Headers['Access-Control-Request-Headers'];
+  if LRequestHeaders.IsEmpty then
+    LRequestHeaders := 'Content-Type, Authorization, X-Requested-With';
+  Res.RawWebResponse.SetCustomHeader('Access-Control-Allow-Headers', LRequestHeaders);
+
+  LRequestMethod := Req.Headers['Access-Control-Request-Method'];
+  if LRequestMethod.IsEmpty then
+    LRequestMethod := 'GET, POST, PUT, PATCH, DELETE, OPTIONS';
+  Res.RawWebResponse.SetCustomHeader('Access-Control-Allow-Methods', LRequestMethod);
+  Res.RawWebResponse.SetCustomHeader('Access-Control-Max-Age', '86400');
+end;
+
 begin
   // Initialize configuration at startup
   try
@@ -46,13 +77,36 @@ begin
   end;
 
   THorse
-    .Use(CORS)
+    .Use(HandleException)
+    .Use(
+      procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
+      begin
+        ApplyCORSHeaders(Req, Res);
+
+        if SameText(Req.RawWebRequest.Method, 'OPTIONS') then
+        begin
+          Res.Status(THTTPStatus.OK).Send('');
+          Exit;
+        end;
+
+        Next();
+      end)
     .Use(Jhonson())
     .Use(OctetStream)
-    .Use(HandleException)
-    .Use(THorseLoggerManager.HorseCallback());
+    .Use(Auth);
 
-  THorse.Use(Auth);
+  THorse.All('/auth/login',
+    procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
+    begin
+      if SameText(Req.RawWebRequest.Method, 'OPTIONS') then
+      begin
+        ApplyCORSHeaders(Req, Res);
+        Res.Status(THTTPStatus.OK).Send('');
+        Exit;
+      end;
+
+      Next();
+    end);
 
   THorse.Get('/ping',
     procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
