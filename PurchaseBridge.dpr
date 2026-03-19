@@ -77,7 +77,6 @@ begin
   end;
 
   THorse
-    .Use(HandleException)
     .Use(
       procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
       begin
@@ -91,6 +90,7 @@ begin
 
         Next();
       end)
+    .Use(HandleException)
     .Use(Jhonson())
     .Use(OctetStream)
     .Use(Auth);

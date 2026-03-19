@@ -28,7 +28,7 @@ var
 begin
   if SameText(Req.RawWebRequest.Method, 'OPTIONS') then
   begin
-    Next();
+    Res.Status(THTTPStatus.OK).Send('');
     Exit;
   end;
 
