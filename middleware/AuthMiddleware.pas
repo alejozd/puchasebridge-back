@@ -11,15 +11,30 @@ procedure Auth(Req: THorseRequest; Res: THorseResponse; Next: TProc);
 
 implementation
 
+function NormalizePath(const APath: string): string;
+begin
+  Result := APath.Trim.ToLower;
+  if (Result.Length > 1) and Result.EndsWith('/') then
+    Result := Result.Substring(0, Result.Length - 1);
+end;
+
 procedure Auth(Req: THorseRequest; Res: THorseResponse; Next: TProc);
 var
   LToken: string;
   LSession: TSessionInfo;
+  LPath: string;
 begin
-  if SameText(Req.RawWebRequest.PathInfo, '/auth/login') or
-     SameText(Req.RawWebRequest.PathInfo, '/ping') then
+  if SameText(Req.RawWebRequest.Method, 'OPTIONS') then
   begin
-    Next;
+    Next();
+    Exit;
+  end;
+
+  LPath := NormalizePath(Req.RawWebRequest.PathInfo);
+  if (LPath = '/auth/login') or
+     (LPath = '/ping') then
+  begin
+    Next();
     Exit;
   end;
 
@@ -38,10 +53,10 @@ begin
   // Inyectar usuario en el contexto
   Req.Session(TSessionInfoObj.Create(LSession));
   try
-    Next;
+    Next();
   finally
     if Req.Session<TObject> <> nil then
-       Req.Session<TObject>.Free;
+      Req.Session<TObject>.Free;
   end;
 end;
 

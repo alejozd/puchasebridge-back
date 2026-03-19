@@ -4,7 +4,6 @@ program PurchaseBridge;
 
 uses
   Horse,
-  Horse.CORS,
   Horse.Jhonson,
   Horse.OctetStream,
   Horse.HandleException,
@@ -46,13 +45,28 @@ begin
   end;
 
   THorse
-    .Use(CORS)
+    .Use(HandleException)
+    .Use(THorseLoggerManager.HorseCallback())
+    .Use(
+      procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
+      begin
+        Res.RawWebResponse.SetCustomHeader('Access-Control-Allow-Origin', 'http://localhost:5173');
+        Res.RawWebResponse.SetCustomHeader('Vary', 'Origin');
+        Res.RawWebResponse.SetCustomHeader('Access-Control-Allow-Credentials', 'true');
+        Res.RawWebResponse.SetCustomHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+        Res.RawWebResponse.SetCustomHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+
+        if SameText(Req.RawWebRequest.Method, 'OPTIONS') then
+        begin
+          Res.Status(THTTPStatus.NoContent).Send('');
+          Exit;
+        end;
+
+        Next();
+      end)
     .Use(Jhonson())
     .Use(OctetStream)
-    .Use(HandleException)
-    .Use(THorseLoggerManager.HorseCallback());
-
-  THorse.Use(Auth);
+    .Use(Auth);
 
   THorse.Get('/ping',
     procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
