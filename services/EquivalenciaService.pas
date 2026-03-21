@@ -31,6 +31,9 @@ implementation
 
 function BuscarEquivalencia(AReferenciaP: string; AUnidadP: string): TFDQuery;
 begin
+  if AReferenciaP.Trim.IsEmpty or AUnidadP.Trim.IsEmpty then
+    raise Exception.Create('Referencia y Unidad son obligatorias para buscar equivalencia');
+
   Result := GetBridgeQuery;
   try
     Result.SQL.Text := 'SELECT * FROM EQUIVALENCIA WHERE REFERENCIAP = :REF AND UNIDADP = :UNI';
@@ -68,6 +71,9 @@ procedure CrearEquivalencia(
 var
   Q: TFDQuery;
 begin
+  if AReferenciaP.Trim.IsEmpty or AUnidadP.Trim.IsEmpty then
+    raise Exception.Create('Referencia y Unidad del proveedor son obligatorias');
+
   if ExisteEquivalencia(AReferenciaP, AUnidadP) then
     raise Exception.CreateFmt('Ya existe una equivalencia para la referencia %s y unidad %s', [AReferenciaP, AUnidadP]);
 
@@ -98,6 +104,9 @@ var
   JSON: TJSONObject;
 begin
   Result := '{}';
+  if AReferenciaP.Trim.IsEmpty or AUnidadP.Trim.IsEmpty then
+    Exit;
+
   Q := BuscarEquivalencia(AReferenciaP, AUnidadP);
   try
     if not Q.IsEmpty then
@@ -156,6 +165,9 @@ function EliminarEquivalencia(const AReferenciaP, AUnidadP: string): Boolean;
 var
   Q: TFDQuery;
 begin
+  if AReferenciaP.Trim.IsEmpty or AUnidadP.Trim.IsEmpty then
+    raise Exception.Create('Referencia y Unidad son obligatorias para eliminar');
+
   Q := GetBridgeQuery;
   try
     Q.SQL.Text := 'DELETE FROM EQUIVALENCIA WHERE REFERENCIAP = :REFP AND UNIDADP = :UNIP';

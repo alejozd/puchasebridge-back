@@ -22,6 +22,7 @@ var
   LProductosArr: TJSONArray;
   LProductoObj: TJSONObject;
 begin
+  Res.ContentType('application/json; charset=utf-8');
   try
     if not Req.Query.TryGetValue('filtro', LFiltro) or LFiltro.Trim.IsEmpty then
     begin

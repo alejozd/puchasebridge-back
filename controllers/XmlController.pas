@@ -38,6 +38,7 @@ var
   LFileInfoList: TList<TFileInfo>;
   LFileInfo: TFileInfo;
 begin
+  Res.ContentType('application/json; charset=utf-8');
   try
     LPath := TPath.Combine('PurchaseBridge', 'Input');
     if not TDirectory.Exists(LPath) then
@@ -107,6 +108,7 @@ var
   LFound: Boolean;
   LFileStream: TFileStream;
 begin
+  Res.ContentType('application/json; charset=utf-8');
   LFound := False;
   LFile := nil;
 
@@ -184,6 +186,7 @@ var
   LProductoObj: TJSONObject;
   I: Integer;
 begin
+  Res.ContentType('application/json; charset=utf-8');
   try
     LBody := Req.Body<TJSONObject>;
     if (LBody = nil) or not LBody.TryGetValue('fileName', LFileName) then
@@ -296,6 +299,7 @@ var
   LResponse, LProductObj: TJSONObject;
   LProductsArr: TJSONArray;
 begin
+  Res.ContentType('application/json; charset=utf-8');
   try
     LFileID := StrToIntDef(Req.Params['id'], 0);
     if LFileID = 0 then
@@ -377,6 +381,7 @@ var
   LProcesadosArr, LErroresArr: TJSONArray;
   LHasPendientes: Boolean;
 begin
+  Res.ContentType('application/json; charset=utf-8');
   LBody := Req.Body<TJSONObject>;
   if (LBody = nil) or not LBody.TryGetValue('ids', LIdsArr) then
   begin
@@ -446,6 +451,7 @@ var
   LJSONList: TJSONArray;
   LJSONObj: TJSONObject;
 begin
+  Res.ContentType('application/json; charset=utf-8');
   try
     Q := GetBridgeQuery;
     try
@@ -493,6 +499,7 @@ var
   LJSONList: TJSONArray;
   LJSONObj: TJSONObject;
 begin
+  Res.ContentType('application/json; charset=utf-8');
   try
     Q := GetBridgeQuery;
     try

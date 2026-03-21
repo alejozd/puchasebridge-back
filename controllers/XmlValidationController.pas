@@ -199,21 +199,40 @@ var
   LBody: TJSONObject;
   LFileName: string;
   LResultJSON: TJSONObject;
+  LErroresArr: TJSONArray;
 begin
-  LBody := Req.Body<TJSONObject>;
-  if (LBody = nil) or not LBody.TryGetValue('fileName', LFileName) then
-  begin
-    LResultJSON := TJSONObject.Create;
-    LResultJSON.AddPair('success', TJSONBool.Create(False));
-    LResultJSON.AddPair('message', 'fileName is required in the body');
-    Res.Status(400).Send(LResultJSON);
-    Exit;
+  Res.ContentType('application/json; charset=utf-8');
+  try
+    LBody := Req.Body<TJSONObject>;
+    if (LBody = nil) or not LBody.TryGetValue('fileName', LFileName) then
+    begin
+      LResultJSON := TJSONObject.Create;
+      LResultJSON.AddPair('fileName', TJSONNull.Create);
+      LResultJSON.AddPair('valido', TJSONBool.Create(False));
+      LResultJSON.AddPair('requiereHomologacion', TJSONBool.Create(False));
+      LErroresArr := TJSONArray.Create;
+      LErroresArr.Add('fileName is required in the body');
+      LResultJSON.AddPair('errores', LErroresArr);
+      Res.Status(400).Send(LResultJSON);
+      Exit;
+    end;
+
+    LFileName := TPath.GetFileName(LFileName);
+    LResultJSON := InternalValidateFile(LFileName);
+    Res.Send<TJSONObject>(LResultJSON);
+  except
+    on E: Exception do
+    begin
+      LResultJSON := TJSONObject.Create;
+      LResultJSON.AddPair('fileName', TJSONNull.Create);
+      LResultJSON.AddPair('valido', TJSONBool.Create(False));
+      LResultJSON.AddPair('requiereHomologacion', TJSONBool.Create(False));
+      LErroresArr := TJSONArray.Create;
+      LErroresArr.Add('Error inesperado: ' + E.Message);
+      LResultJSON.AddPair('errores', LErroresArr);
+      Res.Status(500).Send(LResultJSON);
+    end;
   end;
-
-  LFileName := TPath.GetFileName(LFileName);
-  LResultJSON := InternalValidateFile(LFileName);
-
-  Res.Send<TJSONObject>(LResultJSON);
 end;
 
 procedure ValidateBatch(Req: THorseRequest; Res: THorseResponse; Next: TProc);
@@ -230,6 +249,7 @@ var
   I: Integer;
   LFilesValue: TJSONValue;
 begin
+  Res.ContentType('application/json; charset=utf-8');
   LFiles := TStringList.Create;
   try
     LBody := Req.Body<TJSONObject>;
