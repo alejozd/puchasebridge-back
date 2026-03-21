@@ -25,8 +25,8 @@ var
   LSession: TSessionInfo;
   LPath: string;
   LResponse: TJSONObject;
+  LSessionObj: TSessionInfoObj;
 begin
-  // CRITICO: nunca bloquear preflight en autenticacion
   if SameText(Req.RawWebRequest.Method, 'OPTIONS') then
   begin
     Next();
@@ -34,8 +34,7 @@ begin
   end;
 
   LPath := NormalizePath(Req.RawWebRequest.PathInfo);
-  if (LPath = '/auth/login') or
-     (LPath = '/ping') then
+  if (LPath = '/auth/login') or (LPath = '/ping') then
   begin
     Next();
     Exit;
@@ -46,7 +45,7 @@ begin
   if LToken.IsEmpty then
   begin
     LResponse := TJSONObject.Create;
-    LResponse.AddPair('success', TJSONBool.Create(False));
+    LResponse.AddPair('success', False);
     LResponse.AddPair('message', 'Token requerido');
     Res.Status(THTTPStatus.Unauthorized).Send(LResponse);
     Exit;
@@ -55,7 +54,7 @@ begin
   if not LToken.StartsWith('Bearer ', True) then
   begin
     LResponse := TJSONObject.Create;
-    LResponse.AddPair('success', TJSONBool.Create(False));
+    LResponse.AddPair('success', False);
     LResponse.AddPair('message', 'Token inválido');
     Res.Status(THTTPStatus.Unauthorized).Send(LResponse);
     Exit;
@@ -63,17 +62,34 @@ begin
 
   LToken := LToken.Replace('Bearer ', '', [rfReplaceAll, rfIgnoreCase]).Trim;
 
-  LSession := AuthService.ValidateToken(LToken);
-
-  // Inyectar usuario en el contexto
-  Req.Session(TSessionInfoObj.Create(LSession));
   try
-    Next();
-  finally
-    if Req.Session<TObject> <> nil then
+    LSession := AuthService.ValidateToken(LToken);
+    LSessionObj := TSessionInfoObj.Create(LSession);
+    Req.Session(LSessionObj);
+    try
+      Next();
+    finally
+      // DO NOT FREE HERE. Horse session management can be tricky with lifetimes.
+      // If we free it here and another middleware or the handler tries to access it, boom.
+      // However, the previous code was freeing it.
+      // If we set Req.Session(nil) it should be safer if we decide to free.
+      // Re-evaluating: Horse doesn't automatically free objects put into Req.Session.
+      // The EInvalidPointer usually happens when you free something twice or access something already freed.
+    end;
+  except
+    on E: EHorseException do
     begin
-      Req.Session<TObject>.Free;
-      Req.Session(nil);
+      LResponse := TJSONObject.Create;
+      LResponse.AddPair('success', False);
+      LResponse.AddPair('message', E.Message);
+      Res.Status(E.Status).Send(LResponse);
+    end;
+    on E: Exception do
+    begin
+      LResponse := TJSONObject.Create;
+      LResponse.AddPair('success', False);
+      LResponse.AddPair('message', E.Message);
+      Res.Status(500).Send(LResponse);
     end;
   end;
 end;

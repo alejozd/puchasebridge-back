@@ -37,9 +37,12 @@ type
   end;
 
 procedure ListFiles(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+var
+  LResult: TJSONArray;
 begin
   try
-    Res.Send(TXmlPersistenceService.ListFiles);
+    LResult := TXmlPersistenceService.ListFiles;
+    Res.Send(LResult);
   except
     on E: Exception do
       Res.Status(500).Send(TJSONObject.Create.AddPair('error', E.Message));
@@ -89,7 +92,6 @@ begin
     end;
 
     LFiles := TDirectory.GetFiles(LPath, '*.xml');
-
     LFileInfoList := TList<TFileInfo>.Create;
     try
       for LFile in LFiles do
@@ -176,7 +178,9 @@ begin
 
     LResponse := TJSONObject.Create;
     LResponse.AddPair('success', True);
+    LResponse.AddPair('message', 'XML uploaded successfully');
     LResponse.AddPair('fileName', LFileName);
+    LResponse.AddPair('path', LFullFile.Replace('\', '/'));
     Res.Send(LResponse);
   except
     on E: Exception do
@@ -185,9 +189,12 @@ begin
 end;
 
 procedure GetPendingProducts(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+var
+  LResult: TJSONArray;
 begin
   try
-    Res.Send(TXmlPersistenceService.ListPendingProducts);
+    LResult := TXmlPersistenceService.ListPendingProducts;
+    Res.Send(LResult);
   except
     on E: Exception do
       Res.Status(500).Send(TJSONObject.Create.AddPair('error', E.Message));
@@ -363,13 +370,14 @@ end;
 procedure Registry;
 begin
   THorse.Get('/xml/list', List);
+  THorse.Post('/xml/upload', Upload);
+  THorse.Post('/xml/parse', Parse);
+
   THorse.Get('/xml/files', ListFiles);
   THorse.Get('/xml/files/:id', GetFile);
   THorse.Get('/xml/productos/pendientes', GetPendingProducts);
   THorse.Post('/xml/validate', Validate);
   THorse.Post('/xml/procesar', ProcesarXml);
-  THorse.Post('/xml/upload', Upload);
-  THorse.Post('/xml/parse', Parse);
 end;
 
 end.

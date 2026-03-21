@@ -50,7 +50,116 @@
 			]
 		},
 		{
-			"name": "XML Flow",
+			"name": "XML (Original)",
+			"item": [
+				{
+					"name": "Listar Archivos (FS)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:9000/xml/list",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "9000",
+							"path": [
+								"xml",
+								"list"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Éxito",
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"body": "[\n    {\n        \"fileName\": \"factura1.xml\",\n        \"size\": 24567,\n        \"lastModified\": \"2026-03-17 14:30:00\"\n    }\n]"
+						}
+					]
+				},
+				{
+					"name": "Subir Archivo XML",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "file",
+									"type": "file",
+									"src": []
+								}
+							]
+						},
+						"url": {
+							"raw": "http://localhost:9000/xml/upload",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "9000",
+							"path": [
+								"xml",
+								"upload"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Éxito",
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"body": "{\n    \"success\": true,\n    \"message\": \"XML uploaded successfully\",\n    \"fileName\": \"factura.xml\",\n    \"path\": \"PurchaseBridge/Input/factura.xml\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Parsear Archivo XML",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"fileName\": \"factura1.xml\"\n}"
+						},
+						"url": {
+							"raw": "http://localhost:9000/xml/parse",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "9000",
+							"path": [
+								"xml",
+								"parse"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Éxito",
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"body": "{\n    \"success\": true,\n    \"proveedor\": { ... },\n    \"productos\": [ ... ],\n    \"totales\": { ... }\n}"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "XML Staging (Nuevo)",
 			"item": [
 				{
 					"name": "Listar Archivos (Bandeja)",
@@ -82,7 +191,7 @@
 							"status": "OK",
 							"code": 200,
 							"_postman_previewlanguage": "json",
-							"body": "[\n    {\n        \"id\": 1,\n        \"file_name\": \"ad086000253602726330020260314073312852.xml\",\n        \"proveedor_nombre\": \"COMPAÑIA COLOMBIANA DE CERAMICA S A S\",\n        \"fecha_documento\": \"2026-03-14 00:00:00\",\n        \"estado\": \"VALIDADO\",\n        \"fecha_carga\": \"2026-03-17 18:00:00\"\n    }\n]"
+							"body": "[\n    {\n        \"id\": 1,\n        \"file_name\": \"factura1.xml\",\n        \"proveedor_nombre\": \"CERAMICA SAS\",\n        \"fecha_documento\": \"2026-03-14 00:00:00\",\n        \"estado\": \"VALIDADO\",\n        \"fecha_carga\": \"2026-03-17 18:00:00\"\n    }\n]"
 						}
 					]
 				},
@@ -111,15 +220,7 @@
 							]
 						}
 					},
-					"response": [
-						{
-							"name": "Éxito",
-							"status": "OK",
-							"code": 200,
-							"_postman_previewlanguage": "json",
-							"body": "{\n    \"archivo\": {\n        \"id\": 1,\n        \"file_name\": \"ad0860002536.xml\",\n        \"proveedor_nit\": \"860002536\",\n        \"proveedor_nombre\": \"CERAMICA SAS\",\n        \"fecha_documento\": \"2026-03-14 00:00:00\",\n        \"estado\": \"VALIDADO\",\n        \"fecha_carga\": \"2026-03-17 18:00:00\"\n    },\n    \"productos\": [\n        {\n            \"id\": 1,\n            \"descripcion\": \"LAVAMANOS\",\n            \"referencia\": \"REF123\",\n            \"cantidad\": 10,\n            \"unidad\": \"94\",\n            \"valor_unitario\": 50000,\n            \"valor_total\": 500000,\n            \"equivalencia_id\": 5\n        }\n    ]\n}"
-						}
-					]
+					"response": []
 				},
 				{
 					"name": "Validar y Persistir XML",
@@ -139,7 +240,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"fileName\": \"ad086000253602726330020260314073312852.xml\"\n}"
+							"raw": "{\n  \"fileName\": \"factura1.xml\"\n}"
 						},
 						"url": {
 							"raw": "http://localhost:9000/xml/validate",
@@ -154,18 +255,10 @@
 							]
 						}
 					},
-					"response": [
-						{
-							"name": "Éxito",
-							"status": "OK",
-							"code": 200,
-							"_postman_previewlanguage": "json",
-							"body": "{\n    \"success\": true,\n    \"id\": 1,\n    \"errores\": [],\n    \"advertencias\": []\n}"
-						}
-					]
+					"response": []
 				},
 				{
-					"name": "Productos Pendientes de Homologación",
+					"name": "Productos Pendientes",
 					"request": {
 						"method": "GET",
 						"header": [
@@ -189,18 +282,10 @@
 							]
 						}
 					},
-					"response": [
-						{
-							"name": "Éxito",
-							"status": "OK",
-							"code": 200,
-							"_postman_previewlanguage": "json",
-							"body": "[\n    {\n        \"id\": 2,\n        \"xml_file_id\": 1,\n        \"file_name\": \"ad0860002536.xml\",\n        \"proveedor_nombre\": \"CERAMICA SAS\",\n        \"descripcion\": \"GRIFERIA\",\n        \"referencia\": \"GRIF99\",\n        \"cantidad\": 5,\n        \"unidad\": \"94\",\n        \"valor_unitario\": 30000,\n        \"valor_total\": 150000\n    }\n]"
-						}
-					]
+					"response": []
 				},
 				{
-					"name": "Procesar XML (Batch)",
+					"name": "Procesar XML",
 					"request": {
 						"method": "POST",
 						"header": [
@@ -217,7 +302,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"ids\": [1, 2]\n}"
+							"raw": "{\n  \"ids\": [1]\n}"
 						},
 						"url": {
 							"raw": "http://localhost:9000/xml/procesar",
@@ -232,15 +317,7 @@
 							]
 						}
 					},
-					"response": [
-						{
-							"name": "Éxito",
-							"status": "OK",
-							"code": 200,
-							"_postman_previewlanguage": "json",
-							"body": "{\n    \"procesados\": [\n        {\n            \"id\": 1,\n            \"documento\": \"OC  00001234\"\n        }\n    ],\n    \"errores\": [\n        {\n            \"id\": 2,\n            \"error\": \"Existen productos sin homologación\"\n        }\n    ]\n}"
-						}
-					]
+					"response": []
 				}
 			]
 		},
@@ -253,7 +330,7 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "http://localhost:9000/equivalencias?referenciaP=O60691031&limite=50",
+							"raw": "http://localhost:9000/equivalencias?limite=50",
 							"protocol": "http",
 							"host": [
 								"localhost"
@@ -263,10 +340,6 @@
 								"equivalencias"
 							],
 							"query": [
-								{
-									"key": "referenciaP",
-									"value": "O60691031"
-								},
 								{
 									"key": "limite",
 									"value": "50"
@@ -289,7 +362,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"codigoH\": 123,\n  \"subCodigoH\": 1,\n  \"nombreH\": \"LAVAMANOS ALUVIA\",\n  \"referenciaH\": \"O60691031H\",\n  \"unidadH\": \"MTR\",\n  \"referenciaP\": \"O60691031\",\n  \"unidadP\": \"94\",\n  \"factor\": 1.4\n}"
+							"raw": "{\n  \"codigoH\": 123,\n  \"referenciaH\": \"REF-H\",\n  \"referenciaP\": \"REF-P\",\n  \"unidadP\": \"94\",\n  \"factor\": 1\n}"
 						},
 						"url": {
 							"raw": "http://localhost:9000/equivalencias",
