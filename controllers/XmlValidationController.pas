@@ -73,7 +73,7 @@ var
   LPath, LFullFile, LXMLContent, LParsedJSONStr, LValidationResult: string;
   LParsedInvoice: TParsedInvoice;
   LResultJSON, LParsedObj: TJSONObject;
-  LErroresArray, LEmptyProductos: TJSONArray;
+  LErroresArray: TJSONArray;
   LVal: TJSONValue;
 begin
   try

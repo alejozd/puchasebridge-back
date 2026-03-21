@@ -26,6 +26,11 @@ begin
   LOutputJSON := TJSONObject.Create;
   LResultProductosArray := TJSONArray.Create;
   LErroresArray := TJSONArray.Create;
+
+  // Add child objects to parent immediately to ensure single cleanup point
+  LOutputJSON.AddPair('productos', LResultProductosArray);
+  LOutputJSON.AddPair('errores', LErroresArray);
+
   LInputJSON := nil;
 
   try
@@ -36,8 +41,6 @@ begin
       LOutputJSON.AddPair('valido', TJSONBool.Create(False));
       LOutputJSON.AddPair('requiereHomologacion', TJSONBool.Create(False));
       LOutputJSON.AddPair('proveedorExiste', TJSONBool.Create(False));
-      LOutputJSON.AddPair('productos', LResultProductosArray);
-      LOutputJSON.AddPair('errores', LErroresArray);
       Result := LOutputJSON.ToJSON;
       Exit;
     end;
@@ -86,7 +89,7 @@ begin
           LResultItemJSON := TJSONObject.Create;
           LResultItemJSON.AddPair('referencia', LReferencia);
           LResultItemJSON.AddPair('unidad', LUnidad);
-          LResultItemJSON.AddPair('existeEquivalencia', LValido);
+          LResultItemJSON.AddPair('existeEquivalencia', TJSONBool.Create(LValido));
           LResultProductosArray.Add(LResultItemJSON);
         end;
       end;
@@ -119,8 +122,6 @@ begin
       LOutputJSON.AddPair('valido', TJSONBool.Create(LValido));
       LOutputJSON.AddPair('requiereHomologacion', TJSONBool.Create(LRequiereHomologacion));
       LOutputJSON.AddPair('proveedorExiste', TJSONBool.Create(LProveedorExiste));
-      LOutputJSON.AddPair('productos', LResultProductosArray);
-      LOutputJSON.AddPair('errores', LErroresArray);
 
       Result := LOutputJSON.ToJSON;
     except
@@ -131,17 +132,6 @@ begin
         if LOutputJSON.GetValue('valido') = nil then LOutputJSON.AddPair('valido', TJSONBool.Create(False));
         if LOutputJSON.GetValue('requiereHomologacion') = nil then LOutputJSON.AddPair('requiereHomologacion', TJSONBool.Create(False));
         if LOutputJSON.GetValue('proveedorExiste') = nil then LOutputJSON.AddPair('proveedorExiste', TJSONBool.Create(False));
-
-        if LOutputJSON.GetValue('productos') = nil then
-          LOutputJSON.AddPair('productos', LResultProductosArray)
-        else
-          LResultProductosArray.Free; // Already added or we'll leak if we don't free and it's not in the object
-
-        if LOutputJSON.GetValue('errores') = nil then
-          LOutputJSON.AddPair('errores', LErroresArray)
-        else
-          LErroresArray.Free;
-
         Result := LOutputJSON.ToJSON;
       end;
     end;

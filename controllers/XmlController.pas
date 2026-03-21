@@ -323,8 +323,9 @@ begin
       LResponse := TJSONObject.Create;
       LResponse.AddPair('id', TJSONNumber.Create(Q.FieldByName('ID').AsInteger));
       LResponse.AddPair('fileName', Q.FieldByName('FILE_NAME').AsString);
+      LResponse.AddPair('proveedorNit', Q.FieldByName('PROVEEDOR_NIT').AsString);
       LResponse.AddPair('proveedorNombre', Q.FieldByName('PROVEEDOR_NOMBRE').AsString);
-      LResponse.AddPair('fechaDocumento', FormatDateTime('yyyy-mm-dd HH:nn:ss', Q.FieldByName('FECHA_DOCUMENTO').AsDateTime));
+      LResponse.AddPair('fechaDocumento', FormatDateTime('yyyy-mm-dd', Q.FieldByName('FECHA_DOCUMENTO').AsDateTime));
       LResponse.AddPair('estado', Q.FieldByName('ESTADO').AsString);
       LResponse.AddPair('fechaCarga', FormatDateTime('yyyy-mm-dd HH:nn:ss', Q.FieldByName('FECHA_CARGA').AsDateTime));
 
@@ -340,10 +341,12 @@ begin
         LProductObj.AddPair('id', TJSONNumber.Create(Q.FieldByName('ID').AsInteger));
         LProductObj.AddPair('descripcion', Q.FieldByName('DESCRIPCION').AsString);
         LProductObj.AddPair('referencia', Q.FieldByName('REFERENCIA').AsString);
+        LProductObj.AddPair('referenciaStd', Q.FieldByName('REFERENCIA_STD').AsString);
         LProductObj.AddPair('cantidad', TJSONNumber.Create(Q.FieldByName('CANTIDAD').AsFloat));
-        LProductObj.AddPair('unidad', Q.FieldByName('UNIDADP').AsString);
+        LProductObj.AddPair('unidad', Q.FieldByName('UNIDAD').AsString);
         LProductObj.AddPair('valorUnitario', TJSONNumber.Create(Q.FieldByName('VALOR_UNITARIO').AsFloat));
         LProductObj.AddPair('valorTotal', TJSONNumber.Create(Q.FieldByName('VALOR_TOTAL').AsFloat));
+        LProductObj.AddPair('impuesto', TJSONNumber.Create(Q.FieldByName('IMPUESTO').AsFloat));
 
         if not Q.FieldByName('EQUIVALENCIA_ID').IsNull then
           LProductObj.AddPair('equivalenciaId', TJSONNumber.Create(Q.FieldByName('EQUIVALENCIA_ID').AsInteger))
@@ -418,7 +421,7 @@ begin
         else
         begin
           // 2. Simulate processing (setting state to PROCESADO)
-          Q.SQL.Text := 'UPDATE XML_FILES SET ESTADO = ''PROCESADO'' WHERE ID = :ID';
+          Q.SQL.Text := 'UPDATE XML_FILES SET ESTADO = ''PROCESADO'', FECHA_PROCESO = CURRENT_TIMESTAMP WHERE ID = :ID';
           Q.ParamByName('ID').AsInteger := LId;
           Q.ExecSQL;
 
@@ -471,8 +474,9 @@ begin
         LJSONObj.AddPair('fileName', Q.FieldByName('FILE_NAME').AsString);
         LJSONObj.AddPair('descripcion', Q.FieldByName('DESCRIPCION').AsString);
         LJSONObj.AddPair('referencia', Q.FieldByName('REFERENCIA').AsString);
+        LJSONObj.AddPair('referenciaStd', Q.FieldByName('REFERENCIA_STD').AsString);
         LJSONObj.AddPair('cantidad', TJSONNumber.Create(Q.FieldByName('CANTIDAD').AsFloat));
-        LJSONObj.AddPair('unidad', Q.FieldByName('UNIDADP').AsString);
+        LJSONObj.AddPair('unidad', Q.FieldByName('UNIDAD').AsString);
         LJSONObj.AddPair('valorUnitario', TJSONNumber.Create(Q.FieldByName('VALOR_UNITARIO').AsFloat));
         LJSONObj.AddPair('valorTotal', TJSONNumber.Create(Q.FieldByName('VALOR_TOTAL').AsFloat));
         LJSONList.AddElement(LJSONObj);
@@ -512,8 +516,9 @@ begin
         LJSONObj := TJSONObject.Create;
         LJSONObj.AddPair('id', TJSONNumber.Create(Q.FieldByName('ID').AsInteger));
         LJSONObj.AddPair('fileName', Q.FieldByName('FILE_NAME').AsString);
+        LJSONObj.AddPair('proveedorNit', Q.FieldByName('PROVEEDOR_NIT').AsString);
         LJSONObj.AddPair('proveedorNombre', Q.FieldByName('PROVEEDOR_NOMBRE').AsString);
-        LJSONObj.AddPair('fechaDocumento', FormatDateTime('yyyy-mm-dd HH:nn:ss', Q.FieldByName('FECHA_DOCUMENTO').AsDateTime));
+        LJSONObj.AddPair('fechaDocumento', FormatDateTime('yyyy-mm-dd', Q.FieldByName('FECHA_DOCUMENTO').AsDateTime));
         LJSONObj.AddPair('estado', Q.FieldByName('ESTADO').AsString);
         LJSONObj.AddPair('fechaCarga', FormatDateTime('yyyy-mm-dd HH:nn:ss', Q.FieldByName('FECHA_CARGA').AsDateTime));
         LJSONList.AddElement(LJSONObj);
