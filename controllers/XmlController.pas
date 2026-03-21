@@ -17,7 +17,9 @@ uses
   System.Types,
   Web.HTTPApp,
   Web.ReqFiles,
-  XmlParserService;
+  XmlParserService,
+  FireDAC.Comp.Client,
+  FirebirdConnection;
 
 type
   TFileInfo = record
@@ -287,11 +289,253 @@ begin
   end;
 end;
 
+procedure GetFileById(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+var
+  Q: TFDQuery;
+  LFileID: Integer;
+  LResponse, LProductObj: TJSONObject;
+  LProductsArr: TJSONArray;
+begin
+  try
+    LFileID := StrToIntDef(Req.Params['id'], 0);
+    if LFileID = 0 then
+    begin
+      Res.Status(400).Send('ID inválido');
+      Exit;
+    end;
+
+    Q := GetBridgeQuery;
+    try
+      Q.SQL.Text := 'SELECT * FROM XML_FILES WHERE ID = :ID';
+      Q.ParamByName('ID').AsInteger := LFileID;
+      Q.Open;
+
+      if Q.IsEmpty then
+      begin
+        Res.Status(404).Send('Archivo no encontrado');
+        Exit;
+      end;
+
+      LResponse := TJSONObject.Create;
+      LResponse.AddPair('id', TJSONNumber.Create(Q.FieldByName('ID').AsInteger));
+      LResponse.AddPair('fileName', Q.FieldByName('FILE_NAME').AsString);
+      LResponse.AddPair('proveedorNombre', Q.FieldByName('PROVEEDOR_NOMBRE').AsString);
+      LResponse.AddPair('fechaDocumento', FormatDateTime('yyyy-mm-dd HH:nn:ss', Q.FieldByName('FECHA_DOCUMENTO').AsDateTime));
+      LResponse.AddPair('estado', Q.FieldByName('ESTADO').AsString);
+      LResponse.AddPair('fechaCarga', FormatDateTime('yyyy-mm-dd HH:nn:ss', Q.FieldByName('FECHA_CARGA').AsDateTime));
+
+      Q.Close;
+      Q.SQL.Text := 'SELECT * FROM XML_PRODUCTOS WHERE XML_FILE_ID = :FILEID';
+      Q.ParamByName('FILEID').AsInteger := LFileID;
+      Q.Open;
+
+      LProductsArr := TJSONArray.Create;
+      while not Q.Eof do
+      begin
+        LProductObj := TJSONObject.Create;
+        LProductObj.AddPair('id', TJSONNumber.Create(Q.FieldByName('ID').AsInteger));
+        LProductObj.AddPair('descripcion', Q.FieldByName('DESCRIPCION').AsString);
+        LProductObj.AddPair('referencia', Q.FieldByName('REFERENCIA').AsString);
+        LProductObj.AddPair('cantidad', TJSONNumber.Create(Q.FieldByName('CANTIDAD').AsFloat));
+        LProductObj.AddPair('unidad', Q.FieldByName('UNIDAD').AsString);
+        LProductObj.AddPair('valorUnitario', TJSONNumber.Create(Q.FieldByName('VALOR_UNITARIO').AsFloat));
+        LProductObj.AddPair('valorTotal', TJSONNumber.Create(Q.FieldByName('VALOR_TOTAL').AsFloat));
+
+        if not Q.FieldByName('EQUIVALENCIA_ID').IsNull then
+          LProductObj.AddPair('equivalenciaId', TJSONNumber.Create(Q.FieldByName('EQUIVALENCIA_ID').AsInteger))
+        else
+          LProductObj.AddPair('equivalenciaId', TJSONNull.Create);
+
+        LProductsArr.AddElement(LProductObj);
+        Q.Next;
+      end;
+      LResponse.AddPair('productos', LProductsArr);
+
+      Res.Send(LResponse);
+    finally
+      Q.Free;
+    end;
+  except
+    on E: Exception do
+    begin
+      LResponse := TJSONObject.Create;
+      LResponse.AddPair('success', TJSONBool.Create(False));
+      LResponse.AddPair('message', E.Message);
+      Res.Status(500).Send(LResponse);
+    end;
+  end;
+end;
+
+procedure ProcesarBatch(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+var
+  Q: TFDQuery;
+  LBody: TJSONObject;
+  LIdsArr: TJSONArray;
+  LId: Integer;
+  I: Integer;
+  LResponse, LProcesadoObj, LErrorObj: TJSONObject;
+  LProcesadosArr, LErroresArr: TJSONArray;
+  LHasPendientes: Boolean;
+begin
+  LBody := Req.Body<TJSONObject>;
+  if (LBody = nil) or not LBody.TryGetValue('ids', LIdsArr) then
+  begin
+    Res.Status(400).Send('ids is required');
+    Exit;
+  end;
+
+  LProcesadosArr := TJSONArray.Create;
+  LErroresArr := TJSONArray.Create;
+  LResponse := TJSONObject.Create;
+
+  try
+    Q := GetBridgeQuery;
+    try
+      for I := 0 to LIdsArr.Count - 1 do
+      begin
+        LId := StrToIntDef(LIdsArr.Items[I].Value, 0);
+        if LId = 0 then Continue;
+
+        // 1. Check if all products have equivalencies
+        Q.SQL.Text := 'SELECT COUNT(*) as TOTAL FROM XML_PRODUCTOS WHERE XML_FILE_ID = :FILEID AND EQUIVALENCIA_ID IS NULL';
+        Q.ParamByName('FILEID').AsInteger := LId;
+        Q.Open;
+        LHasPendientes := Q.FieldByName('TOTAL').AsInteger > 0;
+        Q.Close;
+
+        if LHasPendientes then
+        begin
+          LErrorObj := TJSONObject.Create;
+          LErrorObj.AddPair('id', TJSONNumber.Create(LId));
+          LErrorObj.AddPair('error', 'Tiene productos sin equivalencia');
+          LErroresArr.AddElement(LErrorObj);
+        end
+        else
+        begin
+          // 2. Simulate processing (setting state to PROCESADO)
+          Q.SQL.Text := 'UPDATE XML_FILES SET ESTADO = ''PROCESADO'' WHERE ID = :ID';
+          Q.ParamByName('ID').AsInteger := LId;
+          Q.ExecSQL;
+
+          LProcesadoObj := TJSONObject.Create;
+          LProcesadoObj.AddPair('id', TJSONNumber.Create(LId));
+          LProcesadoObj.AddPair('status', 'OK');
+          LProcesadosArr.AddElement(LProcesadoObj);
+        end;
+      end;
+
+      LResponse.AddPair('procesados', LProcesadosArr);
+      LResponse.AddPair('errores', LErroresArr);
+      Res.Send(LResponse);
+    finally
+      Q.Free;
+    end;
+  except
+    on E: Exception do
+    begin
+      LResponse.AddPair('success', TJSONBool.Create(False));
+      LResponse.AddPair('message', E.Message);
+      Res.Status(500).Send(LResponse);
+    end;
+  end;
+end;
+
+procedure GetProductosPendientes(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+var
+  Q: TFDQuery;
+  LJSONList: TJSONArray;
+  LJSONObj: TJSONObject;
+begin
+  try
+    Q := GetBridgeQuery;
+    try
+      Q.SQL.Text :=
+        'SELECT P.*, F.FILE_NAME FROM XML_PRODUCTOS P ' +
+        'JOIN XML_FILES F ON P.XML_FILE_ID = F.ID ' +
+        'WHERE P.EQUIVALENCIA_ID IS NULL ' +
+        'ORDER BY F.FECHA_CARGA DESC';
+      Q.Open;
+
+      LJSONList := TJSONArray.Create;
+      while not Q.Eof do
+      begin
+        LJSONObj := TJSONObject.Create;
+        LJSONObj.AddPair('id', TJSONNumber.Create(Q.FieldByName('ID').AsInteger));
+        LJSONObj.AddPair('xmlFileId', TJSONNumber.Create(Q.FieldByName('XML_FILE_ID').AsInteger));
+        LJSONObj.AddPair('fileName', Q.FieldByName('FILE_NAME').AsString);
+        LJSONObj.AddPair('descripcion', Q.FieldByName('DESCRIPCION').AsString);
+        LJSONObj.AddPair('referencia', Q.FieldByName('REFERENCIA').AsString);
+        LJSONObj.AddPair('cantidad', TJSONNumber.Create(Q.FieldByName('CANTIDAD').AsFloat));
+        LJSONObj.AddPair('unidad', Q.FieldByName('UNIDAD').AsString);
+        LJSONObj.AddPair('valorUnitario', TJSONNumber.Create(Q.FieldByName('VALOR_UNITARIO').AsFloat));
+        LJSONObj.AddPair('valorTotal', TJSONNumber.Create(Q.FieldByName('VALOR_TOTAL').AsFloat));
+        LJSONList.AddElement(LJSONObj);
+        Q.Next;
+      end;
+      Res.Send(LJSONList);
+    finally
+      Q.Free;
+    end;
+  except
+    on E: Exception do
+    begin
+      LJSONObj := TJSONObject.Create;
+      LJSONObj.AddPair('success', TJSONBool.Create(False));
+      LJSONObj.AddPair('message', E.Message);
+      Res.Status(500).Send(LJSONObj);
+    end;
+  end;
+end;
+
+procedure GetFiles(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+var
+  Q: TFDQuery;
+  LJSONList: TJSONArray;
+  LJSONObj: TJSONObject;
+begin
+  try
+    Q := GetBridgeQuery;
+    try
+      Q.SQL.Text := 'SELECT * FROM XML_FILES ORDER BY FECHA_CARGA DESC';
+      Q.Open;
+
+      LJSONList := TJSONArray.Create;
+      while not Q.Eof do
+      begin
+        LJSONObj := TJSONObject.Create;
+        LJSONObj.AddPair('id', TJSONNumber.Create(Q.FieldByName('ID').AsInteger));
+        LJSONObj.AddPair('fileName', Q.FieldByName('FILE_NAME').AsString);
+        LJSONObj.AddPair('proveedorNombre', Q.FieldByName('PROVEEDOR_NOMBRE').AsString);
+        LJSONObj.AddPair('fechaDocumento', FormatDateTime('yyyy-mm-dd HH:nn:ss', Q.FieldByName('FECHA_DOCUMENTO').AsDateTime));
+        LJSONObj.AddPair('estado', Q.FieldByName('ESTADO').AsString);
+        LJSONObj.AddPair('fechaCarga', FormatDateTime('yyyy-mm-dd HH:nn:ss', Q.FieldByName('FECHA_CARGA').AsDateTime));
+        LJSONList.AddElement(LJSONObj);
+        Q.Next;
+      end;
+      Res.Send(LJSONList);
+    finally
+      Q.Free;
+    end;
+  except
+    on E: Exception do
+    begin
+      LJSONObj := TJSONObject.Create;
+      LJSONObj.AddPair('success', TJSONBool.Create(False));
+      LJSONObj.AddPair('message', E.Message);
+      Res.Status(500).Send(LJSONObj);
+    end;
+  end;
+end;
+
 procedure Registry;
 begin
   THorse.Get('/xml/list', List);
   THorse.Post('/xml/upload', Upload);
   THorse.Post('/xml/parse', Parse);
+  THorse.Get('/xml/files', GetFiles);
+  THorse.Get('/xml/files/:id', GetFileById);
+  THorse.Post('/xml/procesar', ProcesarBatch);
+  THorse.Get('/xml/productos/pendientes', GetProductosPendientes);
 end;
 
 end.

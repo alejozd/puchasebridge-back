@@ -14,6 +14,7 @@ uses
   System.Classes,
   System.Generics.Collections,
   XmlParserService,
+  XmlPersistenceService,
   ValidationService;
 
 function ParsedInvoiceToJSONObject(const AParsedInvoice: TParsedInvoice): TJSONObject;
@@ -137,6 +138,10 @@ begin
 
     try
       LValidationResult := ValidarDocumento(LParsedJSONStr);
+
+      // Persist the XML data into staging tables
+      UpsertXMLInvoice(AFileName, LParsedInvoice);
+
       LVal := TJSONObject.ParseJSONValue(LValidationResult);
       if LVal is TJSONObject then
       begin
