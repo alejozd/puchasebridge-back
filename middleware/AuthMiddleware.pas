@@ -71,7 +71,10 @@ begin
     Next();
   finally
     if Req.Session<TObject> <> nil then
+    begin
       Req.Session<TObject>.Free;
+      Req.Session(nil);
+    end;
   end;
 end;
 

@@ -198,7 +198,7 @@ procedure ProcesarXml(Req: THorseRequest; Res: THorseResponse; Next: TProc);
 var
   LBody: TJSONObject;
   LIdsArr: TJSONArray;
-  LSession: TSessionInfo;
+  LSessionObj: TSessionInfoObj;
   LResult: TJSONObject;
 begin
   try
@@ -210,9 +210,14 @@ begin
     end;
 
     LIdsArr := LBody.GetValue('ids') as TJSONArray;
-    LSession := Req.Session<TSessionInfoObj>.Data;
+    LSessionObj := Req.Session<TSessionInfoObj>;
+    if not Assigned(LSessionObj) then
+    begin
+      Res.Status(401).Send(TJSONObject.Create.AddPair('error', 'Sesión no válida'));
+      Exit;
+    end;
 
-    LResult := TXmlProcessingService.ProcesarBatch(LIdsArr, LSession);
+    LResult := TXmlProcessingService.ProcesarBatch(LIdsArr, LSessionObj.Data);
     Res.Send(LResult);
   except
     on E: Exception do
@@ -358,14 +363,11 @@ end;
 procedure Registry;
 begin
   THorse.Get('/xml/list', List);
-  THorse.Group
-    .Prefix('/xml')
-    .Get('/files', ListFiles)
-    .Get('/files/:id', GetFile)
-    .Get('/productos/pendientes', GetPendingProducts)
-    .Post('/validate', Validate)
-    .Post('/procesar', ProcesarXml);
-
+  THorse.Get('/xml/files', ListFiles);
+  THorse.Get('/xml/files/:id', GetFile);
+  THorse.Get('/xml/productos/pendientes', GetPendingProducts);
+  THorse.Post('/xml/validate', Validate);
+  THorse.Post('/xml/procesar', ProcesarXml);
   THorse.Post('/xml/upload', Upload);
   THorse.Post('/xml/parse', Parse);
 end;

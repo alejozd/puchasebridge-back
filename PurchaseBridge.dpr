@@ -84,8 +84,8 @@ begin
 
         Next();
       end)
-    .Use(HandleException)
     .Use(Jhonson())
+    .Use(HandleException)
     .Use(OctetStream)
     .Use(Auth);
 
