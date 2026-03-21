@@ -140,13 +140,19 @@ begin
       LValidationResult := ValidarDocumento(LParsedJSONStr);
 
       // Persist the XML data into staging tables
-      UpsertXMLInvoice(AFileName, LParsedInvoice);
+      try
+        UpsertXMLInvoice(AFileName, LParsedInvoice);
+      except
+        // Non-blocking error for staging
+      end;
 
       LVal := TJSONObject.ParseJSONValue(LValidationResult);
       if LVal is TJSONObject then
       begin
         LResultJSON := LVal as TJSONObject;
-        LResultJSON.AddPair('fileName', AFileName);
+        // Check if fileName is already there to avoid duplicate pair error
+        if LResultJSON.GetValue('fileName') = nil then
+          LResultJSON.AddPair('fileName', AFileName);
       end
       else
       begin

@@ -26,17 +26,17 @@ begin
   LOutputJSON := TJSONObject.Create;
   LResultProductosArray := TJSONArray.Create;
   LErroresArray := TJSONArray.Create;
-  LOutputJSON.AddPair('valido', TJSONBool.Create(False));
-  LOutputJSON.AddPair('requiereHomologacion', TJSONBool.Create(False));
-  LOutputJSON.AddPair('proveedorExiste', TJSONBool.Create(False));
-  LOutputJSON.AddPair('productos', LResultProductosArray);
-  LOutputJSON.AddPair('errores', LErroresArray);
 
   try
     LInputJSON := TJSONObject.ParseJSONValue(AJsonParse) as TJSONObject;
     if not Assigned(LInputJSON) then
     begin
       LErroresArray.Add('JSON de entrada inválido');
+      LOutputJSON.AddPair('valido', TJSONBool.Create(False));
+      LOutputJSON.AddPair('requiereHomologacion', TJSONBool.Create(False));
+      LOutputJSON.AddPair('proveedorExiste', TJSONBool.Create(False));
+      LOutputJSON.AddPair('productos', LResultProductosArray);
+      LOutputJSON.AddPair('errores', LErroresArray);
       Result := LOutputJSON.ToJSON;
       Exit;
     end;
@@ -115,20 +115,23 @@ begin
         LValido := False;
       end;
 
-      LOutputJSON.AddPair('valido', LValido);
-      LOutputJSON.AddPair('requiereHomologacion', LRequiereHomologacion);
-      LOutputJSON.AddPair('proveedorExiste', LProveedorExiste);
+      LOutputJSON.AddPair('valido', TJSONBool.Create(LValido));
+      LOutputJSON.AddPair('requiereHomologacion', TJSONBool.Create(LRequiereHomologacion));
+      LOutputJSON.AddPair('proveedorExiste', TJSONBool.Create(LProveedorExiste));
       LOutputJSON.AddPair('productos', LResultProductosArray);
       LOutputJSON.AddPair('errores', LErroresArray);
-
-      // Re-assign because we added them to LOutputJSON and we want to keep it consistent
-      // But they are already there.
 
       Result := LOutputJSON.ToJSON;
     except
       on E: Exception do
       begin
         LErroresArray.Add('Error durante la validación: ' + E.Message);
+        // Ensure standard fields are present even on inner exception
+        if LOutputJSON.GetValue('valido') = nil then LOutputJSON.AddPair('valido', TJSONBool.Create(False));
+        if LOutputJSON.GetValue('requiereHomologacion') = nil then LOutputJSON.AddPair('requiereHomologacion', TJSONBool.Create(False));
+        if LOutputJSON.GetValue('proveedorExiste') = nil then LOutputJSON.AddPair('proveedorExiste', TJSONBool.Create(False));
+        if LOutputJSON.GetValue('productos') = nil then LOutputJSON.AddPair('productos', LResultProductosArray);
+        if LOutputJSON.GetValue('errores') = nil then LOutputJSON.AddPair('errores', LErroresArray);
         Result := LOutputJSON.ToJSON;
       end;
     end;
