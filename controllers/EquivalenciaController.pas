@@ -210,6 +210,7 @@ end;
 procedure Registry;
 begin
   THorse.Get('/equivalencias', List);
+  THorse.Post('/equivalencias', Create);
   THorse.Post('/equivalencia', Create);
   THorse.Delete('/equivalencia', Delete);
 end;
