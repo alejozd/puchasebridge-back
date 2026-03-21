@@ -52,9 +52,9 @@ begin
     Result.Connection := LConn;
 
     // Firebird 3.0+ uses FIRST SKIP or ROWS to limit
-    // NOTA: Se usa SUBCODIGO como UNIDAD temporalmente mientras se determina el campo real de unidad.
+    // NOTA: Se usa SUBCODIGO como UNIDADH temporalmente mientras se determina el campo real de unidad.
     Result.SQL.Text := Format(
-      'SELECT FIRST :LIMIT CODIGO, SUBCODIGO, NOMBRE, REFERENCIA, SUBCODIGO as UNIDAD ' +
+      'SELECT FIRST :LIMIT CODIGO, SUBCODIGO, NOMBRE, REFERENCIA, SUBCODIGO as UNIDADH ' +
       'FROM %s ' +
       'WHERE NOMBRE LIKE :FILTRO OR REFERENCIA LIKE :FILTRO ' +
       'ORDER BY NOMBRE', [TableName]);

@@ -73,7 +73,7 @@ begin
 
         // 2. Insert products
         Q.SQL.Text :=
-          'INSERT INTO XML_PRODUCTOS (XML_FILE_ID, DESCRIPCION, REFERENCIA, CANTIDAD, UNIDAD, VALOR_UNITARIO, VALOR_TOTAL, EQUIVALENCIA_ID) ' +
+          'INSERT INTO XML_PRODUCTOS (XML_FILE_ID, DESCRIPCION, REFERENCIA, CANTIDAD, UNIDADP, VALOR_UNITARIO, VALOR_TOTAL, EQUIVALENCIA_ID) ' +
           'VALUES (:FILEID, :DESC, :REF, :CANT, :UNI, :VUNI, :VTOT, ' +
           '(SELECT FIRST 1 ID FROM EQUIVALENCIA WHERE REFERENCIAP = :REFP AND UNIDADP = :UNIP))';
 
@@ -88,7 +88,10 @@ begin
           Q.ParamByName('VTOT').AsFloat := AParsedInvoice.Products[I].ValorTotal;
           Q.ParamByName('REFP').AsString := AParsedInvoice.Products[I].Referencia;
           Q.ParamByName('UNIP').AsString := AParsedInvoice.Products[I].Unidad;
-          Q.ExecSQL;
+
+          if not Q.ParamByName('REFP').AsString.Trim.IsEmpty and
+             not Q.ParamByName('UNIP').AsString.Trim.IsEmpty then
+            Q.ExecSQL;
         end;
 
         Conn.Commit;

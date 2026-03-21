@@ -26,6 +26,7 @@ begin
   LOutputJSON := TJSONObject.Create;
   LResultProductosArray := TJSONArray.Create;
   LErroresArray := TJSONArray.Create;
+  LInputJSON := nil;
 
   try
     LInputJSON := TJSONObject.ParseJSONValue(AJsonParse) as TJSONObject;
@@ -130,8 +131,17 @@ begin
         if LOutputJSON.GetValue('valido') = nil then LOutputJSON.AddPair('valido', TJSONBool.Create(False));
         if LOutputJSON.GetValue('requiereHomologacion') = nil then LOutputJSON.AddPair('requiereHomologacion', TJSONBool.Create(False));
         if LOutputJSON.GetValue('proveedorExiste') = nil then LOutputJSON.AddPair('proveedorExiste', TJSONBool.Create(False));
-        if LOutputJSON.GetValue('productos') = nil then LOutputJSON.AddPair('productos', LResultProductosArray);
-        if LOutputJSON.GetValue('errores') = nil then LOutputJSON.AddPair('errores', LErroresArray);
+
+        if LOutputJSON.GetValue('productos') = nil then
+          LOutputJSON.AddPair('productos', LResultProductosArray)
+        else
+          LResultProductosArray.Free; // Already added or we'll leak if we don't free and it's not in the object
+
+        if LOutputJSON.GetValue('errores') = nil then
+          LOutputJSON.AddPair('errores', LErroresArray)
+        else
+          LErroresArray.Free;
+
         Result := LOutputJSON.ToJSON;
       end;
     end;

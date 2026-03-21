@@ -56,7 +56,7 @@ begin
         LProductoObj.AddPair('subcodigo', TJSONNumber.Create(LQ.FieldByName('SUBCODIGO').AsInteger));
         LProductoObj.AddPair('nombre', LQ.FieldByName('NOMBRE').AsString);
         LProductoObj.AddPair('referencia', LQ.FieldByName('REFERENCIA').AsString);
-        LProductoObj.AddPair('unidad', LQ.FieldByName('UNIDAD').AsString);
+        LProductoObj.AddPair('unidad', LQ.FieldByName('UNIDADH').AsString);
 
         LProductosArr.AddElement(LProductoObj);
         LQ.Next;
