@@ -360,7 +360,6 @@ begin
   THorse.Get('/xml/list', List);
   THorse.Group
     .Prefix('/xml')
-    .Use(Auth)
     .Get('/files', ListFiles)
     .Get('/files/:id', GetFile)
     .Get('/productos/pendientes', GetPendingProducts)
