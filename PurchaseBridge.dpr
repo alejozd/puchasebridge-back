@@ -17,6 +17,7 @@ uses
   XMLFacturaService in 'services\XMLFacturaService.pas',
   XmlParserService in 'services\XmlParserService.pas',
   XmlPersistenceService in 'services\XmlPersistenceService.pas',
+  XmlProcessingService in 'services\XmlProcessingService.pas',
   HelisaUtils in 'utils\HelisaUtils.pas',
   HelisaService in 'services\HelisaService.pas',
   EquivalenciaService in 'services\EquivalenciaService.pas',

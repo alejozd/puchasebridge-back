@@ -37,7 +37,15 @@
 							]
 						}
 					},
-					"response": []
+					"response": [
+						{
+							"name": "Éxito",
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"body": "{\n  \"success\": true,\n  \"usuario\": {\n    \"codigo\": 1,\n    \"nombre\": \"ADMIN\"\n  },\n  \"empresa\": {\n    \"codigo\": 0,\n    \"nombre\": \"EMPRESA DEMO\",\n    \"identidad\": \"900123456\",\n    \"anoActual\": 2026\n  },\n  \"token\": \"eyJhbGciOiJIUzI1...\"\n}"
+						}
+					]
 				}
 			]
 		},
@@ -45,30 +53,16 @@
 			"name": "XML Flow",
 			"item": [
 				{
-					"name": "Listar Archivos (Filesystem)",
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "http://localhost:9000/xml/list",
-							"protocol": "http",
-							"host": [
-								"localhost"
-							],
-							"port": "9000",
-							"path": [
-								"xml",
-								"list"
-							]
-						}
-					},
-					"response": []
-				},
-				{
 					"name": "Listar Archivos (Bandeja)",
 					"request": {
 						"method": "GET",
-						"header": [],
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"type": "text"
+							}
+						],
 						"url": {
 							"raw": "http://localhost:9000/xml/files",
 							"protocol": "http",
@@ -82,13 +76,27 @@
 							]
 						}
 					},
-					"response": []
+					"response": [
+						{
+							"name": "Éxito",
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"body": "[\n    {\n        \"id\": 1,\n        \"file_name\": \"ad086000253602726330020260314073312852.xml\",\n        \"proveedor_nombre\": \"COMPAÑIA COLOMBIANA DE CERAMICA S A S\",\n        \"fecha_documento\": \"2026-03-14 00:00:00\",\n        \"estado\": \"VALIDADO\",\n        \"fecha_carga\": \"2026-03-17 18:00:00\"\n    }\n]"
+						}
+					]
 				},
 				{
 					"name": "Detalle de Archivo",
 					"request": {
 						"method": "GET",
-						"header": [],
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"type": "text"
+							}
+						],
 						"url": {
 							"raw": "http://localhost:9000/xml/files/1",
 							"protocol": "http",
@@ -103,37 +111,15 @@
 							]
 						}
 					},
-					"response": []
-				},
-				{
-					"name": "Subir Archivo XML",
-					"request": {
-						"method": "POST",
-						"header": [],
-						"body": {
-							"mode": "formdata",
-							"formdata": [
-								{
-									"key": "file",
-									"type": "file",
-									"src": []
-								}
-							]
-						},
-						"url": {
-							"raw": "http://localhost:9000/xml/upload",
-							"protocol": "http",
-							"host": [
-								"localhost"
-							],
-							"port": "9000",
-							"path": [
-								"xml",
-								"upload"
-							]
+					"response": [
+						{
+							"name": "Éxito",
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"body": "{\n    \"archivo\": {\n        \"id\": 1,\n        \"file_name\": \"ad0860002536.xml\",\n        \"proveedor_nit\": \"860002536\",\n        \"proveedor_nombre\": \"CERAMICA SAS\",\n        \"fecha_documento\": \"2026-03-14 00:00:00\",\n        \"estado\": \"VALIDADO\",\n        \"fecha_carga\": \"2026-03-17 18:00:00\"\n    },\n    \"productos\": [\n        {\n            \"id\": 1,\n            \"descripcion\": \"LAVAMANOS\",\n            \"referencia\": \"REF123\",\n            \"cantidad\": 10,\n            \"unidad\": \"94\",\n            \"valor_unitario\": 50000,\n            \"valor_total\": 500000,\n            \"equivalencia_id\": 5\n        }\n    ]\n}"
 						}
-					},
-					"response": []
+					]
 				},
 				{
 					"name": "Validar y Persistir XML",
@@ -143,6 +129,11 @@
 							{
 								"key": "Content-Type",
 								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
 								"type": "text"
 							}
 						],
@@ -163,13 +154,27 @@
 							]
 						}
 					},
-					"response": []
+					"response": [
+						{
+							"name": "Éxito",
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"body": "{\n    \"success\": true,\n    \"id\": 1,\n    \"errores\": [],\n    \"advertencias\": []\n}"
+						}
+					]
 				},
 				{
 					"name": "Productos Pendientes de Homologación",
 					"request": {
 						"method": "GET",
-						"header": [],
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"type": "text"
+							}
+						],
 						"url": {
 							"raw": "http://localhost:9000/xml/productos/pendientes",
 							"protocol": "http",
@@ -184,7 +189,15 @@
 							]
 						}
 					},
-					"response": []
+					"response": [
+						{
+							"name": "Éxito",
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"body": "[\n    {\n        \"id\": 2,\n        \"xml_file_id\": 1,\n        \"file_name\": \"ad0860002536.xml\",\n        \"proveedor_nombre\": \"CERAMICA SAS\",\n        \"descripcion\": \"GRIFERIA\",\n        \"referencia\": \"GRIF99\",\n        \"cantidad\": 5,\n        \"unidad\": \"94\",\n        \"valor_unitario\": 30000,\n        \"valor_total\": 150000\n    }\n]"
+						}
+					]
 				},
 				{
 					"name": "Procesar XML (Batch)",
@@ -194,6 +207,11 @@
 							{
 								"key": "Content-Type",
 								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
 								"type": "text"
 							}
 						],
@@ -214,7 +232,15 @@
 							]
 						}
 					},
-					"response": []
+					"response": [
+						{
+							"name": "Éxito",
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"body": "{\n    \"procesados\": [\n        {\n            \"id\": 1,\n            \"documento\": \"OC  00001234\"\n        }\n    ],\n    \"errores\": [\n        {\n            \"id\": 2,\n            \"error\": \"Existen productos sin homologación\"\n        }\n    ]\n}"
+						}
+					]
 				}
 			]
 		},
@@ -274,96 +300,6 @@
 							"port": "9000",
 							"path": [
 								"equivalencias"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Eliminar Equivalencia",
-					"request": {
-						"method": "DELETE",
-						"header": [],
-						"url": {
-							"raw": "http://localhost:9000/equivalencia?referenciaP=O60691031&unidadP=94",
-							"protocol": "http",
-							"host": [
-								"localhost"
-							],
-							"port": "9000",
-							"path": [
-								"equivalencia"
-							],
-							"query": [
-								{
-									"key": "referenciaP",
-									"value": "O60691031"
-								},
-								{
-									"key": "unidadP",
-									"value": "94"
-								}
-							]
-						}
-					},
-					"response": []
-				}
-			]
-		},
-		{
-			"name": "Helisa ERP",
-			"item": [
-				{
-					"name": "Buscar Productos Helisa",
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "http://localhost:9000/helisa/productos?filtro=lavamanos&limite=10",
-							"protocol": "http",
-							"host": [
-								"localhost"
-							],
-							"port": "9000",
-							"path": [
-								"helisa",
-								"productos"
-							],
-							"query": [
-								{
-									"key": "filtro",
-									"value": "lavamanos"
-								},
-								{
-									"key": "limite",
-									"value": "10"
-								}
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Validar Proveedor",
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "http://localhost:9000/proveedor/860002536?anio=2026",
-							"protocol": "http",
-							"host": [
-								"localhost"
-							],
-							"port": "9000",
-							"path": [
-								"proveedor",
-								"860002536"
-							],
-							"query": [
-								{
-									"key": "anio",
-									"value": "2026"
-								}
 							]
 						}
 					},
