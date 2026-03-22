@@ -345,7 +345,7 @@ begin
         LProductObj.AddPair('referencia', Q.FieldByName('REFERENCIA').AsString);
         LProductObj.AddPair('referenciaStd', Q.FieldByName('REFERENCIA_STD').AsString);
         LProductObj.AddPair('cantidad', TJSONNumber.Create(Q.FieldByName('CANTIDAD').AsFloat));
-        LProductObj.AddPair('unidadXML', Q.FieldByName('UNIDADH').AsString);
+        LProductObj.AddPair('unidadXML', Q.FieldByName('UNIDAD').AsString);
         LProductObj.AddPair('valorUnitario', TJSONNumber.Create(Q.FieldByName('VALOR_UNITARIO').AsFloat));
         LProductObj.AddPair('valorTotal', TJSONNumber.Create(Q.FieldByName('VALOR_TOTAL').AsFloat));
         LProductObj.AddPair('impuesto', TJSONNumber.Create(Q.FieldByName('IMPUESTO').AsFloat));
@@ -472,7 +472,7 @@ begin
       begin
         if Q.FieldByName('REFERENCIA').AsString.Trim.IsEmpty or
            Q.FieldByName('DESCRIPCION').AsString.Trim.IsEmpty or
-           Q.FieldByName('UNIDADH').AsString.Trim.IsEmpty then
+           Q.FieldByName('UNIDAD').AsString.Trim.IsEmpty then
         begin
           Q.Next;
           Continue;
@@ -484,7 +484,7 @@ begin
         LJSONObj.AddPair('referenciaXML', Q.FieldByName('REFERENCIA').AsString);
         LJSONObj.AddPair('referenciaStd', Q.FieldByName('REFERENCIA_STD').AsString);
         LJSONObj.AddPair('cantidad', TJSONNumber.Create(Q.FieldByName('CANTIDAD').AsFloat));
-        LJSONObj.AddPair('unidadXML', Q.FieldByName('UNIDADH').AsString);
+        LJSONObj.AddPair('unidadXML', Q.FieldByName('UNIDAD').AsString);
         LJSONObj.AddPair('valorUnitario', TJSONNumber.Create(Q.FieldByName('VALOR_UNITARIO').AsFloat));
         LJSONObj.AddPair('valorTotal', TJSONNumber.Create(Q.FieldByName('VALOR_TOTAL').AsFloat));
         LJSONList.AddElement(LJSONObj);

@@ -75,11 +75,10 @@ begin
           Q.Close;
         end;
 
-        // 2. Insert products - Using UNIDADH to store the XML unit for staging
-        // subquery lookup: REFERENCIAH = XML reference, UNIDADH = XML unit
+        // 2. Insert products - Using UNIDAD for XML_PRODUCTOS and UNIDADH for EQUIVALENCIA lookup
         Q.SQL.Text :=
-          'INSERT INTO XML_PRODUCTOS (XML_FILE_ID, DESCRIPCION, REFERENCIA, REFERENCIA_STD, CANTIDAD, UNIDADH, VALOR_UNITARIO, VALOR_TOTAL, IMPUESTO, EQUIVALENCIA_ID) ' +
-          'VALUES (:FILEID, :DESC, :REF, :REFSTD, :CANT, :UNIH, :VUNI, :VTOT, :IMP, ' +
+          'INSERT INTO XML_PRODUCTOS (XML_FILE_ID, DESCRIPCION, REFERENCIA, REFERENCIA_STD, CANTIDAD, UNIDAD, VALOR_UNITARIO, VALOR_TOTAL, IMPUESTO, EQUIVALENCIA_ID) ' +
+          'VALUES (:FILEID, :DESC, :REF, :REFSTD, :CANT, :UNI, :VUNI, :VTOT, :IMP, ' +
           '(SELECT FIRST 1 ID FROM EQUIVALENCIA WHERE REFERENCIAH = :REFX AND UNIDADH = :UNIX))';
 
         for I := 0 to Length(AParsedInvoice.Products) - 1 do
@@ -89,12 +88,12 @@ begin
           Q.ParamByName('REF').AsString := AParsedInvoice.Products[I].Referencia;
           Q.ParamByName('REFSTD').AsString := AParsedInvoice.Products[I].ReferenciaEstandar;
           Q.ParamByName('CANT').AsFloat := AParsedInvoice.Products[I].Cantidad;
-          Q.ParamByName('UNIH').AsString := AParsedInvoice.Products[I].Unidad;
+          Q.ParamByName('UNI').AsString := AParsedInvoice.Products[I].Unidad;
           Q.ParamByName('VUNI').AsFloat := AParsedInvoice.Products[I].ValorUnitario;
           Q.ParamByName('VTOT').AsFloat := AParsedInvoice.Products[I].ValorTotal;
           Q.ParamByName('IMP').AsFloat := AParsedInvoice.Products[I].Impuesto;
 
-          // Parameters for the EQUIVALENCIA subquery
+          // Parameters for the EQUIVALENCIA subquery (mapping XML ref/unit)
           Q.ParamByName('REFX').AsString := AParsedInvoice.Products[I].Referencia;
           Q.ParamByName('UNIX').AsString := AParsedInvoice.Products[I].Unidad;
 
