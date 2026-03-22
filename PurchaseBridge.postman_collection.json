@@ -1,13 +1,13 @@
 {
 	"info": {
 		"_postman_id": "a1b2c3d4-e5f6-7890-abcd-1234567890ab",
-		"name": "PurchaseBridge Complete",
-		"description": "Colección completa para pruebas de integración con Helisa y DIAN XML.",
+		"name": "PurchaseBridge Full API",
+		"description": "Colección completa de endpoints para el sistema PurchaseBridge (Integración Helisa - DIAN XML).",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"item": [
 		{
-			"name": "Auth",
+			"name": "01. Auth",
 			"item": [
 				{
 					"name": "Login Helisa",
@@ -16,8 +16,7 @@
 						"header": [
 							{
 								"key": "Content-Type",
-								"value": "application/json",
-								"type": "text"
+								"value": "application/json"
 							}
 						],
 						"body": {
@@ -27,24 +26,19 @@
 						"url": {
 							"raw": "http://localhost:9000/auth/login",
 							"protocol": "http",
-							"host": [
-								"localhost"
-							],
+							"host": ["localhost"],
 							"port": "9000",
-							"path": [
-								"auth",
-								"login"
-							]
+							"path": ["auth", "login"]
 						}
 					}
 				}
 			]
 		},
 		{
-			"name": "XML Flow",
+			"name": "02. XML Filesystem",
 			"item": [
 				{
-					"name": "Listar Archivos (FS)",
+					"name": "Listar Archivos (Input folder)",
 					"request": {
 						"method": "GET",
 						"header": [],
@@ -52,7 +46,7 @@
 					}
 				},
 				{
-					"name": "Subir Archivo",
+					"name": "Subir Archivo XML",
 					"request": {
 						"method": "POST",
 						"header": [],
@@ -70,7 +64,7 @@
 					}
 				},
 				{
-					"name": "Parsear Archivo",
+					"name": "Parsear XML (Sin persistir)",
 					"request": {
 						"method": "POST",
 						"header": [
@@ -85,9 +79,14 @@
 						},
 						"url": "http://localhost:9000/xml/parse"
 					}
-				},
+				}
+			]
+		},
+		{
+			"name": "03. Validación y Staging",
+			"item": [
 				{
-					"name": "Validar Archivo (Persistir)",
+					"name": "Validar y Persistir (Single)",
 					"request": {
 						"method": "POST",
 						"header": [
@@ -121,7 +120,7 @@
 					}
 				},
 				{
-					"name": "Listar Staging (Files)",
+					"name": "Listar Documentos Staging",
 					"request": {
 						"method": "GET",
 						"header": [],
@@ -129,7 +128,7 @@
 					}
 				},
 				{
-					"name": "Detalle Archivo Staging",
+					"name": "Detalle Documento Staging",
 					"request": {
 						"method": "GET",
 						"header": [],
@@ -137,7 +136,7 @@
 					}
 				},
 				{
-					"name": "Productos Pendientes Homologar",
+					"name": "Productos Pendientes de Homologar",
 					"request": {
 						"method": "GET",
 						"header": [],
@@ -152,48 +151,14 @@
 							]
 						}
 					}
-				},
-				{
-					"name": "Guardar Homologación",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"referenciaXML\": \"ABC123\",\n  \"unidadXML\": \"94\",\n  \"referenciaP\": \"ERP-001\",\n  \"unidadP\": \"94\",\n  \"factor\": 1\n}"
-						},
-						"url": "http://localhost:9000/xml/homologar"
-					}
-				},
-				{
-					"name": "Procesar Batch (Final)",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"ids\": [1]\n}"
-						},
-						"url": "http://localhost:9000/xml/procesar"
-					}
 				}
 			]
 		},
 		{
-			"name": "ERP Data",
+			"name": "04. Homologación y ERP",
 			"item": [
 				{
-					"name": "Buscar Productos ERP",
+					"name": "Buscar Productos ERP (Helisa)",
 					"request": {
 						"method": "GET",
 						"header": [],
@@ -216,12 +181,41 @@
 						"header": [],
 						"url": "http://localhost:9000/erp/unidades"
 					}
-				}
-			]
-		},
-		{
-			"name": "Equivalencias Management",
-			"item": [
+				},
+				{
+					"name": "Guardar Homologación (UI)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"referenciaXML\": \"REF-XML-001\",\n  \"unidadXML\": \"94\",\n  \"referenciaP\": \"ERP-001\",\n  \"unidadP\": \"94\",\n  \"factor\": 1\n}"
+						},
+						"url": "http://localhost:9000/xml/homologar"
+					}
+				},
+				{
+					"name": "Crear Equivalencia (Directo)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"codigoH\": 101010,\n  \"subCodigoH\": 1,\n  \"nombreH\": \"PRODUCTO TEST\",\n  \"referenciaH\": \"REF-XML-001\",\n  \"unidadH\": \"94\",\n  \"referenciaP\": \"ERP-001\",\n  \"unidadP\": \"94\",\n  \"factor\": 1\n}"
+						},
+						"url": "http://localhost:9000/equivalencia"
+					}
+				},
 				{
 					"name": "Listar Equivalencias",
 					"request": {
@@ -235,7 +229,85 @@
 					"request": {
 						"method": "DELETE",
 						"header": [],
-						"url": "http://localhost:9000/equivalencia?referenciaH=ABC&unidadH=94"
+						"url": "http://localhost:9000/equivalencia?referenciaP=ERP-001&unidadP=94"
+					}
+				}
+			]
+		},
+		{
+			"name": "05. Procesamiento Final",
+			"item": [
+				{
+					"name": "Procesar a Helisa (Batch Staging)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"ids\": [1, 2]\n}"
+						},
+						"url": "http://localhost:9000/xml/procesar"
+					}
+				},
+				{
+					"name": "Procesar Documentos (Legacy flow)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"files\": [\"factura1.xml\"]\n}"
+						},
+						"url": "http://localhost:9000/documentos/procesar"
+					}
+				}
+			]
+		},
+		{
+			"name": "06. Otros / Legacy",
+			"item": [
+				{
+					"name": "Consultar Proveedor en Helisa",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:9000/proveedor/800123456?anio=2024",
+							"protocol": "http",
+							"host": ["localhost"],
+							"port": "9000",
+							"path": ["proveedor", "800123456"],
+							"query": [
+								{ "key": "anio", "value": "2024" }
+							]
+						}
+					}
+				},
+				{
+					"name": "Importar Factura XML (Raw)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"application/xml": ""
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "<xml>...</xml>"
+						},
+						"url": "http://localhost:9000/factura/xml"
 					}
 				}
 			]
