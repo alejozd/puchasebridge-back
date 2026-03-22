@@ -16,9 +16,10 @@ uses
 procedure GetProductos(Req: THorseRequest; Res: THorseResponse; Next: TProc);
 var
   LFiltro: string;
-  LQ: TFDQuery;
+  LQEmpresa, LQGlobal: TFDQuery;
   LProductoObj: TJSONObject;
   LProductosArr: TJSONArray;
+  LSubcodigo: Integer;
 begin
   Res.ContentType('application/json; charset=utf-8');
   try
@@ -28,42 +29,62 @@ begin
       Exit;
     end;
 
-    LQ := GetHelisaQuery;
+    // 1. Consultar productos en la base de datos de la empresa (heli00bd.hgw)
+    LQEmpresa := TFDQuery.Create(nil);
     try
-      LQ.Connection.Free;
-      LQ.Connection := CrearConexionParticular('0');
+      LQEmpresa.Connection := CrearConexionParticular('0');
+      try
+        LQEmpresa.SQL.Text :=
+          'SELECT FIRST 20 CODIGO, SUBCODIGO, NOMBRE, REFERENCIA ' +
+          'FROM INMAXXXX ' +
+          'WHERE NOMBRE LIKE :FILTRO OR REFERENCIA LIKE :FILTRO ' +
+          'ORDER BY NOMBRE';
 
-      // Consultar HELI00BD.HGW y tabla INMAXXXX con JOIN a unidades
-      LQ.SQL.Text :=
-        'SELECT FIRST 20 I.CODIGO, I.SUBCODIGO, I.NOMBRE, I.REFERENCIA, U.SIGLA AS UNIDAD_DEFAULT ' +
-        'FROM INMAXXXX I ' +
-        'LEFT JOIN INTUXXXX U ON I.SUBCODIGO = U.CODIGO ' +
-        'WHERE I.NOMBRE LIKE :FILTRO OR I.REFERENCIA LIKE :FILTRO ' +
-        'ORDER BY I.NOMBRE';
+        LQEmpresa.ParamByName('FILTRO').AsString := '%' + LFiltro.ToUpper + '%';
+        LQEmpresa.Open;
 
-      LQ.ParamByName('FILTRO').AsString := '%' + LFiltro.ToUpper + '%';
-      LQ.Open;
+        LProductosArr := TJSONArray.Create;
 
-      LProductosArr := TJSONArray.Create;
-      while not LQ.Eof do
-      begin
-        LProductoObj := TJSONObject.Create;
-        LProductoObj.AddPair('codigo', TJSONNumber.Create(LQ.FieldByName('CODIGO').AsInteger));
-        LProductoObj.AddPair('subcodigo', TJSONNumber.Create(LQ.FieldByName('SUBCODIGO').AsInteger));
-        LProductoObj.AddPair('nombre', LQ.FieldByName('NOMBRE').AsString);
-        LProductoObj.AddPair('referencia', LQ.FieldByName('REFERENCIA').AsString);
-        // Relationship: INTUXXXX.CODIGO = INMAXXXX.SUBCODIGO
-        LProductoObj.AddPair('unidad', TJSONNumber.Create(LQ.FieldByName('SUBCODIGO').AsInteger));
-        LProductoObj.AddPair('unidadDefault', LQ.FieldByName('UNIDAD_DEFAULT').AsString);
+        // 2. Para cada producto, buscar su sigla de unidad en la base de datos global (helisabd.hgw)
+        LQGlobal := GetHelisaQuery;
+        try
+          LQGlobal.SQL.Text := 'SELECT SIGLA FROM INTUXXXX WHERE CODIGO = :SUBCODIGO';
 
-        LProductosArr.AddElement(LProductoObj);
-        LQ.Next;
+          while not LQEmpresa.Eof do
+          begin
+            LSubcodigo := LQEmpresa.FieldByName('SUBCODIGO').AsInteger;
+
+            LProductoObj := TJSONObject.Create;
+            LProductoObj.AddPair('codigo', TJSONNumber.Create(LQEmpresa.FieldByName('CODIGO').AsInteger));
+            LProductoObj.AddPair('subcodigo', TJSONNumber.Create(LSubcodigo));
+            LProductoObj.AddPair('nombre', LQEmpresa.FieldByName('NOMBRE').AsString);
+            LProductoObj.AddPair('referencia', LQEmpresa.FieldByName('REFERENCIA').AsString);
+            LProductoObj.AddPair('unidad', TJSONNumber.Create(LSubcodigo));
+
+            // Buscar sigla
+            LQGlobal.Close;
+            LQGlobal.ParamByName('SUBCODIGO').AsInteger := LSubcodigo;
+            LQGlobal.Open;
+
+            if not LQGlobal.IsEmpty then
+              LProductoObj.AddPair('unidadDefault', LQGlobal.FieldByName('SIGLA').AsString)
+            else
+              LProductoObj.AddPair('unidadDefault', '');
+
+            LProductosArr.AddElement(LProductoObj);
+            LQEmpresa.Next;
+          end;
+        finally
+          if Assigned(LQGlobal.Connection) then LQGlobal.Connection.Free;
+          LQGlobal.Free;
+        end;
+
+        Res.Send(LProductosArr);
+      finally
+        if Assigned(LQEmpresa.Connection) then LQEmpresa.Connection.Free;
       end;
-
-      Res.Send(LProductosArr);
     finally
-      if Assigned(LQ.Connection) then LQ.Connection.Free;
-      LQ.Free;
+      LQEmpresa.Free;
     end;
   except
     on E: Exception do
