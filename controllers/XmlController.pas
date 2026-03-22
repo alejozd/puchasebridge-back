@@ -455,16 +455,30 @@ var
   Q: TFDQuery;
   LJSONList: TJSONArray;
   LJSONObj: TJSONObject;
+  LFileName: string;
+  LSQL: string;
 begin
   Res.ContentType('application/json; charset=utf-8');
   try
+    Req.Query.TryGetValue('fileName', LFileName);
+
     Q := GetBridgeQuery;
     try
-      Q.SQL.Text :=
-        'SELECT P.*, F.FILE_NAME FROM XML_PRODUCTOS P ' +
+      LSQL :=
+        'SELECT P.REFERENCIA, P.DESCRIPCION, P.UNIDAD, P.CANTIDAD, F.FILE_NAME ' +
+        'FROM XML_PRODUCTOS P ' +
         'JOIN XML_FILES F ON P.XML_FILE_ID = F.ID ' +
-        'WHERE P.EQUIVALENCIA_ID IS NULL ' +
-        'ORDER BY F.FECHA_CARGA DESC';
+        'WHERE P.EQUIVALENCIA_ID IS NULL';
+
+      if not LFileName.Trim.IsEmpty then
+        LSQL := LSQL + ' AND F.FILE_NAME = :FNAME';
+
+      LSQL := LSQL + ' ORDER BY F.FECHA_CARGA DESC';
+
+      Q.SQL.Text := LSQL;
+      if not LFileName.Trim.IsEmpty then
+        Q.ParamByName('FNAME').AsString := LFileName;
+
       Q.Open;
 
       LJSONList := TJSONArray.Create;
@@ -482,11 +496,8 @@ begin
         LJSONObj.AddPair('fileName', Q.FieldByName('FILE_NAME').AsString);
         LJSONObj.AddPair('nombreXML', Q.FieldByName('DESCRIPCION').AsString);
         LJSONObj.AddPair('referenciaXML', Q.FieldByName('REFERENCIA').AsString);
-        LJSONObj.AddPair('referenciaStd', Q.FieldByName('REFERENCIA_STD').AsString);
-        LJSONObj.AddPair('cantidad', TJSONNumber.Create(Q.FieldByName('CANTIDAD').AsFloat));
         LJSONObj.AddPair('unidadXML', Q.FieldByName('UNIDAD').AsString);
-        LJSONObj.AddPair('valorUnitario', TJSONNumber.Create(Q.FieldByName('VALOR_UNITARIO').AsFloat));
-        LJSONObj.AddPair('valorTotal', TJSONNumber.Create(Q.FieldByName('VALOR_TOTAL').AsFloat));
+        LJSONObj.AddPair('cantidad', TJSONNumber.Create(Q.FieldByName('CANTIDAD').AsFloat));
         LJSONList.AddElement(LJSONObj);
         Q.Next;
       end;
