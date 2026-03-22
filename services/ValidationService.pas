@@ -34,7 +34,12 @@ begin
   LInputJSON := nil;
 
   try
-    LInputJSON := TJSONObject.ParseJSONValue(AJsonParse) as TJSONObject;
+    try
+      LInputJSON := TJSONObject.ParseJSONValue(AJsonParse) as TJSONObject;
+    except
+      LInputJSON := nil;
+    end;
+
     if not Assigned(LInputJSON) then
     begin
       LErroresArray.Add('JSON de entrada inválido');

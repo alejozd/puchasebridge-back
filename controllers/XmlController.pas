@@ -343,7 +343,6 @@ begin
         LProductObj.AddPair('referencia', Q.FieldByName('REFERENCIA').AsString);
         LProductObj.AddPair('referenciaStd', Q.FieldByName('REFERENCIA_STD').AsString);
         LProductObj.AddPair('cantidad', TJSONNumber.Create(Q.FieldByName('CANTIDAD').AsFloat));
-        LProductObj.AddPair('unidad', Q.FieldByName('UNIDAD').AsString);
         LProductObj.AddPair('valorUnitario', TJSONNumber.Create(Q.FieldByName('VALOR_UNITARIO').AsFloat));
         LProductObj.AddPair('valorTotal', TJSONNumber.Create(Q.FieldByName('VALOR_TOTAL').AsFloat));
         LProductObj.AddPair('impuesto', TJSONNumber.Create(Q.FieldByName('IMPUESTO').AsFloat));
@@ -476,7 +475,6 @@ begin
         LJSONObj.AddPair('referencia', Q.FieldByName('REFERENCIA').AsString);
         LJSONObj.AddPair('referenciaStd', Q.FieldByName('REFERENCIA_STD').AsString);
         LJSONObj.AddPair('cantidad', TJSONNumber.Create(Q.FieldByName('CANTIDAD').AsFloat));
-        LJSONObj.AddPair('unidad', Q.FieldByName('UNIDAD').AsString);
         LJSONObj.AddPair('valorUnitario', TJSONNumber.Create(Q.FieldByName('VALOR_UNITARIO').AsFloat));
         LJSONObj.AddPair('valorTotal', TJSONNumber.Create(Q.FieldByName('VALOR_TOTAL').AsFloat));
         LJSONList.AddElement(LJSONObj);
