@@ -22,7 +22,7 @@ CREATE TABLE XML_PRODUCTOS (
     REFERENCIA          VARCHAR(100) CHARACTER SET ISO8859_1,
     REFERENCIA_STD      VARCHAR(100) CHARACTER SET ISO8859_1,
     CANTIDAD            NUMERIC(18,6),
-    UNIDAD_XML          VARCHAR(20) CHARACTER SET ISO8859_1, /* Explicitly added for homologation flow */
+    UNIDADH             VARCHAR(20) CHARACTER SET ISO8859_1, /* Provider/XML unit stored in staging */
     VALOR_UNITARIO      NUMERIC(18,6),
     VALOR_TOTAL         NUMERIC(18,6),
     IMPUESTO            NUMERIC(18,6),

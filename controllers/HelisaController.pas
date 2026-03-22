@@ -33,6 +33,7 @@ begin
       LQ.Connection.Free;
       LQ.Connection := CrearConexionParticular('0');
 
+      // Consultar HELI00BD.HGW y tabla INMAXXXX
       LQ.SQL.Text :=
         'SELECT FIRST 20 CODIGO, SUBCODIGO, NOMBRE, REFERENCIA ' +
         'FROM INMAXXXX ' +
@@ -50,6 +51,7 @@ begin
         LProductoObj.AddPair('subcodigo', TJSONNumber.Create(LQ.FieldByName('SUBCODIGO').AsInteger));
         LProductoObj.AddPair('nombre', LQ.FieldByName('NOMBRE').AsString);
         LProductoObj.AddPair('referencia', LQ.FieldByName('REFERENCIA').AsString);
+        // Relationship: INTUXXXX.CODIGO = INMAXXXX.SUBCODIGO
         LProductoObj.AddPair('unidad', TJSONNumber.Create(LQ.FieldByName('SUBCODIGO').AsInteger));
 
         LProductosArr.AddElement(LProductoObj);
@@ -77,6 +79,7 @@ var
 begin
   Res.ContentType('application/json; charset=utf-8');
   try
+    // Consultar HELISABD.HGW y tabla INTUXXXX
     LQ := GetHelisaQuery;
     try
       LQ.SQL.Text := 'SELECT CODIGO, NOMBRE, SIGLA FROM INTUXXXX ORDER BY NOMBRE';

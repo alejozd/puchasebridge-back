@@ -345,7 +345,7 @@ begin
         LProductObj.AddPair('referencia', Q.FieldByName('REFERENCIA').AsString);
         LProductObj.AddPair('referenciaStd', Q.FieldByName('REFERENCIA_STD').AsString);
         LProductObj.AddPair('cantidad', TJSONNumber.Create(Q.FieldByName('CANTIDAD').AsFloat));
-        LProductObj.AddPair('unidadXML', Q.FieldByName('UNIDAD_XML').AsString);
+        LProductObj.AddPair('unidadXML', Q.FieldByName('UNIDADH').AsString);
         LProductObj.AddPair('valorUnitario', TJSONNumber.Create(Q.FieldByName('VALOR_UNITARIO').AsFloat));
         LProductObj.AddPair('valorTotal', TJSONNumber.Create(Q.FieldByName('VALOR_TOTAL').AsFloat));
         LProductObj.AddPair('impuesto', TJSONNumber.Create(Q.FieldByName('IMPUESTO').AsFloat));
@@ -470,13 +470,21 @@ begin
       LJSONList := TJSONArray.Create;
       while not Q.Eof do
       begin
+        if Q.FieldByName('REFERENCIA').AsString.Trim.IsEmpty or
+           Q.FieldByName('DESCRIPCION').AsString.Trim.IsEmpty or
+           Q.FieldByName('UNIDADH').AsString.Trim.IsEmpty then
+        begin
+          Q.Next;
+          Continue;
+        end;
+
         LJSONObj := TJSONObject.Create;
         LJSONObj.AddPair('fileName', Q.FieldByName('FILE_NAME').AsString);
         LJSONObj.AddPair('nombreXML', Q.FieldByName('DESCRIPCION').AsString);
         LJSONObj.AddPair('referenciaXML', Q.FieldByName('REFERENCIA').AsString);
         LJSONObj.AddPair('referenciaStd', Q.FieldByName('REFERENCIA_STD').AsString);
         LJSONObj.AddPair('cantidad', TJSONNumber.Create(Q.FieldByName('CANTIDAD').AsFloat));
-        LJSONObj.AddPair('unidadXML', Q.FieldByName('UNIDAD_XML').AsString);
+        LJSONObj.AddPair('unidadXML', Q.FieldByName('UNIDADH').AsString);
         LJSONObj.AddPair('valorUnitario', TJSONNumber.Create(Q.FieldByName('VALOR_UNITARIO').AsFloat));
         LJSONObj.AddPair('valorTotal', TJSONNumber.Create(Q.FieldByName('VALOR_TOTAL').AsFloat));
         LJSONList.AddElement(LJSONObj);
@@ -561,11 +569,21 @@ begin
     LUnidadP := LBody.GetValue('unidadP').Value;
     LFactor := (LBody.GetValue('factor') as TJSONNumber).AsDouble;
 
+    if LReferenciaXML.Trim.IsEmpty or LUnidadXML.Trim.IsEmpty or
+       LReferenciaP.Trim.IsEmpty or LUnidadP.Trim.IsEmpty then
+    begin
+      LResponse := TJSONObject.Create;
+      LResponse.AddPair('success', TJSONBool.Create(False));
+      LResponse.AddPair('message', 'Todos los campos son obligatorios');
+      Res.Status(400).Send(LResponse);
+      Exit;
+    end;
+
     try
-      // REFERENCIAH -> referencia XML
-      // REFERENCIAP -> referencia ERP
-      // UNIDADH -> unidad XML
-      // UNIDADP -> código unidad ERP
+      // REFERENCIAH -> referencia XML (referenciaXML)
+      // UNIDADH -> unidad XML (unidadXML)
+      // REFERENCIAP -> referencia ERP (referenciaP)
+      // UNIDADP -> código unidad ERP (unidadP)
       EquivalenciaService.CrearEquivalencia(
         0, 0, '', LReferenciaP, LUnidadP, LUnidadXML, LReferenciaXML, LFactor
       );

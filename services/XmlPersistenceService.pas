@@ -75,11 +75,12 @@ begin
           Q.Close;
         end;
 
-        // 2. Insert products - Using UNIDAD_XML to support homologation
+        // 2. Insert products - Using UNIDADH to store the XML unit for staging
+        // subquery lookup: REFERENCIAH = XML reference, UNIDADH = XML unit
         Q.SQL.Text :=
-          'INSERT INTO XML_PRODUCTOS (XML_FILE_ID, DESCRIPCION, REFERENCIA, REFERENCIA_STD, CANTIDAD, UNIDAD_XML, VALOR_UNITARIO, VALOR_TOTAL, IMPUESTO, EQUIVALENCIA_ID) ' +
-          'VALUES (:FILEID, :DESC, :REF, :REFSTD, :CANT, :UNIXML, :VUNI, :VTOT, :IMP, ' +
-          '(SELECT FIRST 1 ID FROM EQUIVALENCIA WHERE REFERENCIAP = :REFP AND UNIDADP = :UNIP))';
+          'INSERT INTO XML_PRODUCTOS (XML_FILE_ID, DESCRIPCION, REFERENCIA, REFERENCIA_STD, CANTIDAD, UNIDADH, VALOR_UNITARIO, VALOR_TOTAL, IMPUESTO, EQUIVALENCIA_ID) ' +
+          'VALUES (:FILEID, :DESC, :REF, :REFSTD, :CANT, :UNIH, :VUNI, :VTOT, :IMP, ' +
+          '(SELECT FIRST 1 ID FROM EQUIVALENCIA WHERE REFERENCIAH = :REFX AND UNIDADH = :UNIX))';
 
         for I := 0 to Length(AParsedInvoice.Products) - 1 do
         begin
@@ -88,14 +89,14 @@ begin
           Q.ParamByName('REF').AsString := AParsedInvoice.Products[I].Referencia;
           Q.ParamByName('REFSTD').AsString := AParsedInvoice.Products[I].ReferenciaEstandar;
           Q.ParamByName('CANT').AsFloat := AParsedInvoice.Products[I].Cantidad;
-          Q.ParamByName('UNIXML').AsString := AParsedInvoice.Products[I].Unidad;
+          Q.ParamByName('UNIH').AsString := AParsedInvoice.Products[I].Unidad;
           Q.ParamByName('VUNI').AsFloat := AParsedInvoice.Products[I].ValorUnitario;
           Q.ParamByName('VTOT').AsFloat := AParsedInvoice.Products[I].ValorTotal;
           Q.ParamByName('IMP').AsFloat := AParsedInvoice.Products[I].Impuesto;
 
-          // Mapping parameters
-          Q.ParamByName('REFP').AsString := AParsedInvoice.Products[I].Referencia;
-          Q.ParamByName('UNIP').AsString := AParsedInvoice.Products[I].Unidad;
+          // Parameters for the EQUIVALENCIA subquery
+          Q.ParamByName('REFX').AsString := AParsedInvoice.Products[I].Referencia;
+          Q.ParamByName('UNIX').AsString := AParsedInvoice.Products[I].Unidad;
 
           if not Q.ParamByName('REF').AsString.Trim.IsEmpty then
             Q.ExecSQL;
