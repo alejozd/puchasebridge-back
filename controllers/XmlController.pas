@@ -18,8 +18,10 @@ uses
   Web.HTTPApp,
   Web.ReqFiles,
   XmlParserService,
+  XmlPersistenceService,
   FireDAC.Comp.Client,
-  FirebirdConnection;
+  FirebirdConnection,
+  EquivalenciaService;
 
 type
   TFileInfo = record
@@ -471,8 +473,8 @@ begin
         LJSONObj.AddPair('id', TJSONNumber.Create(Q.FieldByName('ID').AsInteger));
         LJSONObj.AddPair('xmlFileId', TJSONNumber.Create(Q.FieldByName('XML_FILE_ID').AsInteger));
         LJSONObj.AddPair('fileName', Q.FieldByName('FILE_NAME').AsString);
-        LJSONObj.AddPair('descripcion', Q.FieldByName('DESCRIPCION').AsString);
-        LJSONObj.AddPair('referencia', Q.FieldByName('REFERENCIA').AsString);
+        LJSONObj.AddPair('nombreXML', Q.FieldByName('DESCRIPCION').AsString);
+        LJSONObj.AddPair('referenciaXML', Q.FieldByName('REFERENCIA').AsString);
         LJSONObj.AddPair('referenciaStd', Q.FieldByName('REFERENCIA_STD').AsString);
         LJSONObj.AddPair('cantidad', TJSONNumber.Create(Q.FieldByName('CANTIDAD').AsFloat));
         LJSONObj.AddPair('valorUnitario', TJSONNumber.Create(Q.FieldByName('VALOR_UNITARIO').AsFloat));
@@ -537,6 +539,54 @@ begin
   end;
 end;
 
+procedure Homologar(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+var
+  LBody: TJSONObject;
+  LReferenciaXML, LUnidadXML, LReferenciaP, LUnidadP: string;
+  LFactor: Double;
+  LResponse: TJSONObject;
+begin
+  Res.ContentType('application/json; charset=utf-8');
+  try
+    LBody := Req.Body<TJSONObject>;
+    if (LBody = nil) then
+    begin
+      Res.Status(400).Send('Body is required');
+      Exit;
+    end;
+
+    LReferenciaXML := LBody.GetValue('referenciaXML').Value;
+    LUnidadXML := LBody.GetValue('unidadXML').Value;
+    LReferenciaP := LBody.GetValue('referenciaP').Value;
+    LUnidadP := LBody.GetValue('unidadP').Value;
+    LFactor := (LBody.GetValue('factor') as TJSONNumber).AsDouble;
+
+    try
+      EquivalenciaService.CrearEquivalencia(
+        0, 0, '', LReferenciaP, LUnidadP, LUnidadXML, LReferenciaXML, LFactor
+      );
+
+      LResponse := TJSONObject.Create;
+      LResponse.AddPair('success', TJSONBool.Create(True));
+      LResponse.AddPair('message', 'Homologación guardada correctamente');
+      Res.Send(LResponse);
+    except
+      on E: Exception do
+      begin
+        LResponse := TJSONObject.Create;
+        LResponse.AddPair('success', TJSONBool.Create(False));
+        LResponse.AddPair('message', 'Error al guardar homologación: ' + E.Message);
+        Res.Status(500).Send(LResponse);
+      end;
+    end;
+  except
+    on E: Exception do
+    begin
+      Res.Status(500).Send(E.Message);
+    end;
+  end;
+end;
+
 procedure Registry;
 begin
   THorse.Get('/xml/list', List);
@@ -546,6 +596,7 @@ begin
   THorse.Get('/xml/files/:id', GetFileById);
   THorse.Post('/xml/procesar', ProcesarBatch);
   THorse.Get('/xml/productos/pendientes', GetProductosPendientes);
+  THorse.Post('/xml/homologar', Homologar);
 end;
 
 end.

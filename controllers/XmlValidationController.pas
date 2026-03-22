@@ -42,7 +42,7 @@ begin
       LProducto.AddPair('referencia', AParsedInvoice.Products[I].Referencia);
       LProducto.AddPair('referenciaEstandar', AParsedInvoice.Products[I].ReferenciaEstandar);
       LProducto.AddPair('cantidad', TJSONNumber.Create(AParsedInvoice.Products[I].Cantidad));
-      LProducto.AddPair('unidad', AParsedInvoice.Products[I].Unidad);
+      LProducto.AddPair('unidadXML', AParsedInvoice.Products[I].Unidad);
       LProducto.AddPair('precioBase', TJSONNumber.Create(AParsedInvoice.Products[I].PrecioBase));
       LProducto.AddPair('valorUnitario', TJSONNumber.Create(AParsedInvoice.Products[I].ValorUnitario));
       LProducto.AddPair('valorTotal', TJSONNumber.Create(AParsedInvoice.Products[I].ValorTotal));

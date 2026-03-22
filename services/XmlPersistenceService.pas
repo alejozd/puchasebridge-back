@@ -75,7 +75,7 @@ begin
           Q.Close;
         end;
 
-        // 2. Insert products - XML_PRODUCTOS has NO unit column as per confirmed schema
+        // 2. Insert products - XML_PRODUCTOS table has no unit column as per confirmed schema
         Q.SQL.Text :=
           'INSERT INTO XML_PRODUCTOS (XML_FILE_ID, DESCRIPCION, REFERENCIA, REFERENCIA_STD, CANTIDAD, VALOR_UNITARIO, VALOR_TOTAL, IMPUESTO, EQUIVALENCIA_ID) ' +
           'VALUES (:FILEID, :DESC, :REF, :REFSTD, :CANT, :VUNI, :VTOT, :IMP, ' +
@@ -92,7 +92,7 @@ begin
           Q.ParamByName('VTOT').AsFloat := AParsedInvoice.Products[I].ValorTotal;
           Q.ParamByName('IMP').AsFloat := AParsedInvoice.Products[I].Impuesto;
 
-          // Mapping parameters (not inserted into XML_PRODUCTOS, but used for EQUIVALENCIA lookup)
+          // Mapping parameters (used for EQUIVALENCIA lookup)
           Q.ParamByName('REFP').AsString := AParsedInvoice.Products[I].Referencia;
           Q.ParamByName('UNIP').AsString := AParsedInvoice.Products[I].Unidad;
 

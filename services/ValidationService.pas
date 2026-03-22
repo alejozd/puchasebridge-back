@@ -77,7 +77,7 @@ begin
         begin
           LItemJSON := LProductosArray.Items[I] as TJSONObject;
           LReferencia := LItemJSON.GetValue('referencia').Value;
-          LUnidad := LItemJSON.GetValue('unidad').Value;
+          LUnidad := LItemJSON.GetValue('unidadXML').Value;
 
           if LReferencia.Trim.IsEmpty or LUnidad.Trim.IsEmpty then
             LValido := False
