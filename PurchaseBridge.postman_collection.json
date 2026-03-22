@@ -1,43 +1,17 @@
 {
 	"info": {
 		"_postman_id": "a1b2c3d4-e5f6-7890-abcd-1234567890ab",
-		"name": "PurchaseBridge",
-		"description": "Colección para pruebas de integración con Helisa y DIAN XML.",
+		"name": "PurchaseBridge Complete",
+		"description": "Colección completa para pruebas de integración con Helisa y DIAN XML.",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"item": [
 		{
-			"name": "Login Helisa",
-			"request": {
-				"method": "POST",
-				"header": [
-					{
-						"key": "Content-Type",
-						"value": "application/json",
-						"type": "text"
-					}
-				],
-				"body": {
-					"mode": "raw",
-					"raw": "{\n  \"usuario\": \"ADMIN\",\n  \"clave\": \"1234\"\n}"
-				},
-				"url": {
-					"raw": "http://localhost:9000/auth/login",
-					"protocol": "http",
-					"host": [
-						"localhost"
-					],
-					"port": "9000",
-					"path": [
-						"auth",
-						"login"
-					]
-				}
-			},
-			"response": [
+			"name": "Auth",
+			"item": [
 				{
-					"name": "Éxito",
-					"originalRequest": {
+					"name": "Login Helisa",
+					"request": {
 						"method": "POST",
 						"header": [
 							{
@@ -62,746 +36,207 @@
 								"login"
 							]
 						}
-					},
-					"status": "OK",
-					"code": 200,
-					"_postman_previewlanguage": "json",
-					"header": [
-						{
-							"key": "Content-Type",
-							"value": "application/json"
-						}
-					],
-					"cookie": [],
-					"body": "{\n  \"success\": true,\n  \"usuario\": {\n    \"codigo\": 1,\n    \"nombre\": \"ADMIN\"\n  },\n  \"empresa\": {\n    \"codigo\": 0,\n    \"nombre\": \"EMPRESA DEMO\",\n    \"identidad\": \"900123456\",\n    \"anoActual\": 2026,\n    \"tarifaReteCree\": 0.4\n  },\n  \"token\": \"abc123\"\n}"
+					}
 				}
 			]
 		},
 		{
-			"name": "Ping",
-			"request": {
-				"method": "GET",
-				"header": [],
-				"url": {
-					"raw": "http://localhost:9000/ping",
-					"protocol": "http",
-					"host": [
-						"localhost"
-					],
-					"port": "9000",
-					"path": [
-						"ping"
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "Listar Archivos XML",
-			"request": {
-				"method": "GET",
-				"header": [],
-				"url": {
-					"raw": "http://localhost:9000/xml/list",
-					"protocol": "http",
-					"host": [
-						"localhost"
-					],
-					"port": "9000",
-					"path": [
-						"xml",
-						"list"
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "Subir Archivo XML",
-			"request": {
-				"method": "POST",
-				"header": [],
-				"body": {
-					"mode": "formdata",
-					"formdata": [
-						{
-							"key": "file",
-							"type": "file",
-							"src": []
-						}
-					]
-				},
-				"url": {
-					"raw": "http://localhost:9000/xml/upload",
-					"protocol": "http",
-					"host": [
-						"localhost"
-					],
-					"port": "9000",
-					"path": [
-						"xml",
-						"upload"
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "Validar Proveedor",
-			"request": {
-				"method": "GET",
-				"header": [],
-				"url": {
-					"raw": "http://localhost:9000/proveedor/860002536?anio=2026",
-					"protocol": "http",
-					"host": [
-						"localhost"
-					],
-					"port": "9000",
-					"path": [
-						"proveedor",
-						"860002536"
-					],
-					"query": [
-						{
-							"key": "anio",
-							"value": "2026"
-						}
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "Procesar Factura XML",
-			"request": {
-				"method": "POST",
-				"header": [
-					{
-						"key": "Content-Type",
-						"value": "application/xml",
-						"type": "text"
-					}
-				],
-				"body": {
-					"mode": "raw",
-					"raw": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<Invoice xmlns:cac=\"urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2\" xmlns:cbc=\"urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2\" xmlns:ds=\"http://www.w3.org/2000/09/xmldsig#\" xmlns:ext=\"urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2\" xmlns:sts=\"dian:gov:co:facturaelectronica:Structures-2-1\" xmlns:xades=\"http://uri.etsi.org/01903/v1.3.2#\" xmlns:xades141=\"http://uri.etsi.org/01903/v1.4.1#\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">\n    <cbc:IssueDate>2026-05-22</cbc:IssueDate>\n    <cac:AccountingSupplierParty>\n        <cac:Party>\n            <cac:PartyTaxScheme>\n                <cbc:CompanyID schemeAgencyID=\"195\" schemeID=\"5\" schemeName=\"31\">860002536</cbc:CompanyID>\n            </cac:PartyTaxScheme>\n        </cac:Party>\n    </cac:AccountingSupplierParty>\n    <cac:InvoiceLine>\n        <cbc:ID>1</cbc:ID>\n        <cac:Item>\n            <cbc:Description>LAVAMANOS ALUVIA 60 CM BNE EN CJ 7704372060916</cbc:Description>\n            <cac:SellersItemIdentification>\n                <cbc:ID>O60691031</cbc:ID>\n            </cac:SellersItemIdentification>\n        </cac:Item>\n    </cac:InvoiceLine>\n</Invoice>"
-				},
-				"url": {
-					"raw": "http://localhost:9000/factura/xml",
-					"protocol": "http",
-					"host": [
-						"localhost"
-					],
-					"port": "9000",
-					"path": [
-						"factura",
-						"xml"
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "Parsear Archivo XML",
-			"request": {
-				"method": "POST",
-				"header": [
-					{
-						"key": "Content-Type",
-						"value": "application/json",
-						"type": "text"
-					}
-				],
-				"body": {
-					"mode": "raw",
-					"raw": "{\n  \"fileName\": \"ad086000253602726330020260314073312852.xml\"\n}"
-				},
-				"url": {
-					"raw": "http://localhost:9000/xml/parse",
-					"protocol": "http",
-					"host": [
-						"localhost"
-					],
-					"port": "9000",
-					"path": [
-						"xml",
-						"parse"
-					]
-				}
-			},
-			"response": [
+			"name": "XML Flow",
+			"item": [
 				{
-					"name": "Respuesta Exitosa",
-					"originalRequest": {
+					"name": "Listar Archivos (FS)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "http://localhost:9000/xml/list"
+					}
+				},
+				{
+					"name": "Subir Archivo",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "file",
+									"type": "file",
+									"src": []
+								}
+							]
+						},
+						"url": "http://localhost:9000/xml/upload"
+					}
+				},
+				{
+					"name": "Parsear Archivo",
+					"request": {
 						"method": "POST",
 						"header": [
 							{
 								"key": "Content-Type",
-								"value": "application/json",
-								"type": "text"
+								"value": "application/json"
 							}
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"fileName\": \"ad086000253602726330020260314073312852.xml\"\n}"
+							"raw": "{\n  \"fileName\": \"factura1.xml\"\n}"
 						},
-						"url": {
-							"raw": "http://localhost:9000/xml/parse",
-							"protocol": "http",
-							"host": [
-								"localhost"
-							],
-							"port": "9000",
-							"path": [
-								"xml",
-								"parse"
-							]
-						}
-					},
-					"status": "OK",
-					"code": 200,
-					"_postman_previewlanguage": "json",
-					"header": [
-						{
-							"key": "Content-Type",
-							"value": "application/json"
-						}
-					],
-					"cookie": [],
-					"body": "{\n  \"success\": true,\n  \"proveedor\": {\n    \"nit\": \"860002536\",\n    \"nombre\": \"COMPAÑIA COLOMBIANA DE CERAMICA S A S\",\n    \"nombreLegal\": \"COMPAÑIA COLOMBIANA DE CERAMICA S A S\",\n    \"tipoIdentificacion\": \"31\",\n    \"direccion\": \"CL 100 8 A 55 TO C P 9\"\n  },\n  \"productos\": [\n    {\n      \"idLinea\": \"1\",\n      \"descripcion\": \"LAVAMANOS ALUVIA 60 CM BNE EN CJ 7704372060916\",\n      \"referencia\": \"O60691031\",\n      \"referenciaEstandar\": \"7704372060916\",\n      \"cantidad\": 5,\n      \"unidad\": \"94\",\n      \"precioBase\": 277247.8,\n      \"valorUnitario\": 277247.8,\n      \"valorTotal\": 1386239,\n      \"impuesto\": 263385.41,\n      \"porcentajeImpuesto\": 19\n    }\n  ],\n  \"totales\": {\n    \"subtotal\": 1386239.0,\n    \"taxExclusiveAmount\": 1386239.0,\n    \"taxInclusiveAmount\": 1649624.41,\n    \"impuestoTotal\": 263385.41,\n    \"total\": 1649624.41\n  }\n}"
-				}
-			]
-		},
-		{
-			"name": "Validar Archivo XML",
-			"request": {
-				"method": "POST",
-				"header": [
-					{
-						"key": "Content-Type",
-						"value": "application/json",
-						"type": "text"
+						"url": "http://localhost:9000/xml/parse"
 					}
-				],
-				"body": {
-					"mode": "raw",
-					"raw": "{\n  \"fileName\": \"ad086000253602726330020260314073312852.xml\"\n}"
 				},
-				"url": {
-					"raw": "http://localhost:9000/xml/validate",
-					"protocol": "http",
-					"host": [
-						"localhost"
-					],
-					"port": "9000",
-					"path": [
-						"xml",
-						"validate"
-					]
-				}
-			},
-			"response": [
 				{
-					"name": "Respuesta Exitosa",
-					"originalRequest": {
+					"name": "Validar Archivo (Persistir)",
+					"request": {
 						"method": "POST",
 						"header": [
 							{
 								"key": "Content-Type",
-								"value": "application/json",
-								"type": "text"
+								"value": "application/json"
 							}
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"fileName\": \"ad086000253602726330020260314073312852.xml\"\n}"
+							"raw": "{\n  \"fileName\": \"factura1.xml\"\n}"
 						},
-						"url": {
-							"raw": "http://localhost:9000/xml/validate",
-							"protocol": "http",
-							"host": [
-								"localhost"
-							],
-							"port": "9000",
-							"path": [
-								"xml",
-								"validate"
-							]
-						}
-					},
-					"status": "OK",
-					"code": 200,
-					"_postman_previewlanguage": "json",
-					"header": [
-						{
-							"key": "Content-Type",
-							"value": "application/json"
-						}
-					],
-					"cookie": [],
-					"body": "{\n    \"valido\": true,\n    \"requiereHomologacion\": false,\n    \"proveedorExiste\": true,\n    \"productos\": [\n        {\n            \"referencia\": \"O60691031\",\n            \"unidad\": \"94\",\n            \"existeEquivalencia\": true\n        }\n    ],\n    \"errores\": []\n}"
-				}
-			]
-		},
-		{
-			"name": "Validar Archivos XML (Batch)",
-			"request": {
-				"method": "POST",
-				"header": [
-					{
-						"key": "Content-Type",
-						"value": "application/json",
-						"type": "text"
+						"url": "http://localhost:9000/xml/validate"
 					}
-				],
-				"body": {
-					"mode": "raw",
-					"raw": "{\n  \"files\": [\n    \"factura1.xml\",\n    \"factura2.xml\"\n  ]\n}"
 				},
-				"url": {
-					"raw": "http://localhost:9000/xml/validate/batch",
-					"protocol": "http",
-					"host": [
-						"localhost"
-					],
-					"port": "9000",
-					"path": [
-						"xml",
-						"validate",
-						"batch"
-					]
-				}
-			},
-			"response": [
 				{
-					"name": "Respuesta Exitosa",
-					"originalRequest": {
+					"name": "Validar Batch",
+					"request": {
 						"method": "POST",
 						"header": [
 							{
 								"key": "Content-Type",
-								"value": "application/json",
-								"type": "text"
+								"value": "application/json"
 							}
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"files\": [\n    \"factura1.xml\",\n    \"factura2.xml\"\n  ]\n}"
+							"raw": "{\n  \"files\": [\"factura1.xml\"]\n}"
 						},
-						"url": {
-							"raw": "http://localhost:9000/xml/validate/batch",
-							"protocol": "http",
-							"host": [
-								"localhost"
-							],
-							"port": "9000",
-							"path": [
-								"xml",
-								"validate",
-								"batch"
-							]
-						}
-					},
-					"status": "OK",
-					"code": 200,
-					"_postman_previewlanguage": "json",
-					"header": [
-						{
-							"key": "Content-Type",
-							"value": "application/json"
-						}
-					],
-					"cookie": [],
-					"body": "{\n    \"documentos\": [\n        {\n            \"fileName\": \"factura1.xml\",\n            \"valido\": true,\n            \"requiereHomologacion\": false,\n            \"proveedorExiste\": true,\n            \"productos\": [],\n            \"errores\": []\n        },\n        {\n            \"fileName\": \"factura2.xml\",\n            \"valido\": false,\n            \"requiereHomologacion\": false,\n            \"proveedorExiste\": false,\n            \"productos\": [],\n            \"errores\": [\n                \"Archivo no encontrado\"\n            ]\n        }\n    ],\n    \"resumen\": {\n        \"total\": 2,\n        \"validos\": 1,\n        \"conErrores\": 1\n    }\n}"
-				}
-			]
-		},
-		{
-			"name": "Procesar Documentos (Guardar)",
-			"request": {
-				"method": "POST",
-				"header": [
-					{
-						"key": "Content-Type",
-						"value": "application/json",
-						"type": "text"
+						"url": "http://localhost:9000/xml/validate/batch"
 					}
-				],
-				"body": {
-					"mode": "raw",
-					"raw": "{\n  \"files\": [\n    \"factura1.xml\",\n    \"factura3.xml\"\n  ]\n}"
 				},
-				"url": {
-					"raw": "http://localhost:9000/documentos/procesar",
-					"protocol": "http",
-					"host": [
-						"localhost"
-					],
-					"port": "9000",
-					"path": [
-						"documentos",
-						"procesar"
-					]
-				}
-			},
-			"response": [
 				{
-					"name": "Respuesta Exitosa",
-					"originalRequest": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json",
-								"type": "text"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"files\": [\n    \"factura1.xml\",\n    \"factura3.xml\"\n  ]\n}"
-						},
-						"url": {
-							"raw": "http://localhost:9000/documentos/procesar",
-							"protocol": "http",
-							"host": [
-								"localhost"
-							],
-							"port": "9000",
-							"path": [
-								"documentos",
-								"procesar"
-							]
-						}
-					},
-					"status": "OK",
-					"code": 200,
-					"_postman_previewlanguage": "json",
-					"header": [
-						{
-							"key": "Content-Type",
-							"value": "application/json"
-						}
-					],
-					"cookie": [],
-					"body": "{\n    \"procesados\": [\n        {\n            \"fileName\": \"factura1.xml\",\n            \"status\": \"OK\",\n            \"documento\": \"OC  00001234\"\n        }\n    ],\n    \"errores\": [\n        {\n            \"fileName\": \"factura3.xml\",\n            \"error\": \"Archivo no encontrado\"\n        }\n    ]\n}"
-				}
-			]
-		},
-		{
-			"name": "Crear Equivalencia",
-			"request": {
-				"method": "POST",
-				"header": [
-					{
-						"key": "Content-Type",
-						"value": "application/json",
-						"type": "text"
+					"name": "Listar Staging (Files)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "http://localhost:9000/xml/files"
 					}
-				],
-				"body": {
-					"mode": "raw",
-					"raw": "{\n  \"codigoH\": 123,\n  \"subCodigoH\": 1,\n  \"nombreH\": \"LAVAMANOS ALUVIA\",\n  \"referenciaH\": \"O60691031H\",\n  \"unidadH\": \"MTR\",\n  \"referenciaP\": \"O60691031\",\n  \"unidadP\": \"94\",\n  \"factor\": 1.4\n}"
-				},
-				"url": {
-					"raw": "http://localhost:9000/equivalencia",
-					"protocol": "http",
-					"host": [
-						"localhost"
-					],
-					"port": "9000",
-					"path": [
-						"equivalencia"
-					]
-				}
-			},
-			"response": [
-				{
-					"name": "Éxito",
-					"originalRequest": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json",
-								"type": "text"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"codigoH\": 123,\n  \"subCodigoH\": 1,\n  \"nombreH\": \"LAVAMANOS ALUVIA\",\n  \"referenciaH\": \"O60691031H\",\n  \"unidadH\": \"MTR\",\n  \"referenciaP\": \"O60691031\",\n  \"unidadP\": \"94\",\n  \"factor\": 1.4\n}"
-						},
-						"url": {
-							"raw": "http://localhost:9000/equivalencia",
-							"protocol": "http",
-							"host": [
-								"localhost"
-							],
-							"port": "9000",
-							"path": [
-								"equivalencia"
-							]
-						}
-					},
-					"status": "Created",
-					"code": 201,
-					"_postman_previewlanguage": "json",
-					"header": [
-						{
-							"key": "Content-Type",
-							"value": "application/json"
-						}
-					],
-					"cookie": [],
-					"body": "{\n  \"success\": true,\n  \"message\": \"Equivalencia creada correctamente\"\n}"
 				},
 				{
-					"name": "Error duplicado",
-					"originalRequest": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json",
-								"type": "text"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"codigoH\": 123,\n  \"subCodigoH\": 1,\n  \"nombreH\": \"LAVAMANOS ALUVIA\",\n  \"referenciaH\": \"O60691031H\",\n  \"unidadH\": \"MTR\",\n  \"referenciaP\": \"O60691031\",\n  \"unidadP\": \"94\",\n  \"factor\": 1.4\n}"
-						},
-						"url": {
-							"raw": "http://localhost:9000/equivalencia",
-							"protocol": "http",
-							"host": [
-								"localhost"
-							],
-							"port": "9000",
-							"path": [
-								"equivalencia"
-							]
-						}
-					},
-					"status": "Conflict",
-					"code": 409,
-					"_postman_previewlanguage": "json",
-					"header": [
-						{
-							"key": "Content-Type",
-							"value": "application/json"
-						}
-					],
-					"cookie": [],
-					"body": "{\n  \"success\": false,\n  \"message\": \"La equivalencia ya existe\"\n}"
-				}
-			]
-		},
-		{
-			"name": "Listar Equivalencias",
-			"request": {
-				"method": "GET",
-				"header": [],
-				"url": {
-					"raw": "http://localhost:9000/equivalencias?referenciaP=O60691031&limite=50",
-					"protocol": "http",
-					"host": [
-						"localhost"
-					],
-					"port": "9000",
-					"path": [
-						"equivalencias"
-					],
-					"query": [
-						{
-							"key": "referenciaP",
-							"value": "O60691031"
-						},
-						{
-							"key": "limite",
-							"value": "50"
-						}
-					]
-				}
-			},
-			"response": [
+					"name": "Detalle Archivo Staging",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "http://localhost:9000/xml/files/1"
+					}
+				},
 				{
-					"name": "Éxito",
-					"originalRequest": {
+					"name": "Productos Pendientes Homologar",
+					"request": {
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "http://localhost:9000/equivalencias?referenciaP=O60691031&limite=50",
+							"raw": "http://localhost:9000/xml/productos/pendientes?fileName=factura1.xml",
 							"protocol": "http",
-							"host": [
-								"localhost"
-							],
+							"host": ["localhost"],
 							"port": "9000",
-							"path": [
-								"equivalencias"
-							],
+							"path": ["xml", "productos", "pendientes"],
 							"query": [
-								{
-									"key": "referenciaP",
-									"value": "O60691031"
-								},
-								{
-									"key": "limite",
-									"value": "50"
-								}
+								{ "key": "fileName", "value": "factura1.xml" }
 							]
 						}
-					},
-					"status": "OK",
-					"code": 200,
-					"_postman_previewlanguage": "json",
-					"header": [
-						{
-							"key": "Content-Type",
-							"value": "application/json"
-						}
-					],
-					"cookie": [],
-					"body": "{\n    \"equivalencias\": [\n        {\n            \"codigoH\": 4032,\n            \"subcodigoH\": 1,\n            \"nombreH\": \"LAVAMANOS MARSELLA\",\n            \"referenciaH\": \"O23011001\",\n            \"unidadH\": \"MTR\",\n            \"referenciaP\": \"O60691031\",\n            \"unidadP\": \"94\",\n            \"factor\": 1.4\n        }\n    ]\n}"
+					}
+				},
+				{
+					"name": "Guardar Homologación",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"referenciaXML\": \"ABC123\",\n  \"unidadXML\": \"94\",\n  \"referenciaP\": \"ERP-001\",\n  \"unidadP\": \"94\",\n  \"factor\": 1\n}"
+						},
+						"url": "http://localhost:9000/xml/homologar"
+					}
+				},
+				{
+					"name": "Procesar Batch (Final)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"ids\": [1]\n}"
+						},
+						"url": "http://localhost:9000/xml/procesar"
+					}
 				}
 			]
 		},
 		{
-			"name": "Eliminar Equivalencia",
-			"request": {
-				"method": "DELETE",
-				"header": [],
-				"url": {
-					"raw": "http://localhost:9000/equivalencia?referenciaP=O60691031&unidadP=94",
-					"protocol": "http",
-					"host": [
-						"localhost"
-					],
-					"port": "9000",
-					"path": [
-						"equivalencia"
-					],
-					"query": [
-						{
-							"key": "referenciaP",
-							"value": "O60691031"
-						},
-						{
-							"key": "unidadP",
-							"value": "94"
-						}
-					]
-				}
-			},
-			"response": [
+			"name": "ERP Data",
+			"item": [
 				{
-					"name": "Éxito",
-					"originalRequest": {
+					"name": "Buscar Productos ERP",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:9000/erp/productos?search=lavamanos",
+							"protocol": "http",
+							"host": ["localhost"],
+							"port": "9000",
+							"path": ["erp", "productos"],
+							"query": [
+								{ "key": "search", "value": "lavamanos" }
+							]
+						}
+					}
+				},
+				{
+					"name": "Listar Unidades ERP",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "http://localhost:9000/erp/unidades"
+					}
+				}
+			]
+		},
+		{
+			"name": "Equivalencias Management",
+			"item": [
+				{
+					"name": "Listar Equivalencias",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "http://localhost:9000/equivalencias"
+					}
+				},
+				{
+					"name": "Eliminar Equivalencia",
+					"request": {
 						"method": "DELETE",
 						"header": [],
-						"url": {
-							"raw": "http://localhost:9000/equivalencia?referenciaP=O60691031&unidadP=94",
-							"protocol": "http",
-							"host": [
-								"localhost"
-							],
-							"port": "9000",
-							"path": [
-								"equivalencia"
-							],
-							"query": [
-								{
-									"key": "referenciaP",
-									"value": "O60691031"
-								},
-								{
-									"key": "unidadP",
-									"value": "94"
-								}
-							]
-						}
-					},
-					"status": "OK",
-					"code": 200,
-					"_postman_previewlanguage": "json",
-					"header": [
-						{
-							"key": "Content-Type",
-							"value": "application/json"
-						}
-					],
-					"cookie": [],
-					"body": "{\n    \"success\": true,\n    \"message\": \"Equivalencia eliminada correctamente\"\n}"
-				}
-			]
-		},
-		{
-			"name": "Buscar Productos Helisa",
-			"request": {
-				"method": "GET",
-				"header": [],
-				"url": {
-					"raw": "http://localhost:9000/helisa/productos?filtro=lavamanos&limite=10",
-					"protocol": "http",
-					"host": [
-						"localhost"
-					],
-					"port": "9000",
-					"path": [
-						"helisa",
-						"productos"
-					],
-					"query": [
-						{
-							"key": "filtro",
-							"value": "lavamanos"
-						},
-						{
-							"key": "limite",
-							"value": "10"
-						}
-					]
-				}
-			},
-			"response": [
-				{
-					"name": "Éxito",
-					"originalRequest": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "http://localhost:9000/helisa/productos?filtro=lavamanos&limite=10",
-							"protocol": "http",
-							"host": [
-								"localhost"
-							],
-							"port": "9000",
-							"path": [
-								"helisa",
-								"productos"
-							],
-							"query": [
-								{
-									"key": "filtro",
-									"value": "lavamanos"
-								},
-								{
-									"key": "limite",
-									"value": "10"
-								}
-							]
-						}
-					},
-					"status": "OK",
-					"code": 200,
-					"_postman_previewlanguage": "json",
-					"header": [
-						{
-							"key": "Content-Type",
-							"value": "application/json"
-						}
-					],
-					"cookie": [],
-					"body": "{\n    \"productos\": [\n        {\n            \"codigo\": 123,\n            \"subcodigo\": 1,\n            \"nombre\": \"LAVAMANOS ALUVIA\",\n            \"referencia\": \"O60691031\",\n            \"unidad\": \"MTR\"\n        }\n    ]\n}"
+						"url": "http://localhost:9000/equivalencia?referenciaH=ABC&unidadH=94"
+					}
 				}
 			]
 		}

@@ -345,7 +345,7 @@ begin
         LProductObj.AddPair('referencia', Q.FieldByName('REFERENCIA').AsString);
         LProductObj.AddPair('referenciaStd', Q.FieldByName('REFERENCIA_STD').AsString);
         LProductObj.AddPair('cantidad', TJSONNumber.Create(Q.FieldByName('CANTIDAD').AsFloat));
-        LProductObj.AddPair('unidadXML', Q.FieldByName('UNIDAD').AsString);
+        LProductObj.AddPair('unidad', Q.FieldByName('UNIDAD').AsString);
         LProductObj.AddPair('valorUnitario', TJSONNumber.Create(Q.FieldByName('VALOR_UNITARIO').AsFloat));
         LProductObj.AddPair('valorTotal', TJSONNumber.Create(Q.FieldByName('VALOR_TOTAL').AsFloat));
         LProductObj.AddPair('impuesto', TJSONNumber.Create(Q.FieldByName('IMPUESTO').AsFloat));
@@ -456,48 +456,48 @@ var
   LJSONList: TJSONArray;
   LJSONObj: TJSONObject;
   LFileName: string;
-  LSQL: string;
+  LFileID: Integer;
 begin
   Res.ContentType('application/json; charset=utf-8');
   try
-    Req.Query.TryGetValue('fileName', LFileName);
+    if not Req.Query.TryGetValue('fileName', LFileName) or LFileName.Trim.IsEmpty then
+    begin
+      Res.Status(400).Send('fileName is required');
+      Exit;
+    end;
 
     Q := GetBridgeQuery;
     try
-      LSQL :=
-        'SELECT P.REFERENCIA, P.DESCRIPCION, P.UNIDAD, P.CANTIDAD, F.FILE_NAME ' +
-        'FROM XML_PRODUCTOS P ' +
-        'JOIN XML_FILES F ON P.XML_FILE_ID = F.ID ' +
-        'WHERE P.EQUIVALENCIA_ID IS NULL';
+      // 1. Get File ID
+      Q.SQL.Text := 'SELECT ID FROM XML_FILES WHERE FILE_NAME = :FNAME';
+      Q.ParamByName('FNAME').AsString := LFileName;
+      Q.Open;
 
-      if not LFileName.Trim.IsEmpty then
-        LSQL := LSQL + ' AND F.FILE_NAME = :FNAME';
+      if Q.IsEmpty then
+      begin
+        Res.Status(404).Send('File not found in staging');
+        Exit;
+      end;
 
-      LSQL := LSQL + ' ORDER BY F.FECHA_CARGA DESC';
+      LFileID := Q.FieldByName('ID').AsInteger;
+      Q.Close;
 
-      Q.SQL.Text := LSQL;
-      if not LFileName.Trim.IsEmpty then
-        Q.ParamByName('FNAME').AsString := LFileName;
+      // 2. Get Pending Products with exact aliases
+      Q.SQL.Text :=
+        'SELECT REFERENCIA AS referenciaXml, DESCRIPCION AS nombre, UNIDAD AS unidad ' +
+        'FROM XML_PRODUCTOS ' +
+        'WHERE XML_FILE_ID = :FILEID AND EQUIVALENCIA_ID IS NULL';
 
+      Q.ParamByName('FILEID').AsInteger := LFileID;
       Q.Open;
 
       LJSONList := TJSONArray.Create;
       while not Q.Eof do
       begin
-        if Q.FieldByName('REFERENCIA').AsString.Trim.IsEmpty or
-           Q.FieldByName('DESCRIPCION').AsString.Trim.IsEmpty or
-           Q.FieldByName('UNIDAD').AsString.Trim.IsEmpty then
-        begin
-          Q.Next;
-          Continue;
-        end;
-
         LJSONObj := TJSONObject.Create;
-        LJSONObj.AddPair('fileName', Q.FieldByName('FILE_NAME').AsString);
-        LJSONObj.AddPair('nombreXML', Q.FieldByName('DESCRIPCION').AsString);
-        LJSONObj.AddPair('referenciaXML', Q.FieldByName('REFERENCIA').AsString);
-        LJSONObj.AddPair('unidadXML', Q.FieldByName('UNIDAD').AsString);
-        LJSONObj.AddPair('cantidad', TJSONNumber.Create(Q.FieldByName('CANTIDAD').AsFloat));
+        LJSONObj.AddPair('referenciaXml', Q.FieldByName('referenciaXml').AsString);
+        LJSONObj.AddPair('nombre', Q.FieldByName('nombre').AsString);
+        LJSONObj.AddPair('unidad', Q.FieldByName('unidad').AsString);
         LJSONList.AddElement(LJSONObj);
         Q.Next;
       end;
@@ -591,12 +591,10 @@ begin
     end;
 
     try
-      // REFERENCIAH -> referencia XML (referenciaXML)
-      // UNIDADH -> unidad XML (unidadXML)
-      // REFERENCIAP -> referencia ERP (referenciaP)
-      // UNIDADP -> código unidad ERP (unidadP)
+      // Pasamos los valores del XML a REFERENCIAH/UNIDADH para que coincida con la lógica de búsqueda
+      // y los valores del ERP a REFERENCIAP/UNIDADP.
       EquivalenciaService.CrearEquivalencia(
-        0, 0, '', LReferenciaP, LUnidadP, LUnidadXML, LReferenciaXML, LFactor
+        0, 0, '', LReferenciaXML, LUnidadXML, LUnidadP, LReferenciaP, LFactor
       );
 
       LResponse := TJSONObject.Create;
