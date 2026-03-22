@@ -75,10 +75,10 @@ begin
           Q.Close;
         end;
 
-        // 2. Insert products - XML_PRODUCTOS table has no unit column as per confirmed schema
+        // 2. Insert products - Using UNIDAD_XML to support homologation
         Q.SQL.Text :=
-          'INSERT INTO XML_PRODUCTOS (XML_FILE_ID, DESCRIPCION, REFERENCIA, REFERENCIA_STD, CANTIDAD, VALOR_UNITARIO, VALOR_TOTAL, IMPUESTO, EQUIVALENCIA_ID) ' +
-          'VALUES (:FILEID, :DESC, :REF, :REFSTD, :CANT, :VUNI, :VTOT, :IMP, ' +
+          'INSERT INTO XML_PRODUCTOS (XML_FILE_ID, DESCRIPCION, REFERENCIA, REFERENCIA_STD, CANTIDAD, UNIDAD_XML, VALOR_UNITARIO, VALOR_TOTAL, IMPUESTO, EQUIVALENCIA_ID) ' +
+          'VALUES (:FILEID, :DESC, :REF, :REFSTD, :CANT, :UNIXML, :VUNI, :VTOT, :IMP, ' +
           '(SELECT FIRST 1 ID FROM EQUIVALENCIA WHERE REFERENCIAP = :REFP AND UNIDADP = :UNIP))';
 
         for I := 0 to Length(AParsedInvoice.Products) - 1 do
@@ -88,11 +88,12 @@ begin
           Q.ParamByName('REF').AsString := AParsedInvoice.Products[I].Referencia;
           Q.ParamByName('REFSTD').AsString := AParsedInvoice.Products[I].ReferenciaEstandar;
           Q.ParamByName('CANT').AsFloat := AParsedInvoice.Products[I].Cantidad;
+          Q.ParamByName('UNIXML').AsString := AParsedInvoice.Products[I].Unidad;
           Q.ParamByName('VUNI').AsFloat := AParsedInvoice.Products[I].ValorUnitario;
           Q.ParamByName('VTOT').AsFloat := AParsedInvoice.Products[I].ValorTotal;
           Q.ParamByName('IMP').AsFloat := AParsedInvoice.Products[I].Impuesto;
 
-          // Mapping parameters (used for EQUIVALENCIA lookup)
+          // Mapping parameters
           Q.ParamByName('REFP').AsString := AParsedInvoice.Products[I].Referencia;
           Q.ParamByName('UNIP').AsString := AParsedInvoice.Products[I].Unidad;
 

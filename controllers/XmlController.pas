@@ -345,6 +345,7 @@ begin
         LProductObj.AddPair('referencia', Q.FieldByName('REFERENCIA').AsString);
         LProductObj.AddPair('referenciaStd', Q.FieldByName('REFERENCIA_STD').AsString);
         LProductObj.AddPair('cantidad', TJSONNumber.Create(Q.FieldByName('CANTIDAD').AsFloat));
+        LProductObj.AddPair('unidadXML', Q.FieldByName('UNIDAD_XML').AsString);
         LProductObj.AddPair('valorUnitario', TJSONNumber.Create(Q.FieldByName('VALOR_UNITARIO').AsFloat));
         LProductObj.AddPair('valorTotal', TJSONNumber.Create(Q.FieldByName('VALOR_TOTAL').AsFloat));
         LProductObj.AddPair('impuesto', TJSONNumber.Create(Q.FieldByName('IMPUESTO').AsFloat));
@@ -470,13 +471,12 @@ begin
       while not Q.Eof do
       begin
         LJSONObj := TJSONObject.Create;
-        LJSONObj.AddPair('id', TJSONNumber.Create(Q.FieldByName('ID').AsInteger));
-        LJSONObj.AddPair('xmlFileId', TJSONNumber.Create(Q.FieldByName('XML_FILE_ID').AsInteger));
         LJSONObj.AddPair('fileName', Q.FieldByName('FILE_NAME').AsString);
         LJSONObj.AddPair('nombreXML', Q.FieldByName('DESCRIPCION').AsString);
         LJSONObj.AddPair('referenciaXML', Q.FieldByName('REFERENCIA').AsString);
         LJSONObj.AddPair('referenciaStd', Q.FieldByName('REFERENCIA_STD').AsString);
         LJSONObj.AddPair('cantidad', TJSONNumber.Create(Q.FieldByName('CANTIDAD').AsFloat));
+        LJSONObj.AddPair('unidadXML', Q.FieldByName('UNIDAD_XML').AsString);
         LJSONObj.AddPair('valorUnitario', TJSONNumber.Create(Q.FieldByName('VALOR_UNITARIO').AsFloat));
         LJSONObj.AddPair('valorTotal', TJSONNumber.Create(Q.FieldByName('VALOR_TOTAL').AsFloat));
         LJSONList.AddElement(LJSONObj);
@@ -562,6 +562,10 @@ begin
     LFactor := (LBody.GetValue('factor') as TJSONNumber).AsDouble;
 
     try
+      // REFERENCIAH -> referencia XML
+      // REFERENCIAP -> referencia ERP
+      // UNIDADH -> unidad XML
+      // UNIDADP -> código unidad ERP
       EquivalenciaService.CrearEquivalencia(
         0, 0, '', LReferenciaP, LUnidadP, LUnidadXML, LReferenciaXML, LFactor
       );
