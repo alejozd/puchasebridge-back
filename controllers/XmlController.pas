@@ -560,53 +560,70 @@ end;
 
 procedure Homologar(Req: THorseRequest; Res: THorseResponse; Next: TProc);
 var
-  LBody: TJSONObject;
-  LReferenciaXML, LUnidadXML, LReferenciaP, LUnidadP: string;
+  LJSON: TJSONObject;
+  LReferenciaXML, LUnidadXML, LReferenciaErp, LUnidadErp: string;
   LFactor: Double;
   LResponse: TJSONObject;
 begin
   Res.ContentType('application/json; charset=utf-8');
   try
-    LBody := Req.Body<TJSONObject>;
-    if (LBody = nil) then
-    begin
-      Res.Status(400).Send('Body is required');
-      Exit;
-    end;
-
-    LReferenciaXML := LBody.GetValue('referenciaXML').Value;
-    LUnidadXML := LBody.GetValue('unidadXML').Value;
-    LReferenciaP := LBody.GetValue('referenciaP').Value;
-    LUnidadP := LBody.GetValue('unidadP').Value;
-    LFactor := (LBody.GetValue('factor') as TJSONNumber).AsDouble;
-
-    if LReferenciaXML.Trim.IsEmpty or LUnidadXML.Trim.IsEmpty or
-       LReferenciaP.Trim.IsEmpty or LUnidadP.Trim.IsEmpty then
-    begin
-      LResponse := TJSONObject.Create;
-      LResponse.AddPair('success', TJSONBool.Create(False));
-      LResponse.AddPair('message', 'Todos los campos son obligatorios');
-      Res.Status(400).Send(LResponse);
-      Exit;
-    end;
-
     try
-      // Pasamos los valores del XML a REFERENCIAH/UNIDADH para que coincida con la lógica de búsqueda
-      // y los valores del ERP a REFERENCIAP/UNIDADP.
-      EquivalenciaService.CrearEquivalencia(
-        0, 0, '', LReferenciaXML, LUnidadXML, LUnidadP, LReferenciaP, LFactor
-      );
+      if Req.Body.Trim.IsEmpty then
+        raise Exception.Create('Request body vacío');
 
-      LResponse := TJSONObject.Create;
-      LResponse.AddPair('success', TJSONBool.Create(True));
-      LResponse.AddPair('message', 'Homologación guardada correctamente');
-      Res.Send(LResponse);
+      LJSON := TJSONObject.ParseJSONValue(Req.Body) as TJSONObject;
+      try
+        if not Assigned(LJSON) then
+          raise Exception.Create('JSON inválido');
+
+        // Validar campos obligatorios
+        if LJSON.GetValue('referenciaXml') = nil then
+          raise Exception.Create('referenciaXml requerido');
+        if LJSON.GetValue('unidadXml') = nil then
+          raise Exception.Create('unidadXml requerido');
+        if LJSON.GetValue('referenciaErp') = nil then
+          raise Exception.Create('referenciaErp requerido');
+        if LJSON.GetValue('unidadErp') = nil then
+          raise Exception.Create('unidadErp requerido');
+        if LJSON.GetValue('factor') = nil then
+          raise Exception.Create('factor requerido');
+
+        // Asignación segura
+        LReferenciaXML := LJSON.GetValue('referenciaXml').Value;
+        LUnidadXML := LJSON.GetValue('unidadXml').Value;
+        LReferenciaErp := LJSON.GetValue('referenciaErp').Value;
+        LUnidadErp := LJSON.GetValue('unidadErp').Value;
+
+        if LJSON.GetValue('factor') is TJSONNumber then
+          LFactor := (LJSON.GetValue('factor') as TJSONNumber).AsDouble
+        else
+          LFactor := StrToFloatDef(LJSON.GetValue('factor').Value, 0);
+
+        // Validar antes de usar
+        if LReferenciaErp.Trim = '' then
+          raise Exception.Create('Referencia ERP vacía');
+        if LUnidadErp.Trim = '' then
+          raise Exception.Create('Unidad ERP vacía');
+
+        // Pasamos los valores del XML a REFERENCIAH/UNIDADH para que coincida con la lógica de búsqueda
+        // y los valores del ERP a REFERENCIAP/UNIDADP.
+        EquivalenciaService.CrearEquivalencia(
+          0, 0, '', LReferenciaXML, LUnidadXML, LUnidadErp, LReferenciaErp, LFactor
+        );
+
+        LResponse := TJSONObject.Create;
+        LResponse.AddPair('success', TJSONBool.Create(True));
+        LResponse.AddPair('message', 'Homologación guardada correctamente');
+        Res.Send(LResponse);
+      finally
+        if Assigned(LJSON) then LJSON.Free;
+      end;
     except
       on E: Exception do
       begin
         LResponse := TJSONObject.Create;
         LResponse.AddPair('success', TJSONBool.Create(False));
-        LResponse.AddPair('message', 'Error al guardar homologación: ' + E.Message);
+        LResponse.AddPair('mensaje', E.Message);
         Res.Status(500).Send(LResponse);
       end;
     end;
