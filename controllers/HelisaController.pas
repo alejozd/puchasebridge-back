@@ -33,12 +33,13 @@ begin
       LQ.Connection.Free;
       LQ.Connection := CrearConexionParticular('0');
 
-      // Consultar HELI00BD.HGW y tabla INMAXXXX
+      // Consultar HELI00BD.HGW y tabla INMAXXXX con JOIN a unidades
       LQ.SQL.Text :=
-        'SELECT FIRST 20 CODIGO, SUBCODIGO, NOMBRE, REFERENCIA ' +
-        'FROM INMAXXXX ' +
-        'WHERE NOMBRE LIKE :FILTRO OR REFERENCIA LIKE :FILTRO ' +
-        'ORDER BY NOMBRE';
+        'SELECT FIRST 20 I.CODIGO, I.SUBCODIGO, I.NOMBRE, I.REFERENCIA, U.SIGLA AS UNIDAD_DEFAULT ' +
+        'FROM INMAXXXX I ' +
+        'LEFT JOIN INTUXXXX U ON I.SUBCODIGO = U.CODIGO ' +
+        'WHERE I.NOMBRE LIKE :FILTRO OR I.REFERENCIA LIKE :FILTRO ' +
+        'ORDER BY I.NOMBRE';
 
       LQ.ParamByName('FILTRO').AsString := '%' + LFiltro.ToUpper + '%';
       LQ.Open;
@@ -53,6 +54,7 @@ begin
         LProductoObj.AddPair('referencia', LQ.FieldByName('REFERENCIA').AsString);
         // Relationship: INTUXXXX.CODIGO = INMAXXXX.SUBCODIGO
         LProductoObj.AddPair('unidad', TJSONNumber.Create(LQ.FieldByName('SUBCODIGO').AsInteger));
+        LProductoObj.AddPair('unidadDefault', LQ.FieldByName('UNIDAD_DEFAULT').AsString);
 
         LProductosArr.AddElement(LProductoObj);
         LQ.Next;
