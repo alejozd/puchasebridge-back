@@ -79,7 +79,7 @@ begin
 
     try
       LXMLDoc := TXMLDocument.Create(nil);
-      (LXMLDoc as TXMLDocument).DOMVendor := sAdom4XmlVendor;
+      LXMLDoc.DOMVendor := GetDOMVendor(sAdom4XmlVendor);
       LXMLDoc.LoadFromFile(LPath);
       LXMLDoc.Active := True;
 
@@ -101,20 +101,20 @@ begin
         for I := 0 to LSimpleCodeList.ChildNodes.Count - 1 do
         begin
           LRow := LSimpleCodeList.ChildNodes[I];
-          if SameText(LRow.LocalName, 'Row') then
+          if (LRow.NodeType = ntElement) and SameText(LRow.LocalName, 'Row') then
           begin
             LCode := '';
             LName := '';
             for J := 0 to LRow.ChildNodes.Count - 1 do
             begin
               LValue := LRow.ChildNodes[J];
-              if SameText(LValue.LocalName, 'Value') then
+              if (LValue.NodeType = ntElement) and SameText(LValue.LocalName, 'Value') then
               begin
                 if SameText(VarToStr(LValue.Attributes['ColumnRef']), 'code') then
                 begin
                   LSimpleValue := nil;
                   for K := 0 to LValue.ChildNodes.Count - 1 do
-                    if SameText(LValue.ChildNodes[K].LocalName, 'SimpleValue') then
+                    if (LValue.ChildNodes[K].NodeType = ntElement) and SameText(LValue.ChildNodes[K].LocalName, 'SimpleValue') then
                     begin
                       LSimpleValue := LValue.ChildNodes[K];
                       Break;
@@ -126,7 +126,7 @@ begin
                 begin
                   LSimpleValue := nil;
                   for K := 0 to LValue.ChildNodes.Count - 1 do
-                    if SameText(LValue.ChildNodes[K].LocalName, 'SimpleValue') then
+                    if (LValue.ChildNodes[K].NodeType = ntElement) and SameText(LValue.ChildNodes[K].LocalName, 'SimpleValue') then
                     begin
                       LSimpleValue := LValue.ChildNodes[K];
                       Break;
