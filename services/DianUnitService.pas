@@ -44,7 +44,8 @@ end;
 
 class procedure TDianUnitService.Initialize;
 var
-  LXMLDoc: IXMLDocument;
+  LXMLDoc: TXMLDocument;
+  LXMLIntf: IXMLDocument;
   LRootNode, LSimpleCodeList, LRow, LValue, LSimpleValue: IXMLNode;
   I, J, K: Integer;
   LPath: string;
@@ -82,8 +83,9 @@ begin
       LXMLDoc.DOMVendor := GetDOMVendor(sAdom4XmlVendor);
       LXMLDoc.LoadFromFile(LPath);
       LXMLDoc.Active := True;
+      LXMLIntf := LXMLDoc;
 
-      LRootNode := LXMLDoc.DocumentElement;
+      LRootNode := LXMLIntf.DocumentElement;
 
       // Find SimpleCodeList
       LSimpleCodeList := nil;
