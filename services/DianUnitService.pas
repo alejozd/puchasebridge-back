@@ -6,12 +6,7 @@ uses
   System.SysUtils,
   System.Classes,
   System.Generics.Collections,
-  System.IOUtils,
   System.SyncObjs,
-  System.Variants,
-  Xml.XMLDoc,
-  Xml.adomxmldom,
-  Xml.xmldom,
   Xml.XMLIntf;
 
 type
@@ -27,6 +22,13 @@ type
   end;
 
 implementation
+
+uses
+  System.IOUtils,
+  System.Variants,
+  Xml.XMLDoc,
+  Xml.adomxmldom,
+  Xml.xmldom;
 
 { TDianUnitService }
 
@@ -44,7 +46,7 @@ end;
 
 class procedure TDianUnitService.Initialize;
 var
-  LXMLIntf: IXMLDocument;
+  LXMLDoc: IXMLDocument;
   LRootNode, LSimpleCodeList, LRow, LValue, LSimpleValue: IXMLNode;
   I, J, K: Integer;
   LPath: string;
@@ -78,18 +80,16 @@ begin
       Exit;
 
     try
-      LXMLIntf := NewXMLDocument;
-      LXMLIntf.DOMVendor := sAdom4XmlVendor;
-      LXMLIntf.LoadFromFile(LPath);
-      LXMLIntf.Active := True;
+      LXMLDoc := LoadXMLDocument(LPath);
+      LXMLDoc.Active := True;
 
-      LRootNode := LXMLIntf.DocumentElement;
+      LRootNode := LXMLDoc.DocumentElement;
 
       // Find SimpleCodeList
       LSimpleCodeList := nil;
       for I := 0 to LRootNode.ChildNodes.Count - 1 do
       begin
-        if SameText(LRootNode.ChildNodes[I].LocalName, 'SimpleCodeList') then
+        if (LRootNode.ChildNodes[I].NodeType = ntElement) and SameText(LRootNode.ChildNodes[I].LocalName, 'SimpleCodeList') then
         begin
           LSimpleCodeList := LRootNode.ChildNodes[I];
           Break;
