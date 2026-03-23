@@ -443,7 +443,7 @@ begin
         LJSONObj.AddPair('referenciaXML', Q.FieldByName('REFERENCIAXML').AsString);
         LJSONObj.AddPair('nombreProducto', Q.FieldByName('NOMBREPRODUCTO').AsString);
         LJSONObj.AddPair('unidadXML', Q.FieldByName('UNIDADXML').AsString);
-        LJSONObj.AddPair('unidadXMLNombre', TDianUnitService.GetUnitName(Q.FieldByName('UNIDADXML').AsString));
+        LJSONObj.AddPair('unidadXMLNombre', TDianUnitService.getUnidadNombre(Q.FieldByName('UNIDADXML').AsString));
         LJSONObj.AddPair('estado', 'pendiente');
         LJSONList.AddElement(LJSONObj);
         Q.Next;
