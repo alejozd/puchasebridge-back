@@ -25,82 +25,17 @@ uses
   DianUnitService;
 
 type
-  TFileInfo = record
+  TCombinedFileInfo = record
+    ID: Integer;
     FileName: string;
     Size: Int64;
+    ProveedorNit: string;
+    Proveedor: string;
+    FechaDocumento: TDateTime;
+    Estado: string;
+    FechaCarga: TDateTime;
     LastModified: TDateTime;
   end;
-
-procedure List(Req: THorseRequest; Res: THorseResponse; Next: TProc);
-var
-  LPath: string;
-  LFiles: TStringDynArray;
-  LFile: string;
-  LJSONList: TJSONArray;
-  LJSONObj: TJSONObject;
-  LFileInfoList: TList<TFileInfo>;
-  LFileInfo: TFileInfo;
-begin
-  Res.ContentType('application/json; charset=utf-8');
-  try
-    LPath := TPath.Combine('PurchaseBridge', 'Input');
-    if not TDirectory.Exists(LPath) then
-    begin
-      Res.Send(TJSONArray.Create);
-      Exit;
-    end;
-
-    LFiles := TDirectory.GetFiles(LPath, '*.xml');
-
-    LFileInfoList := TList<TFileInfo>.Create;
-    try
-      for LFile in LFiles do
-      begin
-        LFileInfo.FileName := TPath.GetFileName(LFile);
-        LFileInfo.Size := TFile.GetSize(LFile);
-        LFileInfo.LastModified := TFile.GetLastWriteTime(LFile);
-        LFileInfoList.Add(LFileInfo);
-      end;
-
-      LFileInfoList.Sort(TComparer<TFileInfo>.Construct(
-        function(const Left, Right: TFileInfo): Integer
-        begin
-          if Left.LastModified < Right.LastModified then
-            Result := 1
-          else if Left.LastModified > Right.LastModified then
-            Result := -1
-          else
-            Result := 0;
-        end));
-
-      LJSONList := TJSONArray.Create;
-      try
-        for LFileInfo in LFileInfoList do
-        begin
-          LJSONObj := TJSONObject.Create;
-          LJSONObj.AddPair('fileName', LFileInfo.FileName);
-          LJSONObj.AddPair('size', TJSONNumber.Create(LFileInfo.Size));
-          LJSONObj.AddPair('lastModified', FormatDateTime('yyyy-mm-dd HH:nn:ss', LFileInfo.LastModified));
-          LJSONList.AddElement(LJSONObj);
-        end;
-        Res.Send(LJSONList);
-      except
-        LJSONList.Free;
-        raise;
-      end;
-    finally
-      LFileInfoList.Free;
-    end;
-  except
-    on E: Exception do
-    begin
-      LJSONObj := TJSONObject.Create;
-      LJSONObj.AddPair('success', TJSONBool.Create(False));
-      LJSONObj.AddPair('message', E.Message);
-      Res.Status(500).Send(LJSONObj);
-    end;
-  end;
-end;
 
 procedure Upload(Req: THorseRequest; Res: THorseResponse; Next: TProc);
 var
@@ -327,7 +262,16 @@ begin
       LResponse.AddPair('id', TJSONNumber.Create(Q.FieldByName('ID').AsInteger));
       LResponse.AddPair('fileName', Q.FieldByName('FILE_NAME').AsString);
       LResponse.AddPair('proveedorNit', Q.FieldByName('PROVEEDOR_NIT').AsString);
-      LResponse.AddPair('proveedorNombre', Q.FieldByName('PROVEEDOR_NOMBRE').AsString);
+      if Q.FieldByName('PROVEEDOR_NOMBRE').AsString.Trim.IsEmpty then
+      begin
+        LResponse.AddPair('proveedor', 'Sin proveedor');
+        LResponse.AddPair('proveedorNombre', 'Sin proveedor');
+      end
+      else
+      begin
+        LResponse.AddPair('proveedor', Q.FieldByName('PROVEEDOR_NOMBRE').AsString);
+        LResponse.AddPair('proveedorNombre', Q.FieldByName('PROVEEDOR_NOMBRE').AsString);
+      end;
       LResponse.AddPair('fechaDocumento', FormatDateTime('yyyy-mm-dd', Q.FieldByName('FECHA_DOCUMENTO').AsDateTime));
       LResponse.AddPair('estado', Q.FieldByName('ESTADO').AsString);
       LResponse.AddPair('fechaCarga', FormatDateTime('yyyy-mm-dd HH:nn:ss', Q.FieldByName('FECHA_CARGA').AsDateTime));
@@ -522,36 +466,105 @@ end;
 procedure GetFiles(Req: THorseRequest; Res: THorseResponse; Next: TProc);
 var
   Q: TFDQuery;
+  LPath, LFile: string;
+  LFiles: TStringDynArray;
+  LCombinedList: TList<TCombinedFileInfo>;
+  LInfo: TCombinedFileInfo;
+  LDBData: TDictionary<string, TCombinedFileInfo>;
   LJSONList: TJSONArray;
   LJSONObj: TJSONObject;
 begin
   Res.ContentType('application/json; charset=utf-8');
   try
-    Q := GetBridgeQuery;
+    LCombinedList := TList<TCombinedFileInfo>.Create;
+    LDBData := TDictionary<string, TCombinedFileInfo>.Create;
     try
-      Q.SQL.Text := 'SELECT * FROM XML_FILES ORDER BY FECHA_CARGA DESC';
-      Q.Open;
+      // 1. Get database records
+      Q := GetBridgeQuery;
+      try
+        Q.SQL.Text := 'SELECT * FROM XML_FILES';
+        Q.Open;
+        while not Q.Eof do
+        begin
+          LInfo.ID := Q.FieldByName('ID').AsInteger;
+          LInfo.FileName := Q.FieldByName('FILE_NAME').AsString;
+          LInfo.ProveedorNit := Q.FieldByName('PROVEEDOR_NIT').AsString;
+          LInfo.Proveedor := Q.FieldByName('PROVEEDOR_NOMBRE').AsString;
+          if LInfo.Proveedor.Trim.IsEmpty then LInfo.Proveedor := 'Sin proveedor';
+          LInfo.FechaDocumento := Q.FieldByName('FECHA_DOCUMENTO').AsDateTime;
+          LInfo.Estado := Q.FieldByName('ESTADO').AsString;
+          LInfo.FechaCarga := Q.FieldByName('FECHA_CARGA').AsDateTime;
+          LDBData.AddOrSetValue(LInfo.FileName.ToLower, LInfo);
+          Q.Next;
+        end;
+      finally
+        Q.Free;
+      end;
 
+      // 2. Scan physical files and merge
+      LPath := TPath.Combine('PurchaseBridge', 'Input');
+      if TDirectory.Exists(LPath) then
+      begin
+        LFiles := TDirectory.GetFiles(LPath, '*.xml');
+        for LFile in LFiles do
+        begin
+          LInfo.FileName := TPath.GetFileName(LFile);
+          LInfo.Size := TFile.GetSize(LFile);
+          LInfo.LastModified := TFile.GetLastWriteTime(LFile);
+
+          if LDBData.TryGetValue(LInfo.FileName.ToLower, LInfo) then
+          begin
+             // Fields already populated from DB, update fs fields
+             LInfo.Size := TFile.GetSize(LFile);
+             LInfo.LastModified := TFile.GetLastWriteTime(LFile);
+          end
+          else
+          begin
+             // Not in DB
+             LInfo.ID := 0;
+             LInfo.ProveedorNit := '';
+             LInfo.Proveedor := 'Sin procesar';
+             LInfo.FechaDocumento := 0;
+             LInfo.Estado := 'CARGADO';
+             LInfo.FechaCarga := LInfo.LastModified;
+          end;
+          LCombinedList.Add(LInfo);
+        end;
+      end;
+
+      // 3. Sort by FechaCarga desc
+      LCombinedList.Sort(TComparer<TCombinedFileInfo>.Construct(
+        function(const Left, Right: TCombinedFileInfo): Integer
+        begin
+          if Left.FechaCarga < Right.FechaCarga then Result := 1
+          else if Left.FechaCarga > Right.FechaCarga then Result := -1
+          else Result := 0;
+        end));
+
+      // 4. Construct JSON
       LJSONList := TJSONArray.Create;
-      while not Q.Eof do
+      for LInfo in LCombinedList do
       begin
         LJSONObj := TJSONObject.Create;
-        LJSONObj.AddPair('id', TJSONNumber.Create(Q.FieldByName('ID').AsInteger));
-        LJSONObj.AddPair('fileName', Q.FieldByName('FILE_NAME').AsString);
-        LJSONObj.AddPair('proveedorNit', Q.FieldByName('PROVEEDOR_NIT').AsString);
-        if Q.FieldByName('PROVEEDOR_NOMBRE').AsString.Trim.IsEmpty then
-          LJSONObj.AddPair('proveedor', 'Sin proveedor')
+        LJSONObj.AddPair('id', TJSONNumber.Create(LInfo.ID));
+        LJSONObj.AddPair('fileName', LInfo.FileName);
+        LJSONObj.AddPair('size', TJSONNumber.Create(LInfo.Size));
+        LJSONObj.AddPair('proveedorNit', LInfo.ProveedorNit);
+        LJSONObj.AddPair('proveedor', LInfo.Proveedor);
+        LJSONObj.AddPair('proveedorNombre', LInfo.Proveedor);
+        if LInfo.FechaDocumento > 0 then
+          LJSONObj.AddPair('fechaDocumento', FormatDateTime('yyyy-mm-dd', LInfo.FechaDocumento))
         else
-          LJSONObj.AddPair('proveedor', Q.FieldByName('PROVEEDOR_NOMBRE').AsString);
-        LJSONObj.AddPair('fechaDocumento', FormatDateTime('yyyy-mm-dd', Q.FieldByName('FECHA_DOCUMENTO').AsDateTime));
-        LJSONObj.AddPair('estado', Q.FieldByName('ESTADO').AsString);
-        LJSONObj.AddPair('fechaCarga', FormatDateTime('yyyy-mm-dd HH:nn:ss', Q.FieldByName('FECHA_CARGA').AsDateTime));
+          LJSONObj.AddPair('fechaDocumento', TJSONNull.Create);
+        LJSONObj.AddPair('estado', LInfo.Estado);
+        LJSONObj.AddPair('fechaCarga', FormatDateTime('yyyy-mm-dd HH:nn:ss', LInfo.FechaCarga));
+        LJSONObj.AddPair('lastModified', FormatDateTime('yyyy-mm-dd HH:nn:ss', LInfo.LastModified));
         LJSONList.AddElement(LJSONObj);
-        Q.Next;
       end;
       Res.Send(LJSONList);
     finally
-      Q.Free;
+      LCombinedList.Free;
+      LDBData.Free;
     end;
   except
     on E: Exception do
@@ -643,7 +656,7 @@ end;
 
 procedure Registry;
 begin
-  THorse.Get('/xml/list', List);
+  THorse.Get('/xml/list', GetFiles);
   THorse.Post('/xml/upload', Upload);
   THorse.Post('/xml/parse', Parse);
   THorse.Get('/xml/files', GetFiles);

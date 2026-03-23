@@ -27,9 +27,7 @@ implementation
 uses
   System.IOUtils,
   System.Variants,
-  Xml.XMLDoc,
-  Xml.adomxmldom,
-  Xml.xmldom;
+  Xml.XMLDoc;
 
 { TDianUnitService }
 
@@ -64,7 +62,6 @@ end;
 
 class procedure TDianUnitService.Initialize;
 var
-  LXMLDoc: TXMLDocument;
   LXMLIntf: IXMLDocument;
   LRootNode, LSimpleCodeList, LRow, LValue, LSimpleValue: IXMLNode;
   I, J, K: Integer;
@@ -83,6 +80,7 @@ begin
 
     LMap := TDictionary<string, string>.Create;
     try
+      // Search paths
       LPath := TPath.Combine(ExtractFilePath(ParamStr(0)), 'examples');
       LPath := TPath.Combine(LPath, 'ToolBox');
       LPath := TPath.Combine(LPath, 'Listas de valores');
@@ -98,14 +96,12 @@ begin
 
       if TFile.Exists(LPath) then
       begin
-        LXMLDoc := TXMLDocument.Create(nil);
-        LXMLDoc.DOMVendor := GetDOMVendor(sAdom4XmlVendor);
-        LXMLDoc.LoadFromFile(LPath);
-        LXMLDoc.Active := True;
-        LXMLIntf := LXMLDoc;
+        LXMLIntf := LoadXMLDocument(LPath);
+        LXMLIntf.Active := True;
 
         LRootNode := LXMLIntf.DocumentElement;
 
+        // Find SimpleCodeList
         LSimpleCodeList := nil;
         for I := 0 to LRootNode.ChildNodes.Count - 1 do
         begin
@@ -170,7 +166,6 @@ begin
         end;
       end;
     except
-      // silent fail
     end;
     FUnitMap := LMap;
   finally
