@@ -466,7 +466,7 @@ end;
 procedure GetFiles(Req: THorseRequest; Res: THorseResponse; Next: TProc);
 var
   Q: TFDQuery;
-  LPath, LFile: string;
+  LPath, LFile, LFileNameOnly: string;
   LFiles: TStringDynArray;
   LCombinedList: TList<TCombinedFileInfo>;
   LInfo: TCombinedFileInfo;
@@ -477,8 +477,9 @@ begin
   Res.ContentType('application/json; charset=utf-8');
   try
     LCombinedList := TList<TCombinedFileInfo>.Create;
-    LDBData := TDictionary<string, TCombinedFileInfo>.Create;
     try
+      LDBData := TDictionary<string, TCombinedFileInfo>.Create;
+      try
       // 1. Get database records
       Q := GetBridgeQuery;
       try
@@ -486,6 +487,7 @@ begin
         Q.Open;
         while not Q.Eof do
         begin
+          LInfo := Default(TCombinedFileInfo);
           LInfo.ID := Q.FieldByName('ID').AsInteger;
           LInfo.FileName := Q.FieldByName('FILE_NAME').AsString;
           LInfo.ProveedorNit := Q.FieldByName('PROVEEDOR_NIT').AsString;
@@ -501,36 +503,39 @@ begin
         Q.Free;
       end;
 
-      // 2. Scan physical files and merge
+      // 2. Scan physical files and merge/add
       LPath := TPath.Combine('PurchaseBridge', 'Input');
       if TDirectory.Exists(LPath) then
       begin
         LFiles := TDirectory.GetFiles(LPath, '*.xml');
         for LFile in LFiles do
         begin
-          LInfo.FileName := TPath.GetFileName(LFile);
-          LInfo.Size := TFile.GetSize(LFile);
-          LInfo.LastModified := TFile.GetLastWriteTime(LFile);
-
-          if LDBData.TryGetValue(LInfo.FileName.ToLower, LInfo) then
+          LFileNameOnly := TPath.GetFileName(LFile);
+          if LDBData.TryGetValue(LFileNameOnly.ToLower, LInfo) then
           begin
-             // Fields already populated from DB, update fs fields
-             LInfo.Size := TFile.GetSize(LFile);
-             LInfo.LastModified := TFile.GetLastWriteTime(LFile);
+            LInfo.Size := TFile.GetSize(LFile);
+            LInfo.LastModified := TFile.GetLastWriteTime(LFile);
+            LDBData.Items[LFileNameOnly.ToLower] := LInfo;
           end
           else
           begin
-             // Not in DB
-             LInfo.ID := 0;
-             LInfo.ProveedorNit := '';
-             LInfo.Proveedor := 'Sin procesar';
-             LInfo.FechaDocumento := 0;
-             LInfo.Estado := 'CARGADO';
-             LInfo.FechaCarga := LInfo.LastModified;
+            LInfo := Default(TCombinedFileInfo);
+            LInfo.ID := 0;
+            LInfo.FileName := LFileNameOnly;
+            LInfo.Size := TFile.GetSize(LFile);
+            LInfo.LastModified := TFile.GetLastWriteTime(LFile);
+            LInfo.ProveedorNit := '';
+            LInfo.Proveedor := 'Sin procesar';
+            LInfo.FechaDocumento := 0;
+            LInfo.Estado := 'CARGADO';
+            LInfo.FechaCarga := LInfo.LastModified;
+            LDBData.Add(LFileNameOnly.ToLower, LInfo);
           end;
-          LCombinedList.Add(LInfo);
         end;
       end;
+
+      for LInfo in LDBData.Values do
+        LCombinedList.Add(LInfo);
 
       // 3. Sort by FechaCarga desc
       LCombinedList.Sort(TComparer<TCombinedFileInfo>.Construct(
@@ -548,7 +553,13 @@ begin
         LJSONObj := TJSONObject.Create;
         LJSONObj.AddPair('id', TJSONNumber.Create(LInfo.ID));
         LJSONObj.AddPair('fileName', LInfo.FileName);
-        LJSONObj.AddPair('size', TJSONNumber.Create(LInfo.Size));
+
+        // Final implementation of Size fallback
+        if LInfo.Size > 0 then
+          LJSONObj.AddPair('size', TJSONNumber.Create(LInfo.Size))
+        else
+          LJSONObj.AddPair('size', TJSONNumber.Create(0));
+
         LJSONObj.AddPair('proveedorNit', LInfo.ProveedorNit);
         LJSONObj.AddPair('proveedor', LInfo.Proveedor);
         LJSONObj.AddPair('proveedorNombre', LInfo.Proveedor);
@@ -562,9 +573,11 @@ begin
         LJSONList.AddElement(LJSONObj);
       end;
       Res.Send(LJSONList);
+      finally
+        LDBData.Free;
+      end;
     finally
       LCombinedList.Free;
-      LDBData.Free;
     end;
   except
     on E: Exception do
@@ -656,6 +669,7 @@ end;
 
 procedure Registry;
 begin
+  // /xml/list is deprecated, use /xml/files
   THorse.Get('/xml/list', GetFiles);
   THorse.Post('/xml/upload', Upload);
   THorse.Post('/xml/parse', Parse);
