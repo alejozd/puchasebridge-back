@@ -6,7 +6,8 @@ uses
   System.JSON,
   System.SysUtils,
   ProveedorRepository,
-  EquivalenciaService;
+  EquivalenciaService,
+  FireDAC.Comp.Client;
 
 function ValidarDocumento(AJsonParse: string): string;
 
@@ -22,6 +23,7 @@ var
   LProveedorExiste, LTodosProductosExisten, LAlgunProductoNoExiste: Boolean;
   LValido, LRequiereHomologacion: Boolean;
   I: Integer;
+  LEquivalencia: TFDQuery;
 begin
   LOutputJSON := TJSONObject.Create;
   LResultProductosArray := TJSONArray.Create;
@@ -79,10 +81,16 @@ begin
           LReferencia := LItemJSON.GetValue('referencia').Value;
           LUnidad := LItemJSON.GetValue('unidadXML').Value;
 
-          if LReferencia.Trim.IsEmpty or LUnidad.Trim.IsEmpty then
-            LValido := False
-          else
-            LValido := ExisteEquivalencia(LReferencia, LUnidad);
+          LValido := False;
+          if not (LReferencia.Trim.IsEmpty or LUnidad.Trim.IsEmpty) then
+          begin
+            LEquivalencia := BuscarEquivalencia(LReferencia, LUnidad);
+            try
+              LValido := not LEquivalencia.IsEmpty;
+            finally
+              LEquivalencia.Free;
+            end;
+          end;
 
           if not LValido then
           begin
