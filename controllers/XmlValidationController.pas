@@ -14,6 +14,7 @@ uses
   System.Classes,
   System.Generics.Collections,
   XmlParserService,
+  XmlPersistenceService,
   ValidationService;
 
 function ParsedInvoiceToJSONObject(const AParsedInvoice: TParsedInvoice): TJSONObject;
@@ -41,7 +42,7 @@ begin
       LProducto.AddPair('referencia', AParsedInvoice.Products[I].Referencia);
       LProducto.AddPair('referenciaEstandar', AParsedInvoice.Products[I].ReferenciaEstandar);
       LProducto.AddPair('cantidad', TJSONNumber.Create(AParsedInvoice.Products[I].Cantidad));
-      LProducto.AddPair('unidad', AParsedInvoice.Products[I].Unidad);
+      LProducto.AddPair('unidadXML', AParsedInvoice.Products[I].Unidad);
       LProducto.AddPair('precioBase', TJSONNumber.Create(AParsedInvoice.Products[I].PrecioBase));
       LProducto.AddPair('valorUnitario', TJSONNumber.Create(AParsedInvoice.Products[I].ValorUnitario));
       LProducto.AddPair('valorTotal', TJSONNumber.Create(AParsedInvoice.Products[I].ValorTotal));
@@ -72,7 +73,7 @@ var
   LPath, LFullFile, LXMLContent, LParsedJSONStr, LValidationResult: string;
   LParsedInvoice: TParsedInvoice;
   LResultJSON, LParsedObj: TJSONObject;
-  LErroresArray, LEmptyProductos: TJSONArray;
+  LErroresArray: TJSONArray;
   LVal: TJSONValue;
 begin
   try
@@ -137,11 +138,21 @@ begin
 
     try
       LValidationResult := ValidarDocumento(LParsedJSONStr);
+
+      // Persist the XML data into staging tables
+      try
+        UpsertXMLInvoice(AFileName, LParsedInvoice);
+      except
+        // Non-blocking error for staging
+      end;
+
       LVal := TJSONObject.ParseJSONValue(LValidationResult);
       if LVal is TJSONObject then
       begin
         LResultJSON := LVal as TJSONObject;
-        LResultJSON.AddPair('fileName', AFileName);
+        // Check if fileName is already there to avoid duplicate pair error
+        if LResultJSON.GetValue('fileName') = nil then
+          LResultJSON.AddPair('fileName', AFileName);
       end
       else
       begin
@@ -194,21 +205,40 @@ var
   LBody: TJSONObject;
   LFileName: string;
   LResultJSON: TJSONObject;
+  LErroresArr: TJSONArray;
 begin
-  LBody := Req.Body<TJSONObject>;
-  if (LBody = nil) or not LBody.TryGetValue('fileName', LFileName) then
-  begin
-    LResultJSON := TJSONObject.Create;
-    LResultJSON.AddPair('success', TJSONBool.Create(False));
-    LResultJSON.AddPair('message', 'fileName is required in the body');
-    Res.Status(400).Send(LResultJSON);
-    Exit;
+  Res.ContentType('application/json; charset=utf-8');
+  try
+    LBody := Req.Body<TJSONObject>;
+    if (LBody = nil) or not LBody.TryGetValue('fileName', LFileName) then
+    begin
+      LResultJSON := TJSONObject.Create;
+      LResultJSON.AddPair('fileName', TJSONNull.Create);
+      LResultJSON.AddPair('valido', TJSONBool.Create(False));
+      LResultJSON.AddPair('requiereHomologacion', TJSONBool.Create(False));
+      LErroresArr := TJSONArray.Create;
+      LErroresArr.Add('fileName is required in the body');
+      LResultJSON.AddPair('errores', LErroresArr);
+      Res.Status(400).Send(LResultJSON);
+      Exit;
+    end;
+
+    LFileName := TPath.GetFileName(LFileName);
+    LResultJSON := InternalValidateFile(LFileName);
+    Res.Send<TJSONObject>(LResultJSON);
+  except
+    on E: Exception do
+    begin
+      LResultJSON := TJSONObject.Create;
+      LResultJSON.AddPair('fileName', TJSONNull.Create);
+      LResultJSON.AddPair('valido', TJSONBool.Create(False));
+      LResultJSON.AddPair('requiereHomologacion', TJSONBool.Create(False));
+      LErroresArr := TJSONArray.Create;
+      LErroresArr.Add('Error inesperado: ' + E.Message);
+      LResultJSON.AddPair('errores', LErroresArr);
+      Res.Status(500).Send(LResultJSON);
+    end;
   end;
-
-  LFileName := TPath.GetFileName(LFileName);
-  LResultJSON := InternalValidateFile(LFileName);
-
-  Res.Send<TJSONObject>(LResultJSON);
 end;
 
 procedure ValidateBatch(Req: THorseRequest; Res: THorseResponse; Next: TProc);
@@ -225,6 +255,7 @@ var
   I: Integer;
   LFilesValue: TJSONValue;
 begin
+  Res.ContentType('application/json; charset=utf-8');
   LFiles := TStringList.Create;
   try
     LBody := Req.Body<TJSONObject>;

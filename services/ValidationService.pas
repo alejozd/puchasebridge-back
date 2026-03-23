@@ -6,7 +6,8 @@ uses
   System.JSON,
   System.SysUtils,
   ProveedorRepository,
-  EquivalenciaService;
+  EquivalenciaService,
+  FireDAC.Comp.Client;
 
 function ValidarDocumento(AJsonParse: string): string;
 
@@ -22,19 +23,35 @@ var
   LProveedorExiste, LTodosProductosExisten, LAlgunProductoNoExiste: Boolean;
   LValido, LRequiereHomologacion: Boolean;
   I: Integer;
+  LEquivalencia: TFDQuery;
 begin
-  LInputJSON := TJSONObject.ParseJSONValue(AJsonParse) as TJSONObject;
-  if not Assigned(LInputJSON) then
-  begin
-    Result := '{"error": "JSON de entrada inválido"}';
-    Exit;
-  end;
-
   LOutputJSON := TJSONObject.Create;
   LResultProductosArray := TJSONArray.Create;
   LErroresArray := TJSONArray.Create;
 
+  // Add child objects to parent immediately to ensure single cleanup point
+  LOutputJSON.AddPair('productos', LResultProductosArray);
+  LOutputJSON.AddPair('errores', LErroresArray);
+
+  LInputJSON := nil;
+
   try
+    try
+      LInputJSON := TJSONObject.ParseJSONValue(AJsonParse) as TJSONObject;
+    except
+      LInputJSON := nil;
+    end;
+
+    if not Assigned(LInputJSON) then
+    begin
+      LErroresArray.Add('JSON de entrada inválido');
+      LOutputJSON.AddPair('valido', TJSONBool.Create(False));
+      LOutputJSON.AddPair('requiereHomologacion', TJSONBool.Create(False));
+      LOutputJSON.AddPair('proveedorExiste', TJSONBool.Create(False));
+      Result := LOutputJSON.ToJSON;
+      Exit;
+    end;
+
     try
       // A. Validar proveedor
       LProveedorExiste := False;
@@ -62,9 +79,18 @@ begin
         begin
           LItemJSON := LProductosArray.Items[I] as TJSONObject;
           LReferencia := LItemJSON.GetValue('referencia').Value;
-          LUnidad := LItemJSON.GetValue('unidad').Value;
+          LUnidad := LItemJSON.GetValue('unidadXML').Value;
 
-          LValido := ExisteEquivalencia(LReferencia, LUnidad);
+          LValido := False;
+          if not (LReferencia.Trim.IsEmpty or LUnidad.Trim.IsEmpty) then
+          begin
+            LEquivalencia := BuscarEquivalencia(LReferencia, LUnidad);
+            try
+              LValido := not LEquivalencia.IsEmpty;
+            finally
+              LEquivalencia.Free;
+            end;
+          end;
 
           if not LValido then
           begin
@@ -76,7 +102,7 @@ begin
           LResultItemJSON := TJSONObject.Create;
           LResultItemJSON.AddPair('referencia', LReferencia);
           LResultItemJSON.AddPair('unidad', LUnidad);
-          LResultItemJSON.AddPair('existeEquivalencia', LValido);
+          LResultItemJSON.AddPair('existeEquivalencia', TJSONBool.Create(LValido));
           LResultProductosArray.Add(LResultItemJSON);
         end;
       end;
@@ -106,23 +132,25 @@ begin
         LValido := False;
       end;
 
-      LOutputJSON.AddPair('valido', LValido);
-      LOutputJSON.AddPair('requiereHomologacion', LRequiereHomologacion);
-      LOutputJSON.AddPair('proveedorExiste', LProveedorExiste);
-      LOutputJSON.AddPair('productos', LResultProductosArray);
-      LOutputJSON.AddPair('errores', LErroresArray);
+      LOutputJSON.AddPair('valido', TJSONBool.Create(LValido));
+      LOutputJSON.AddPair('requiereHomologacion', TJSONBool.Create(LRequiereHomologacion));
+      LOutputJSON.AddPair('proveedorExiste', TJSONBool.Create(LProveedorExiste));
 
       Result := LOutputJSON.ToJSON;
     except
       on E: Exception do
       begin
-        LResultProductosArray.Free;
-        LErroresArray.Free;
-        Result := '{"error": "Error durante la validación: ' + E.Message + '"}';
+        LErroresArray.Add('Error durante la validación: ' + E.Message);
+        // Ensure standard fields are present even on inner exception
+        if LOutputJSON.GetValue('valido') = nil then LOutputJSON.AddPair('valido', TJSONBool.Create(False));
+        if LOutputJSON.GetValue('requiereHomologacion') = nil then LOutputJSON.AddPair('requiereHomologacion', TJSONBool.Create(False));
+        if LOutputJSON.GetValue('proveedorExiste') = nil then LOutputJSON.AddPair('proveedorExiste', TJSONBool.Create(False));
+        Result := LOutputJSON.ToJSON;
       end;
     end;
   finally
-    LInputJSON.Free;
+    if Assigned(LInputJSON) then
+      LInputJSON.Free;
     LOutputJSON.Free;
   end;
 end;

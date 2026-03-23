@@ -22,6 +22,7 @@ var
   LEquivalenciasArr: TJSONArray;
   LEquivalenciaObj: TJSONObject;
 begin
+  Res.ContentType('application/json; charset=utf-8');
   try
     if not Req.Query.TryGetValue('referenciaP', LRefP) then LRefP := '';
     if not Req.Query.TryGetValue('unidadP', LUniP) then LUniP := '';
@@ -74,6 +75,7 @@ var
   LFactor: Double;
   LResponse: TJSONObject;
 begin
+  Res.ContentType('application/json; charset=utf-8');
   try
     LBody := Req.Body<TJSONObject>;
     if not Assigned(LBody) then
@@ -176,6 +178,7 @@ var
   LSuccess: Boolean;
   LResponse: TJSONObject;
 begin
+  Res.ContentType('application/json; charset=utf-8');
   try
     if not Req.Query.TryGetValue('referenciaP', LRefP) or LRefP.Trim.IsEmpty then
     begin

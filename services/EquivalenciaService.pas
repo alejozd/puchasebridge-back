@@ -9,8 +9,8 @@ uses
   FireDAC.Stan.Param,
   FirebirdConnection;
 
-function BuscarEquivalencia(AReferenciaP: string; AUnidadP: string): TFDQuery;
-function ExisteEquivalencia(AReferenciaP: string; AUnidadP: string): Boolean;
+function BuscarEquivalencia(AReferenciaH: string; AUnidadH: string): TFDQuery;
+function ExisteEquivalencia(AReferenciaH: string; AUnidadH: string): Boolean;
 procedure CrearEquivalencia(
   ACodigoH: Integer;
   ASubCodigoH: Integer;
@@ -21,21 +21,24 @@ procedure CrearEquivalencia(
   AReferenciaP: string;
   AFactor: Double
 );
-function ObtenerEquivalenciaJSON(AReferenciaP: string; AUnidadP: string): string;
+function ObtenerEquivalenciaJSON(AReferenciaH: string; AUnidadH: string): string;
 
 // Nuevas funciones
-function ListarEquivalencias(const AReferenciaP, AUnidadP: string; ALimite: Integer): TFDQuery;
-function EliminarEquivalencia(const AReferenciaP, AUnidadP: string): Boolean;
+function ListarEquivalencias(const AReferenciaH, AUnidadH: string; ALimite: Integer): TFDQuery;
+function EliminarEquivalencia(const AReferenciaH, AUnidadH: string): Boolean;
 
 implementation
 
-function BuscarEquivalencia(AReferenciaP: string; AUnidadP: string): TFDQuery;
+function BuscarEquivalencia(AReferenciaH: string; AUnidadH: string): TFDQuery;
 begin
+  if AReferenciaH.Trim.IsEmpty or AUnidadH.Trim.IsEmpty then
+    raise Exception.Create('Referencia XML y Unidad XML son obligatorias para buscar equivalencia');
+
   Result := GetBridgeQuery;
   try
-    Result.SQL.Text := 'SELECT * FROM EQUIVALENCIA WHERE REFERENCIAP = :REF AND UNIDADP = :UNI';
-    Result.ParamByName('REF').AsString := AReferenciaP;
-    Result.ParamByName('UNI').AsString := AUnidadP;
+    Result.SQL.Text := 'SELECT * FROM EQUIVALENCIA WHERE REFERENCIAH = :REF AND UNIDADH = :UNI';
+    Result.ParamByName('REF').AsString := AReferenciaH;
+    Result.ParamByName('UNI').AsString := AUnidadH;
     Result.Open;
   except
     Result.Free;
@@ -43,11 +46,11 @@ begin
   end;
 end;
 
-function ExisteEquivalencia(AReferenciaP: string; AUnidadP: string): Boolean;
+function ExisteEquivalencia(AReferenciaH: string; AUnidadH: string): Boolean;
 var
   Q: TFDQuery;
 begin
-  Q := BuscarEquivalencia(AReferenciaP, AUnidadP);
+  Q := BuscarEquivalencia(AReferenciaH, AUnidadH);
   try
     Result := not Q.IsEmpty;
   finally
@@ -68,8 +71,11 @@ procedure CrearEquivalencia(
 var
   Q: TFDQuery;
 begin
-  if ExisteEquivalencia(AReferenciaP, AUnidadP) then
-    raise Exception.CreateFmt('Ya existe una equivalencia para la referencia %s y unidad %s', [AReferenciaP, AUnidadP]);
+  if AReferenciaH.Trim.IsEmpty or AUnidadH.Trim.IsEmpty then
+    raise Exception.Create('Referencia XML y Unidad XML son obligatorias');
+
+  if ExisteEquivalencia(AReferenciaH, AUnidadH) then
+    raise Exception.CreateFmt('Ya existe una equivalencia para la referencia XML %s y unidad %s', [AReferenciaH, AUnidadH]);
 
   Q := GetBridgeQuery;
   try
@@ -92,13 +98,16 @@ begin
   end;
 end;
 
-function ObtenerEquivalenciaJSON(AReferenciaP: string; AUnidadP: string): string;
+function ObtenerEquivalenciaJSON(AReferenciaH: string; AUnidadH: string): string;
 var
   Q: TFDQuery;
   JSON: TJSONObject;
 begin
   Result := '{}';
-  Q := BuscarEquivalencia(AReferenciaP, AUnidadP);
+  if AReferenciaH.Trim.IsEmpty or AUnidadH.Trim.IsEmpty then
+    Exit;
+
+  Q := BuscarEquivalencia(AReferenciaH, AUnidadH);
   try
     if not Q.IsEmpty then
     begin
@@ -122,7 +131,7 @@ begin
   end;
 end;
 
-function ListarEquivalencias(const AReferenciaP, AUnidadP: string; ALimite: Integer): TFDQuery;
+function ListarEquivalencias(const AReferenciaH, AUnidadH: string; ALimite: Integer): TFDQuery;
 var
   SQL: string;
 begin
@@ -130,20 +139,20 @@ begin
   try
     SQL := 'SELECT FIRST :LIMIT * FROM EQUIVALENCIA WHERE 1=1';
 
-    if not AReferenciaP.Trim.IsEmpty then
-      SQL := SQL + ' AND REFERENCIAP = :REFP';
+    if not AReferenciaH.Trim.IsEmpty then
+      SQL := SQL + ' AND REFERENCIAH = :REFX';
 
-    if not AUnidadP.Trim.IsEmpty then
-      SQL := SQL + ' AND UNIDADP = :UNIP';
+    if not AUnidadH.Trim.IsEmpty then
+      SQL := SQL + ' AND UNIDADH = :UNIX';
 
     Result.SQL.Text := SQL;
     Result.ParamByName('LIMIT').AsInteger := ALimite;
 
-    if not AReferenciaP.Trim.IsEmpty then
-      Result.ParamByName('REFP').AsString := AReferenciaP;
+    if not AReferenciaH.Trim.IsEmpty then
+      Result.ParamByName('REFX').AsString := AReferenciaH;
 
-    if not AUnidadP.Trim.IsEmpty then
-      Result.ParamByName('UNIP').AsString := AUnidadP;
+    if not AUnidadH.Trim.IsEmpty then
+      Result.ParamByName('UNIX').AsString := AUnidadH;
 
     Result.Open;
   except
@@ -152,15 +161,18 @@ begin
   end;
 end;
 
-function EliminarEquivalencia(const AReferenciaP, AUnidadP: string): Boolean;
+function EliminarEquivalencia(const AReferenciaH, AUnidadH: string): Boolean;
 var
   Q: TFDQuery;
 begin
+  if AReferenciaH.Trim.IsEmpty or AUnidadH.Trim.IsEmpty then
+    raise Exception.Create('Referencia XML y Unidad XML son obligatorias para eliminar');
+
   Q := GetBridgeQuery;
   try
-    Q.SQL.Text := 'DELETE FROM EQUIVALENCIA WHERE REFERENCIAP = :REFP AND UNIDADP = :UNIP';
-    Q.ParamByName('REFP').AsString := AReferenciaP;
-    Q.ParamByName('UNIP').AsString := AUnidadP;
+    Q.SQL.Text := 'DELETE FROM EQUIVALENCIA WHERE REFERENCIAH = :REFX AND UNIDADH = :UNIX';
+    Q.ParamByName('REFX').AsString := AReferenciaH;
+    Q.ParamByName('UNIX').AsString := AUnidadH;
     Q.ExecSQL;
     Result := Q.RowsAffected > 0;
   finally

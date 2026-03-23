@@ -71,6 +71,7 @@ begin
 
     Result.Params.UserName := DBConfig.User;
     Result.Params.Password := DBConfig.Pass;
+    Result.Params.Values['CharacterSet'] := 'UTF8';
     Result.LoginPrompt := False;
 
     Result.Connected := True;
@@ -105,6 +106,7 @@ begin
 
     Result.Params.UserName := DBConfig.User;
     Result.Params.Password := DBConfig.Pass;
+    Result.Params.Values['CharacterSet'] := 'UTF8';
     Result.LoginPrompt := False;
 
     Result.Connected := True;
@@ -131,6 +133,7 @@ begin
     Result.Params.Database := DBConfig.Path;
     Result.Params.UserName := DBConfig.User;
     Result.Params.Password := DBConfig.Pass;
+    Result.Params.Values['CharacterSet'] := 'UTF8';
     Result.LoginPrompt := False;
     Result.Connected := True;
   except
@@ -158,6 +161,7 @@ begin
       Conn.Params.Database := Config.Servidor + ':' + Config.RutaBaseDatos + '\helisabd.hgw';
     Conn.Params.UserName := DBConfig.User;
     Conn.Params.Password := DBConfig.Pass;
+    Conn.Params.Values['CharacterSet'] := 'UTF8';
     Conn.LoginPrompt := False;
     Conn.Connected := True;
     Result.Connection := Conn;
@@ -181,6 +185,7 @@ begin
     Conn.Params.Database := DBConfig.Path;
     Conn.Params.UserName := DBConfig.User;
     Conn.Params.Password := DBConfig.Pass;
+    Conn.Params.Values['CharacterSet'] := 'UTF8';
     Conn.LoginPrompt := False;
     Conn.Connected := True;
     Result.Connection := Conn;

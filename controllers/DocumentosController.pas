@@ -89,6 +89,7 @@ var
   LDocumentoERP, LAnio: string;
   LSession: TSessionInfo;
 begin
+  Res.ContentType('application/json; charset=utf-8');
   LProcesadosArr := TJSONArray.Create;
   LErroresArr := TJSONArray.Create;
   LResponse := TJSONObject.Create;

@@ -11,68 +11,119 @@ uses
   System.JSON,
   System.SysUtils,
   FireDAC.Comp.Client,
-  ProductoRepository;
+  FirebirdConnection;
 
 procedure GetProductos(Req: THorseRequest; Res: THorseResponse; Next: TProc);
 var
-  LFiltro, LAnio, LLimiteStr: string;
-  LLimite: Integer;
-  LQ: TFDQuery;
-  LResponse: TJSONObject;
-  LProductosArr: TJSONArray;
+  LFiltro: string;
+  LQEmpresa, LQGlobal: TFDQuery;
   LProductoObj: TJSONObject;
+  LProductosArr: TJSONArray;
+  LSubcodigo: Integer;
 begin
+  Res.ContentType('application/json; charset=utf-8');
   try
-    if not Req.Query.TryGetValue('filtro', LFiltro) or LFiltro.Trim.IsEmpty then
+    if not Req.Query.TryGetValue('search', LFiltro) or LFiltro.Trim.IsEmpty then
     begin
-      Res.Status(400).Send(TJSONObject.Create.AddPair('error', 'El parámetro "filtro" es obligatorio'));
+      Res.Status(400).Send(TJSONObject.Create.AddPair('error', 'El parámetro "search" es obligatorio'));
       Exit;
     end;
 
-    if LFiltro.Trim.Length < 3 then
-    begin
-      Res.Status(400).Send(TJSONObject.Create.AddPair('error', 'El filtro debe tener al menos 3 caracteres'));
-      Exit;
-    end;
-
-    if Req.Query.TryGetValue('limite', LLimiteStr) then
-      LLimite := StrToIntDef(LLimiteStr, 20)
-    else
-      LLimite := 20;
-
-    if not Req.Query.TryGetValue('anio', LAnio) then
-      LAnio := '';
-
-    LQ := ProductoRepository.BuscarProductos(LFiltro, LLimite, LAnio);
+    // 1. Consultar productos en la base de datos de la empresa (heli00bd.hgw)
+    LQEmpresa := TFDQuery.Create(nil);
     try
-      LResponse := TJSONObject.Create;
-      LProductosArr := TJSONArray.Create;
+      LQEmpresa.Connection := CrearConexionParticular('0');
+      try
+        LQEmpresa.SQL.Text :=
+          'SELECT FIRST 20 CODIGO, SUBCODIGO, NOMBRE, REFERENCIA ' +
+          'FROM INMAXXXX ' +
+          'WHERE NOMBRE LIKE :FILTRO OR REFERENCIA LIKE :FILTRO ' +
+          'ORDER BY NOMBRE';
 
+        LQEmpresa.ParamByName('FILTRO').AsString := '%' + LFiltro.ToUpper + '%';
+        LQEmpresa.Open;
+
+        LProductosArr := TJSONArray.Create;
+
+        // 2. Para cada producto, buscar su sigla de unidad en la base de datos global (helisabd.hgw)
+        LQGlobal := GetHelisaQuery;
+        try
+          LQGlobal.SQL.Text := 'SELECT SIGLA FROM INTUXXXX WHERE CODIGO = :SUBCODIGO';
+
+          while not LQEmpresa.Eof do
+          begin
+            LSubcodigo := LQEmpresa.FieldByName('SUBCODIGO').AsInteger;
+
+            LProductoObj := TJSONObject.Create;
+            LProductoObj.AddPair('codigo', TJSONNumber.Create(LQEmpresa.FieldByName('CODIGO').AsInteger));
+            LProductoObj.AddPair('subcodigo', TJSONNumber.Create(LSubcodigo));
+            LProductoObj.AddPair('nombre', LQEmpresa.FieldByName('NOMBRE').AsString);
+            LProductoObj.AddPair('referencia', LQEmpresa.FieldByName('REFERENCIA').AsString);
+            LProductoObj.AddPair('unidad', TJSONNumber.Create(LSubcodigo));
+
+            // Buscar sigla
+            LQGlobal.Close;
+            LQGlobal.ParamByName('SUBCODIGO').AsInteger := LSubcodigo;
+            LQGlobal.Open;
+
+            if not LQGlobal.IsEmpty then
+              LProductoObj.AddPair('unidadDefault', LQGlobal.FieldByName('SIGLA').AsString)
+            else
+              LProductoObj.AddPair('unidadDefault', '');
+
+            LProductosArr.AddElement(LProductoObj);
+            LQEmpresa.Next;
+          end;
+        finally
+          if Assigned(LQGlobal.Connection) then LQGlobal.Connection.Free;
+          LQGlobal.Free;
+        end;
+
+        Res.Send(LProductosArr);
+      finally
+        if Assigned(LQEmpresa.Connection) then LQEmpresa.Connection.Free;
+      end;
+    finally
+      LQEmpresa.Free;
+    end;
+  except
+    on E: Exception do
+    begin
+      Res.Status(500).Send(TJSONObject.Create.AddPair('error', E.Message));
+    end;
+  end;
+end;
+
+procedure GetUnidades(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+var
+  LQ: TFDQuery;
+  LUnidadesArr: TJSONArray;
+  LUnidadObj: TJSONObject;
+begin
+  Res.ContentType('application/json; charset=utf-8');
+  try
+    // Consultar HELISABD.HGW y tabla INTUXXXX
+    LQ := GetHelisaQuery;
+    try
+      LQ.SQL.Text := 'SELECT CODIGO, NOMBRE, SIGLA FROM INTUXXXX ORDER BY NOMBRE';
+      LQ.Open;
+
+      LUnidadesArr := TJSONArray.Create;
       while not LQ.Eof do
       begin
-        LProductoObj := TJSONObject.Create;
-        LProductoObj.AddPair('codigo', TJSONNumber.Create(LQ.FieldByName('CODIGO').AsInteger));
-        LProductoObj.AddPair('subcodigo', TJSONNumber.Create(LQ.FieldByName('SUBCODIGO').AsInteger));
-        LProductoObj.AddPair('nombre', LQ.FieldByName('NOMBRE').AsString);
-        LProductoObj.AddPair('referencia', LQ.FieldByName('REFERENCIA').AsString);
-        LProductoObj.AddPair('unidad', LQ.FieldByName('UNIDAD').AsString);
+        LUnidadObj := TJSONObject.Create;
+        LUnidadObj.AddPair('codigo', LQ.FieldByName('CODIGO').AsString);
+        LUnidadObj.AddPair('nombre', LQ.FieldByName('NOMBRE').AsString);
+        LUnidadObj.AddPair('sigla', LQ.FieldByName('SIGLA').AsString);
 
-        LProductosArr.AddElement(LProductoObj);
+        LUnidadesArr.AddElement(LUnidadObj);
         LQ.Next;
       end;
-
-      LResponse.AddPair('productos', LProductosArr);
-      Res.Send(LResponse);
+      Res.Send(LUnidadesArr);
     finally
-      // Manual cleanup of both Query and its Connection (since it has no owner)
-      if Assigned(LQ) then
-      begin
-        if Assigned(LQ.Connection) then
-          LQ.Connection.Free;
-        LQ.Free;
-      end;
+      if Assigned(LQ.Connection) then LQ.Connection.Free;
+      LQ.Free;
     end;
-
   except
     on E: Exception do
     begin
@@ -83,7 +134,8 @@ end;
 
 procedure Registry;
 begin
-  THorse.Get('/helisa/productos', GetProductos);
+  THorse.Get('/erp/productos', GetProductos);
+  THorse.Get('/erp/unidades', GetUnidades);
 end;
 
 end.
