@@ -15,6 +15,7 @@ type
     class var FUnitMap: TDictionary<string, string>;
     class var FLock: TCriticalSection;
     class procedure Initialize;
+    class function GetLocalName(const ANode: IXMLNode): string;
   public
     class function GetUnitName(const ACode: string): string;
     class constructor Create;
@@ -44,13 +45,33 @@ begin
   FLock.Free;
 end;
 
+class function TDianUnitService.GetLocalName(const ANode: IXMLNode): string;
+var
+  LName: string;
+  LPos: Integer;
+begin
+  Result := ANode.LocalName;
+  if Result = '' then
+  begin
+    LName := ANode.NodeName;
+    LPos := Pos(':', LName);
+    if LPos > 0 then
+      Result := Copy(LName, LPos + 1, MaxInt)
+    else
+      Result := LName;
+  end;
+end;
+
 class procedure TDianUnitService.Initialize;
 var
-  LXMLDoc: IXMLDocument;
+  LXMLDoc: TXMLDocument;
+  LXMLIntf: IXMLDocument;
   LRootNode, LSimpleCodeList, LRow, LValue, LSimpleValue: IXMLNode;
   I, J, K: Integer;
   LPath: string;
   LCode, LName: string;
+  LAttr: string;
+  LMap: TDictionary<string, string>;
 begin
   if Assigned(FUnitMap) then
     Exit;
@@ -60,107 +81,118 @@ begin
     if Assigned(FUnitMap) then
       Exit;
 
-    FUnitMap := TDictionary<string, string>.Create;
-
-    LPath := TPath.Combine(ExtractFilePath(ParamStr(0)), 'examples');
-    LPath := TPath.Combine(LPath, 'ToolBox');
-    LPath := TPath.Combine(LPath, 'Listas de valores');
-    LPath := TPath.Combine(LPath, 'UnidadesMedida-2.1.gc');
-
-    // If not found in executable path, try relative to current dir (for dev environment)
-    if not TFile.Exists(LPath) then
-    begin
-      LPath := TPath.Combine(GetCurrentDir, 'examples');
+    LMap := TDictionary<string, string>.Create;
+    try
+      LPath := TPath.Combine(ExtractFilePath(ParamStr(0)), 'examples');
       LPath := TPath.Combine(LPath, 'ToolBox');
       LPath := TPath.Combine(LPath, 'Listas de valores');
       LPath := TPath.Combine(LPath, 'UnidadesMedida-2.1.gc');
-    end;
 
-    if not TFile.Exists(LPath) then
-      Exit;
-
-    try
-      LXMLDoc := LoadXMLDocument(LPath);
-      LXMLDoc.Active := True;
-
-      LRootNode := LXMLDoc.DocumentElement;
-
-      // Find SimpleCodeList
-      LSimpleCodeList := nil;
-      for I := 0 to LRootNode.ChildNodes.Count - 1 do
+      if not TFile.Exists(LPath) then
       begin
-        if (LRootNode.ChildNodes[I].NodeType = ntElement) and SameText(LRootNode.ChildNodes[I].LocalName, 'SimpleCodeList') then
-        begin
-          LSimpleCodeList := LRootNode.ChildNodes[I];
-          Break;
-        end;
+        LPath := TPath.Combine(GetCurrentDir, 'examples');
+        LPath := TPath.Combine(LPath, 'ToolBox');
+        LPath := TPath.Combine(LPath, 'Listas de valores');
+        LPath := TPath.Combine(LPath, 'UnidadesMedida-2.1.gc');
       end;
 
-      if LSimpleCodeList <> nil then
+      if TFile.Exists(LPath) then
       begin
-        for I := 0 to LSimpleCodeList.ChildNodes.Count - 1 do
+        LXMLDoc := TXMLDocument.Create(nil);
+        LXMLDoc.DOMVendor := GetDOMVendor(sAdom4XmlVendor);
+        LXMLDoc.LoadFromFile(LPath);
+        LXMLDoc.Active := True;
+        LXMLIntf := LXMLDoc;
+
+        LRootNode := LXMLIntf.DocumentElement;
+
+        LSimpleCodeList := nil;
+        for I := 0 to LRootNode.ChildNodes.Count - 1 do
         begin
-          LRow := LSimpleCodeList.ChildNodes[I];
-          if (LRow.NodeType = ntElement) and SameText(LRow.LocalName, 'Row') then
+          if (LRootNode.ChildNodes[I].NodeType = ntElement) and
+             SameText(GetLocalName(LRootNode.ChildNodes[I]), 'SimpleCodeList') then
           begin
-            LCode := '';
-            LName := '';
-            for J := 0 to LRow.ChildNodes.Count - 1 do
+            LSimpleCodeList := LRootNode.ChildNodes[I];
+            Break;
+          end;
+        end;
+
+        if LSimpleCodeList <> nil then
+        begin
+          for I := 0 to LSimpleCodeList.ChildNodes.Count - 1 do
+          begin
+            LRow := LSimpleCodeList.ChildNodes[I];
+            if (LRow.NodeType = ntElement) and SameText(GetLocalName(LRow), 'Row') then
             begin
-              LValue := LRow.ChildNodes[J];
-              if (LValue.NodeType = ntElement) and SameText(LValue.LocalName, 'Value') then
+              LCode := '';
+              LName := '';
+              for J := 0 to LRow.ChildNodes.Count - 1 do
               begin
-                if SameText(VarToStr(LValue.Attributes['ColumnRef']), 'code') then
+                LValue := LRow.ChildNodes[J];
+                if (LValue.NodeType = ntElement) and SameText(GetLocalName(LValue), 'Value') then
                 begin
-                  LSimpleValue := nil;
-                  for K := 0 to LValue.ChildNodes.Count - 1 do
-                    if (LValue.ChildNodes[K].NodeType = ntElement) and SameText(LValue.ChildNodes[K].LocalName, 'SimpleValue') then
-                    begin
-                      LSimpleValue := LValue.ChildNodes[K];
-                      Break;
-                    end;
-                  if LSimpleValue <> nil then
-                    LCode := LSimpleValue.Text;
-                end
-                else if SameText(VarToStr(LValue.Attributes['ColumnRef']), 'name') then
-                begin
-                  LSimpleValue := nil;
-                  for K := 0 to LValue.ChildNodes.Count - 1 do
-                    if (LValue.ChildNodes[K].NodeType = ntElement) and SameText(LValue.ChildNodes[K].LocalName, 'SimpleValue') then
-                    begin
-                      LSimpleValue := LValue.ChildNodes[K];
-                      Break;
-                    end;
-                  if LSimpleValue <> nil then
-                    LName := LSimpleValue.Text;
+                  LAttr := VarToStr(LValue.Attributes['ColumnRef']);
+                  if LAttr = '' then
+                     LAttr := VarToStr(LValue.Attributes['gc:ColumnRef']);
+
+                  if SameText(LAttr, 'code') then
+                  begin
+                    LSimpleValue := nil;
+                    for K := 0 to LValue.ChildNodes.Count - 1 do
+                      if (LValue.ChildNodes[K].NodeType = ntElement) and
+                         SameText(GetLocalName(LValue.ChildNodes[K]), 'SimpleValue') then
+                      begin
+                        LSimpleValue := LValue.ChildNodes[K];
+                        Break;
+                      end;
+                    if LSimpleValue <> nil then
+                      LCode := LSimpleValue.Text.Trim;
+                  end
+                  else if SameText(LAttr, 'name') then
+                  begin
+                    LSimpleValue := nil;
+                    for K := 0 to LValue.ChildNodes.Count - 1 do
+                      if (LValue.ChildNodes[K].NodeType = ntElement) and
+                         SameText(GetLocalName(LValue.ChildNodes[K]), 'SimpleValue') then
+                      begin
+                        LSimpleValue := LValue.ChildNodes[K];
+                        Break;
+                      end;
+                    if LSimpleValue <> nil then
+                      LName := UpperCase(LSimpleValue.Text.Trim);
+                  end;
                 end;
               end;
+              if (LCode <> '') and (LName <> '') then
+                LMap.AddOrSetValue(LCode, LName);
             end;
-            if (LCode <> '') and (LName <> '') then
-              FUnitMap.AddOrSetValue(LCode, LName);
           end;
         end;
       end;
     except
-      // Fail silently, map will remain empty or partially filled
+      // silent fail
     end;
+    FUnitMap := LMap;
   finally
     FLock.Leave;
   end;
 end;
 
 class function TDianUnitService.GetUnitName(const ACode: string): string;
+var
+  LCleanCode: string;
 begin
   if not Assigned(FUnitMap) then
     Initialize;
 
+  LCleanCode := ACode.Trim;
   FLock.Enter;
   try
-    if not FUnitMap.TryGetValue(ACode, Result) then
+    if (FUnitMap = nil) or not FUnitMap.TryGetValue(LCleanCode, Result) then
       Result := ACode;
 
     if Result = '' then
-      Result := 'N/A';
+      Result := ACode;
   finally
     FLock.Leave;
   end;
