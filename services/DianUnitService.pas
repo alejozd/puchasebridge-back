@@ -79,7 +79,7 @@ begin
 
     try
       LXMLDoc := TXMLDocument.Create(nil);
-      LXMLDoc.DOMVendor := GetDOMVendor(sAdom4XmlVendor);
+      (LXMLDoc as TXMLDocument).DOMVendor := sAdom4XmlVendor;
       LXMLDoc.LoadFromFile(LPath);
       LXMLDoc.Active := True;
 
@@ -151,7 +151,9 @@ end;
 
 class function TDianUnitService.GetUnitName(const ACode: string): string;
 begin
-  Initialize;
+  if not Assigned(FUnitMap) then
+    Initialize;
+
   FLock.Enter;
   try
     if not FUnitMap.TryGetValue(ACode, Result) then
