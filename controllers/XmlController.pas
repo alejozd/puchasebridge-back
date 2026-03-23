@@ -482,9 +482,9 @@ begin
       LFileID := Q.FieldByName('ID').AsInteger;
       Q.Close;
 
-      // 2. Get Pending Products with exact aliases
+      // 2. Get Pending Products with exact aliases for frontend consistency
       Q.SQL.Text :=
-        'SELECT REFERENCIA AS referenciaXml, DESCRIPCION AS nombre, UNIDAD AS unidad ' +
+        'SELECT REFERENCIA AS REFERENCIAXML, DESCRIPCION AS NOMBREPRODUCTO, UNIDAD AS UNIDADXML ' +
         'FROM XML_PRODUCTOS ' +
         'WHERE XML_FILE_ID = :FILEID AND EQUIVALENCIA_ID IS NULL';
 
@@ -495,9 +495,10 @@ begin
       while not Q.Eof do
       begin
         LJSONObj := TJSONObject.Create;
-        LJSONObj.AddPair('referenciaXml', Q.FieldByName('referenciaXml').AsString);
-        LJSONObj.AddPair('nombre', Q.FieldByName('nombre').AsString);
-        LJSONObj.AddPair('unidad', Q.FieldByName('unidad').AsString);
+        LJSONObj.AddPair('referenciaXML', Q.FieldByName('REFERENCIAXML').AsString);
+        LJSONObj.AddPair('nombreProducto', Q.FieldByName('NOMBREPRODUCTO').AsString);
+        LJSONObj.AddPair('unidadXML', Q.FieldByName('UNIDADXML').AsString);
+        LJSONObj.AddPair('estado', 'pendiente');
         LJSONList.AddElement(LJSONObj);
         Q.Next;
       end;
