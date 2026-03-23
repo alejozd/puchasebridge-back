@@ -179,17 +179,25 @@ begin
     Result.NombreLegal := GetNodeTextByLocalName(TaxSchemeNode, 'RegistrationName');
   end;
 
-  // Nombre
+  // Nombre (Ruta típica cac:PartyName/cbc:Name)
   Node := FindNodeByLocalName(PartyNode, 'PartyName');
   if Node <> nil then
     Result.Nombre := GetNodeTextByLocalName(Node, 'Name');
 
-  Node := FindNodeByLocalName(PartyNode, 'PartyLegalEntity');
-  if Node <> nil then
+  if Result.Nombre = '' then
   begin
-    if Result.Nombre = '' then
+    Node := FindNodeByLocalName(PartyNode, 'PartyLegalEntity');
+    if Node <> nil then
+    begin
       Result.Nombre := GetNodeTextByLocalName(Node, 'RegistrationName');
-    if Result.NombreLegal = '' then
+      if Result.NombreLegal = '' then
+        Result.NombreLegal := GetNodeTextByLocalName(Node, 'RegistrationName');
+    end;
+  end
+  else
+  begin
+    Node := FindNodeByLocalName(PartyNode, 'PartyLegalEntity');
+    if (Node <> nil) and (Result.NombreLegal = '') then
       Result.NombreLegal := GetNodeTextByLocalName(Node, 'RegistrationName');
   end;
 
