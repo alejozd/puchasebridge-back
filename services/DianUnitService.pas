@@ -44,7 +44,6 @@ end;
 
 class procedure TDianUnitService.Initialize;
 var
-  LXMLDoc: TXMLDocument;
   LXMLIntf: IXMLDocument;
   LRootNode, LSimpleCodeList, LRow, LValue, LSimpleValue: IXMLNode;
   I, J, K: Integer;
@@ -79,11 +78,10 @@ begin
       Exit;
 
     try
-      LXMLDoc := TXMLDocument.Create(nil);
-      LXMLDoc.DOMVendor := GetDOMVendor(sAdom4XmlVendor);
-      LXMLDoc.LoadFromFile(LPath);
-      LXMLDoc.Active := True;
-      LXMLIntf := LXMLDoc;
+      LXMLIntf := NewXMLDocument;
+      LXMLIntf.DOMVendor := sAdom4XmlVendor;
+      LXMLIntf.LoadFromFile(LPath);
+      LXMLIntf.Active := True;
 
       LRootNode := LXMLIntf.DocumentElement;
 

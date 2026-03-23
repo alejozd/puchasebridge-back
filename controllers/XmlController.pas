@@ -539,7 +539,10 @@ begin
         LJSONObj.AddPair('id', TJSONNumber.Create(Q.FieldByName('ID').AsInteger));
         LJSONObj.AddPair('fileName', Q.FieldByName('FILE_NAME').AsString);
         LJSONObj.AddPair('proveedorNit', Q.FieldByName('PROVEEDOR_NIT').AsString);
-        LJSONObj.AddPair('proveedorNombre', Q.FieldByName('PROVEEDOR_NOMBRE').AsString);
+        if Q.FieldByName('PROVEEDOR_NOMBRE').AsString.Trim.IsEmpty then
+          LJSONObj.AddPair('proveedor', 'Sin proveedor')
+        else
+          LJSONObj.AddPair('proveedor', Q.FieldByName('PROVEEDOR_NOMBRE').AsString);
         LJSONObj.AddPair('fechaDocumento', FormatDateTime('yyyy-mm-dd', Q.FieldByName('FECHA_DOCUMENTO').AsDateTime));
         LJSONObj.AddPair('estado', Q.FieldByName('ESTADO').AsString);
         LJSONObj.AddPair('fechaCarga', FormatDateTime('yyyy-mm-dd HH:nn:ss', Q.FieldByName('FECHA_CARGA').AsDateTime));
