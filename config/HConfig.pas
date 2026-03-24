@@ -13,6 +13,7 @@ type
     Servidor: string;
     Tipo: string;
     Empresa: string;
+    UnidadesPath: string;
   end;
 
   THConfig = class
@@ -26,6 +27,8 @@ type
     class function GetInstance: THConfig;
     property Config: THelisaConfig read FConfig;
   end;
+
+function GetUnidadesPath: string;
 
 const
   Seccion = 'Software Administrativo y de Gestion 2';
@@ -72,14 +75,14 @@ begin
     Reg.RootKey := HKEY_LOCAL_MACHINE;
     Clave := 'Software\Helisa\' + Seccion;
 
-    if not Reg.OpenKeyReadOnly(Clave) then
-      raise Exception.Create('No se encontr' + #243 + ' configuraci' + #243 + ' n Helisa en HKLM');
-
-    FConfig.RutaPrograma := Reg.ReadString('Programa');
-    FConfig.RutaBaseDatos := Reg.ReadString('Base de datos');
-    FConfig.RutaArchivos := Reg.ReadString('Archivos');
-    FConfig.Servidor := Reg.ReadString('Servidor');
-    FConfig.Tipo := Reg.ReadString('Tipo');
+    if Reg.OpenKeyReadOnly(Clave) then
+    begin
+      FConfig.RutaPrograma := Reg.ReadString('Programa');
+      FConfig.RutaBaseDatos := Reg.ReadString('Base de datos');
+      FConfig.RutaArchivos := Reg.ReadString('Archivos');
+      FConfig.Servidor := Reg.ReadString('Servidor');
+      FConfig.Tipo := Reg.ReadString('Tipo');
+    end;
   finally
     Reg.Free;
   end;
@@ -88,8 +91,24 @@ begin
   Ini := TIniFile.Create(TPath.Combine(AppPath, 'config.ini'));
   try
     FConfig.Empresa := Ini.ReadString('HELISA', 'Empresa', '0');
+    FConfig.UnidadesPath := Ini.ReadString('DIAN', 'UnidadesPath', '');
   finally
     Ini.Free;
+  end;
+end;
+
+function GetUnidadesPath: string;
+var
+  LConfig: THelisaConfig;
+  LAppPath: string;
+begin
+  LConfig := THConfig.GetInstance.Config;
+  Result := LConfig.UnidadesPath;
+
+  if (Result <> '') and not TPath.IsPathRooted(Result) then
+  begin
+    LAppPath := TPath.GetDirectoryName(GetModuleName(HInstance));
+    Result := TPath.Combine(LAppPath, Result);
   end;
 end;
 
