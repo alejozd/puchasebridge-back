@@ -29,6 +29,7 @@ uses
   System.IOUtils,
   System.Variants,
   Xml.XMLDoc,
+  Xml.omnixmldom,
   HConfig;
 
 { TDianUnitService }
@@ -89,6 +90,7 @@ begin
 
       LXMLDoc := TXMLDocument.Create(nil);
       try
+        LXMLDoc.DOMVendor := GetDOMVendor(sOmniXmlVendor);
         LXMLDoc.LoadFromFile(LPath);
         LXMLDoc.Active := True;
 
@@ -103,7 +105,7 @@ begin
           begin
             LSimpleCodeList := LRootNode.ChildNodes[I];
             Break;
-            end;
+          end;
         end;
 
         if LSimpleCodeList <> nil then
@@ -157,17 +159,15 @@ begin
             end;
           end;
         end;
+        FUnitMap := LMap;
       finally
+        // Important: Manual Free since we are not using the interface for the root object here
         LXMLDoc.Free;
       end;
-    except
-      on E: Exception do
-      begin
+    finally
+      if not Assigned(FUnitMap) then
         LMap.Free;
-        raise;
-      end;
     end;
-    FUnitMap := LMap;
   finally
     FLock.Leave;
   end;

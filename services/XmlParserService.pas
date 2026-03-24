@@ -68,6 +68,9 @@ type
 
 implementation
 
+uses
+  Xml.omnixmldom;
+
 { TXmlParserService }
 
 class function TXmlParserService.CreateXMLDoc(const AXML: string): IXMLDocument;
@@ -75,6 +78,7 @@ var
   LXMLDoc: TXMLDocument;
 begin
   LXMLDoc := TXMLDocument.Create(nil);
+  LXMLDoc.DOMVendor := GetDOMVendor(sOmniXmlVendor);
   LXMLDoc.LoadFromXML(AXML);
   LXMLDoc.Active := True;
   Result := LXMLDoc;
