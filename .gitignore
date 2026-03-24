@@ -28,6 +28,7 @@ __recovery/
 *.obj
 *.pch
 *.tds
+*.dsv
 
 # Configuración de usuario en proyectos
 *.identcache
