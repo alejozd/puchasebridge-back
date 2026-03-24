@@ -29,8 +29,6 @@ uses
   System.IOUtils,
   System.Variants,
   Xml.XMLDoc,
-  Xml.adomxmldom,
-  Xml.xmldom,
   HConfig;
 
 { TDianUnitService }
@@ -91,7 +89,6 @@ begin
 
       LXMLDoc := TXMLDocument.Create(nil);
       try
-        LXMLDoc.DOMVendor := GetDOMVendor(sAdom4XmlVendor);
         LXMLDoc.LoadFromFile(LPath);
         LXMLDoc.Active := True;
 
@@ -106,7 +103,7 @@ begin
           begin
             LSimpleCodeList := LRootNode.ChildNodes[I];
             Break;
-          end;
+            end;
         end;
 
         if LSimpleCodeList <> nil then

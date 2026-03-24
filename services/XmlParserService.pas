@@ -8,8 +8,6 @@ uses
   System.Generics.Collections,
   System.DateUtils,
   Xml.XMLDoc,
-  Xml.adomxmldom,
-  Xml.xmldom,
   Xml.XMLIntf;
 
 type
@@ -77,7 +75,6 @@ var
   LXMLDoc: TXMLDocument;
 begin
   LXMLDoc := TXMLDocument.Create(nil);
-  LXMLDoc.DOMVendor := GetDOMVendor(sAdom4XmlVendor);
   LXMLDoc.LoadFromXML(AXML);
   LXMLDoc.Active := True;
   Result := LXMLDoc;
