@@ -593,7 +593,8 @@ end;
 procedure Homologar(Req: THorseRequest; Res: THorseResponse; Next: TProc);
 var
   LBody, LResponse: TJSONObject;
-  LReferenciaXML, LUnidadXML, LReferenciaErp, LUnidadErp: string;
+  LReferenciaXML, LUnidadXML, LReferenciaErp, LUnidadErp, LNombreH: string;
+  LCodigoH, LSubCodigoH: Integer;
   LFactor: Double;
   LEquivalenciaID: Integer;
   LConn: TFDConnection;
@@ -606,7 +607,6 @@ begin
       LBody := Req.Body<TJSONObject>;
       if not Assigned(LBody) then
       begin
-        // Fallback to manual parsing if Johnson didn't catch it
         if not Req.Body.Trim.IsEmpty then
           LBody := TJSONObject.ParseJSONValue(Req.Body) as TJSONObject;
       end;
@@ -615,7 +615,7 @@ begin
         raise Exception.Create('JSON body inválido o vacío');
 
       try
-        // Robust key extraction (handles case variations from frontend)
+        // Extract XML product info
         if not LBody.TryGetValue('referenciaXml', LReferenciaXML) then
           if not LBody.TryGetValue('referenciaXML', LReferenciaXML) then
             raise Exception.Create('referenciaXml es requerido');
@@ -624,6 +624,17 @@ begin
           if not LBody.TryGetValue('unidadXML', LUnidadXML) then
             raise Exception.Create('unidadXml es requerido');
 
+        // Extract ERP product info (MANDATORY)
+        if not LBody.TryGetValue('codigoH', LCodigoH) then
+          raise Exception.Create('codigoH (Código ERP) es requerido');
+
+        if not LBody.TryGetValue('nombreH', LNombreH) then
+          raise Exception.Create('nombreH (Nombre ERP) es requerido');
+
+        if not LBody.TryGetValue('subCodigoH', LSubCodigoH) then
+          LSubCodigoH := 0;
+
+        // Extract ERP mapping info
         if not LBody.TryGetValue('referenciaErp', LReferenciaErp) then
           if not LBody.TryGetValue('referenciaP', LReferenciaErp) then
             raise Exception.Create('referenciaErp es requerido');
@@ -651,7 +662,7 @@ begin
           if LEquivalenciaID = 0 then
           begin
             LEquivalenciaID := EquivalenciaService.CrearEquivalencia(
-              LConn, 0, 0, '', LReferenciaXML, LUnidadXML, LUnidadErp, LReferenciaErp, LFactor
+              LConn, LCodigoH, LSubCodigoH, LNombreH, LReferenciaXML, LUnidadXML, LUnidadErp, LReferenciaErp, LFactor
             );
           end;
 
@@ -684,7 +695,6 @@ begin
           end;
         end;
       finally
-        // Only free LBody if we parsed it manually (it wasn't from Horse)
         if (LBody <> Req.Body<TJSONObject>) and Assigned(LBody) then
           LBody.Free;
       end;
