@@ -41,3 +41,6 @@ Win64/
 
 # Configuración sensible local
 config.ini
+
+# Base de datos
+*.fdb
