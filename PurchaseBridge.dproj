@@ -118,8 +118,22 @@
         <DCCReference Include="repositories\ProveedorRepository.pas"/>
         <DCCReference Include="repositories\ProductoRepository.pas"/>
         <DCCReference Include="services\XMLFacturaService.pas"/>
+        <DCCReference Include="services\XmlParserService.pas"/>
+        <DCCReference Include="utils\HelisaUtils.pas"/>
+        <DCCReference Include="services\HelisaService.pas"/>
+        <DCCReference Include="services\EquivalenciaService.pas"/>
+        <DCCReference Include="services\ValidationService.pas"/>
+        <DCCReference Include="services\DocumentoService.pas"/>
         <DCCReference Include="controllers\ImportController.pas"/>
         <DCCReference Include="controllers\ProveedorController.pas"/>
+        <DCCReference Include="controllers\XmlController.pas"/>
+        <DCCReference Include="controllers\XmlValidationController.pas"/>
+        <DCCReference Include="controllers\EquivalenciaController.pas"/>
+        <DCCReference Include="controllers\HelisaController.pas"/>
+        <DCCReference Include="controllers\DocumentosController.pas"/>
+        <DCCReference Include="services\AuthService.pas"/>
+        <DCCReference Include="controllers\AuthController.pas"/>
+        <DCCReference Include="middleware\AuthMiddleware.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>
