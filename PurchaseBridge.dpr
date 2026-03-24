@@ -20,7 +20,7 @@ uses
   HelisaUtils in 'utils\HelisaUtils.pas',
   HelisaService in 'services\HelisaService.pas',
   EquivalenciaService in 'services\EquivalenciaService.pas',
-  DianUnitService in 'services\DianUnitService.pas',
+  DianUnits in 'services\DianUnits.pas',
   ValidationService in 'services\ValidationService.pas',
   DocumentoService in 'services\DocumentoService.pas',
   ImportController in 'controllers\ImportController.pas',

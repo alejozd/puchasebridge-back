@@ -51,3 +51,7 @@ Path=F:\Proyectos\delphi_backend\purchasebridge\backend\database\purchasebridge.
 1. Importa el archivo `PurchaseBridge.postman_collection.json` en Postman.
 2. Asegúrate de que el servidor está corriendo en el puerto 9000.
 3. Ejecuta las peticiones de prueba incluidas.
+
+## Prueba
+
+Esta es una línea de prueba.
