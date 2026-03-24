@@ -7,7 +7,6 @@ uses
   System.Classes,
   System.Generics.Collections,
   System.DateUtils,
-  Xml.XMLDoc,
   Xml.XMLIntf;
 
 type
@@ -69,6 +68,7 @@ type
 implementation
 
 uses
+  Xml.XMLDoc,
   Xml.omnixmldom;
 
 { TXmlParserService }
@@ -78,7 +78,7 @@ var
   LXMLDoc: TXMLDocument;
 begin
   LXMLDoc := TXMLDocument.Create(nil);
-  LXMLDoc.DOMVendor := GetDOMVendor(sOmniXmlVendor);
+  LXMLDoc.VendorName := sOmniXmlVendor;
   LXMLDoc.LoadFromXML(AXML);
   LXMLDoc.Active := True;
   Result := LXMLDoc;

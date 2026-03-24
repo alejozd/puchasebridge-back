@@ -75,14 +75,14 @@ begin
     Reg.RootKey := HKEY_LOCAL_MACHINE;
     Clave := 'Software\Helisa\' + Seccion;
 
-    if Reg.OpenKeyReadOnly(Clave) then
-    begin
-      FConfig.RutaPrograma := Reg.ReadString('Programa');
-      FConfig.RutaBaseDatos := Reg.ReadString('Base de datos');
-      FConfig.RutaArchivos := Reg.ReadString('Archivos');
-      FConfig.Servidor := Reg.ReadString('Servidor');
-      FConfig.Tipo := Reg.ReadString('Tipo');
-    end;
+    if not Reg.OpenKeyReadOnly(Clave) then
+      raise Exception.Create('No se encontr' + #243 + ' configuraci' + #243 + ' n Helisa en HKLM');
+
+    FConfig.RutaPrograma := Reg.ReadString('Programa');
+    FConfig.RutaBaseDatos := Reg.ReadString('Base de datos');
+    FConfig.RutaArchivos := Reg.ReadString('Archivos');
+    FConfig.Servidor := Reg.ReadString('Servidor');
+    FConfig.Tipo := Reg.ReadString('Tipo');
   finally
     Reg.Free;
   end;

@@ -90,7 +90,7 @@ begin
 
       LXMLDoc := TXMLDocument.Create(nil);
       try
-        LXMLDoc.DOMVendor := GetDOMVendor(sOmniXmlVendor);
+        LXMLDoc.VendorName := sOmniXmlVendor;
         LXMLDoc.LoadFromFile(LPath);
         LXMLDoc.Active := True;
 
@@ -161,7 +161,12 @@ begin
         end;
         FUnitMap := LMap;
       finally
-        // Important: Manual Free since we are not using the interface for the root object here
+        // To avoid AV when child nodes are freed after LXMLDoc, we nil them first
+        LSimpleValue := nil;
+        LValue := nil;
+        LRow := nil;
+        LSimpleCodeList := nil;
+        LRootNode := nil;
         LXMLDoc.Free;
       end;
     finally
