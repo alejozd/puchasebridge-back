@@ -9,9 +9,13 @@ uses
   FireDAC.Stan.Param,
   FirebirdConnection;
 
-function BuscarEquivalencia(AReferenciaH: string; AUnidadH: string): TFDQuery;
+function BuscarEquivalencia(AReferenciaH: string; AUnidadH: string): TFDQuery; overload;
+function BuscarEquivalencia(AConnection: TFDConnection; AReferenciaH: string; AUnidadH: string): TFDQuery; overload;
 function ExisteEquivalencia(AReferenciaH: string; AUnidadH: string): Boolean;
-procedure CrearEquivalencia(
+function GetIDEquivalencia(AReferenciaH, AUnidadH: string): Integer; overload;
+function GetIDEquivalencia(AConnection: TFDConnection; AReferenciaH, AUnidadH: string): Integer; overload;
+
+function CrearEquivalencia(
   ACodigoH: Integer;
   ASubCodigoH: Integer;
   ANombreH: string;
@@ -20,7 +24,20 @@ procedure CrearEquivalencia(
   AUnidadP: string;
   AReferenciaP: string;
   AFactor: Double
-);
+): Integer; overload;
+
+function CrearEquivalencia(
+  AConnection: TFDConnection;
+  ACodigoH: Integer;
+  ASubCodigoH: Integer;
+  ANombreH: string;
+  AReferenciaH: string;
+  AUnidadH: string;
+  AUnidadP: string;
+  AReferenciaP: string;
+  AFactor: Double
+): Integer; overload;
+
 function ObtenerEquivalenciaJSON(AReferenciaH: string; AUnidadH: string): string;
 
 // Nuevas funciones
@@ -31,10 +48,22 @@ implementation
 
 function BuscarEquivalencia(AReferenciaH: string; AUnidadH: string): TFDQuery;
 begin
+  Result := BuscarEquivalencia(nil, AReferenciaH, AUnidadH);
+end;
+
+function BuscarEquivalencia(AConnection: TFDConnection; AReferenciaH: string; AUnidadH: string): TFDQuery;
+begin
   if AReferenciaH.Trim.IsEmpty or AUnidadH.Trim.IsEmpty then
     raise Exception.Create('Referencia XML y Unidad XML son obligatorias para buscar equivalencia');
 
-  Result := GetBridgeQuery;
+  if Assigned(AConnection) then
+  begin
+    Result := TFDQuery.Create(nil);
+    Result.Connection := AConnection;
+  end
+  else
+    Result := GetBridgeQuery;
+
   try
     Result.SQL.Text := 'SELECT * FROM EQUIVALENCIA WHERE REFERENCIAH = :REF AND UNIDADH = :UNI';
     Result.ParamByName('REF').AsString := AReferenciaH;
@@ -58,7 +87,26 @@ begin
   end;
 end;
 
-procedure CrearEquivalencia(
+function GetIDEquivalencia(AReferenciaH, AUnidadH: string): Integer;
+begin
+  Result := GetIDEquivalencia(nil, AReferenciaH, AUnidadH);
+end;
+
+function GetIDEquivalencia(AConnection: TFDConnection; AReferenciaH, AUnidadH: string): Integer;
+var
+  Q: TFDQuery;
+begin
+  Result := 0;
+  Q := BuscarEquivalencia(AConnection, AReferenciaH, AUnidadH);
+  try
+    if not Q.IsEmpty then
+      Result := Q.FieldByName('ID').AsInteger;
+  finally
+    Q.Free;
+  end;
+end;
+
+function CrearEquivalencia(
   ACodigoH: Integer;
   ASubCodigoH: Integer;
   ANombreH: string;
@@ -67,34 +115,72 @@ procedure CrearEquivalencia(
   AUnidadP: string;
   AReferenciaP: string;
   AFactor: Double
-);
+): Integer;
+begin
+  Result := CrearEquivalencia(nil, ACodigoH, ASubCodigoH, ANombreH, AReferenciaH, AUnidadH, AUnidadP, AReferenciaP, AFactor);
+end;
+
+function CrearEquivalencia(
+  AConnection: TFDConnection;
+  ACodigoH: Integer;
+  ASubCodigoH: Integer;
+  ANombreH: string;
+  AReferenciaH: string;
+  AUnidadH: string;
+  AUnidadP: string;
+  AReferenciaP: string;
+  AFactor: Double
+): Integer;
 var
   Q: TFDQuery;
+  LConnOwn: Boolean;
 begin
   if AReferenciaH.Trim.IsEmpty or AUnidadH.Trim.IsEmpty then
     raise Exception.Create('Referencia XML y Unidad XML son obligatorias');
 
-  if ExisteEquivalencia(AReferenciaH, AUnidadH) then
-    raise Exception.CreateFmt('Ya existe una equivalencia para la referencia XML %s y unidad %s', [AReferenciaH, AUnidadH]);
+  LConnOwn := not Assigned(AConnection);
+  if LConnOwn then
+    AConnection := GetBridgeConnection;
 
-  Q := GetBridgeQuery;
   try
-    Q.SQL.Text :=
-      'INSERT INTO EQUIVALENCIA (CODIGOH, SUBCODIGOH, NOMBREH, REFERENCIAH, UNIDADH, UNIDADP, REFERENCIAP, FACTOR) ' +
-      'VALUES (:CODIGOH, :SUBCODIGOH, :NOMBREH, :REFERENCIAH, :UNIDADH, :UNIDADP, :REFERENCIAP, :FACTOR)';
+    Q := TFDQuery.Create(nil);
+    try
+      Q.Connection := AConnection;
 
-    Q.ParamByName('CODIGOH').AsInteger := ACodigoH;
-    Q.ParamByName('SUBCODIGOH').AsInteger := ASubCodigoH;
-    Q.ParamByName('NOMBREH').AsString := ANombreH;
-    Q.ParamByName('REFERENCIAH').AsString := AReferenciaH;
-    Q.ParamByName('UNIDADH').AsString := AUnidadH;
-    Q.ParamByName('UNIDADP').AsString := AUnidadP;
-    Q.ParamByName('REFERENCIAP').AsString := AReferenciaP;
-    Q.ParamByName('FACTOR').AsFloat := AFactor;
+      // Check if it already exists to avoid duplicate errors
+      Q.SQL.Text := 'SELECT ID FROM EQUIVALENCIA WHERE REFERENCIAH = :REF AND UNIDADH = :UNI';
+      Q.ParamByName('REF').AsString := AReferenciaH;
+      Q.ParamByName('UNI').AsString := AUnidadH;
+      Q.Open;
 
-    Q.ExecSQL;
+      if not Q.IsEmpty then
+      begin
+        Result := Q.FieldByName('ID').AsInteger;
+        Exit;
+      end;
+      Q.Close;
+
+      Q.SQL.Text :=
+        'INSERT INTO EQUIVALENCIA (CODIGOH, SUBCODIGOH, NOMBREH, REFERENCIAH, UNIDADH, UNIDADP, REFERENCIAP, FACTOR) ' +
+        'VALUES (:CODIGOH, :SUBCODIGOH, :NOMBREH, :REFERENCIAH, :UNIDADH, :UNIDADP, :REFERENCIAP, :FACTOR) RETURNING ID';
+
+      Q.ParamByName('CODIGOH').AsInteger := ACodigoH;
+      Q.ParamByName('SUBCODIGOH').AsInteger := ASubCodigoH;
+      Q.ParamByName('NOMBREH').AsString := ANombreH;
+      Q.ParamByName('REFERENCIAH').AsString := AReferenciaH;
+      Q.ParamByName('UNIDADH').AsString := AUnidadH;
+      Q.ParamByName('UNIDADP').AsString := AUnidadP;
+      Q.ParamByName('REFERENCIAP').AsString := AReferenciaP;
+      Q.ParamByName('FACTOR').AsFloat := AFactor;
+
+      Q.Open;
+      Result := Q.FieldByName('ID').AsInteger;
+    finally
+      Q.Free;
+    end;
   finally
-    Q.Free;
+    if LConnOwn then
+      AConnection.Free;
   end;
 end;
 

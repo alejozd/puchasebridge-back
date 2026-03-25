@@ -592,78 +592,123 @@ end;
 
 procedure Homologar(Req: THorseRequest; Res: THorseResponse; Next: TProc);
 var
-  LJSON: TJSONObject;
-  LReferenciaXML, LUnidadXML, LReferenciaErp, LUnidadErp: string;
+  LBody, LResponse: TJSONObject;
+  LReferenciaXML, LUnidadXML, LReferenciaErp, LUnidadErp, LNombreH: string;
+  LCodigoH, LSubCodigoH: Integer;
   LFactor: Double;
-  LResponse: TJSONObject;
+  LEquivalenciaID: Integer;
+  LConn: TFDConnection;
+  Q: TFDQuery;
 begin
   Res.ContentType('application/json; charset=utf-8');
+  LConn := GetBridgeConnection;
   try
     try
-      if Req.Body.Trim.IsEmpty then
-        raise Exception.Create('Request body vacío');
+      LBody := Req.Body<TJSONObject>;
+      if not Assigned(LBody) then
+      begin
+        if not Req.Body.Trim.IsEmpty then
+          LBody := TJSONObject.ParseJSONValue(Req.Body) as TJSONObject;
+      end;
 
-      LJSON := TJSONObject.ParseJSONValue(Req.Body) as TJSONObject;
+      if not Assigned(LBody) then
+        raise Exception.Create('JSON body inválido o vacío');
+
       try
-        if not Assigned(LJSON) then
-          raise Exception.Create('JSON inválido');
+        // Extract XML product info
+        if not LBody.TryGetValue('referenciaXml', LReferenciaXML) then
+          if not LBody.TryGetValue('referenciaXML', LReferenciaXML) then
+            raise Exception.Create('referenciaXml es requerido');
 
-        // Validar campos obligatorios
-        if LJSON.GetValue('referenciaXml') = nil then
-          raise Exception.Create('referenciaXml requerido');
-        if LJSON.GetValue('unidadXml') = nil then
-          raise Exception.Create('unidadXml requerido');
-        if LJSON.GetValue('referenciaErp') = nil then
-          raise Exception.Create('referenciaErp requerido');
-        if LJSON.GetValue('unidadErp') = nil then
-          raise Exception.Create('unidadErp requerido');
-        if LJSON.GetValue('factor') = nil then
-          raise Exception.Create('factor requerido');
+        if not LBody.TryGetValue('unidadXml', LUnidadXML) then
+          if not LBody.TryGetValue('unidadXML', LUnidadXML) then
+            raise Exception.Create('unidadXml es requerido');
 
-        // Asignación segura
-        LReferenciaXML := LJSON.GetValue('referenciaXml').Value;
-        LUnidadXML := LJSON.GetValue('unidadXml').Value;
-        LReferenciaErp := LJSON.GetValue('referenciaErp').Value;
-        LUnidadErp := LJSON.GetValue('unidadErp').Value;
+        // Extract ERP product info (MANDATORY)
+        if not LBody.TryGetValue('codigoH', LCodigoH) then
+          raise Exception.Create('codigoH (Código ERP) es requerido');
 
-        if LJSON.GetValue('factor') is TJSONNumber then
-          LFactor := (LJSON.GetValue('factor') as TJSONNumber).AsDouble
-        else
-          LFactor := StrToFloatDef(LJSON.GetValue('factor').Value, 0);
+        if not LBody.TryGetValue('nombreH', LNombreH) then
+          raise Exception.Create('nombreH (Nombre ERP) es requerido');
 
-        // Validar antes de usar
-        if LReferenciaErp.Trim = '' then
-          raise Exception.Create('Referencia ERP vacía');
-        if LUnidadErp.Trim = '' then
-          raise Exception.Create('Unidad ERP vacía');
+        if not LBody.TryGetValue('subCodigoH', LSubCodigoH) then
+          LSubCodigoH := 0;
 
-        // Pasamos los valores del XML a REFERENCIAH/UNIDADH para que coincida con la lógica de búsqueda
-        // y los valores del ERP a REFERENCIAP/UNIDADP.
-        EquivalenciaService.CrearEquivalencia(
-          0, 0, '', LReferenciaXML, LUnidadXML, LUnidadErp, LReferenciaErp, LFactor
-        );
+        // Extract ERP mapping info
+        if not LBody.TryGetValue('referenciaErp', LReferenciaErp) then
+          if not LBody.TryGetValue('referenciaP', LReferenciaErp) then
+            raise Exception.Create('referenciaErp es requerido');
 
-        LResponse := TJSONObject.Create;
-        LResponse.AddPair('success', TJSONBool.Create(True));
-        LResponse.AddPair('message', 'Homologación guardada correctamente');
-        Res.Send(LResponse);
+        if not LBody.TryGetValue('unidadErp', LUnidadErp) then
+          if not LBody.TryGetValue('unidadP', LUnidadErp) then
+            raise Exception.Create('unidadErp es requerido');
+
+        if not LBody.TryGetValue('factor', LFactor) then
+        begin
+           if LBody.GetValue('factor') <> nil then
+             LFactor := StrToFloatDef(LBody.GetValue('factor').Value, 1)
+           else
+             LFactor := 1;
+        end;
+
+        if LReferenciaErp.Trim.IsEmpty then raise Exception.Create('Referencia ERP vacía');
+        if LUnidadErp.Trim.IsEmpty then raise Exception.Create('Unidad ERP vacía');
+
+        LConn.StartTransaction;
+        try
+          // 1. Get or Create Equivalencia
+          LEquivalenciaID := EquivalenciaService.GetIDEquivalencia(LConn, LReferenciaXML, LUnidadXML);
+
+          if LEquivalenciaID = 0 then
+          begin
+            LEquivalenciaID := EquivalenciaService.CrearEquivalencia(
+              LConn, LCodigoH, LSubCodigoH, LNombreH, LReferenciaXML, LUnidadXML, LUnidadErp, LReferenciaErp, LFactor
+            );
+          end;
+
+          // 2. Update all pending products in XML_PRODUCTOS with this same mapping
+          Q := TFDQuery.Create(nil);
+          try
+            Q.Connection := LConn;
+            Q.SQL.Text :=
+              'UPDATE XML_PRODUCTOS SET EQUIVALENCIA_ID = :EID ' +
+              'WHERE REFERENCIA = :REF AND UNIDAD = :UNI AND EQUIVALENCIA_ID IS NULL';
+            Q.ParamByName('EID').AsInteger := LEquivalenciaID;
+            Q.ParamByName('REF').AsString := LReferenciaXML;
+            Q.ParamByName('UNI').AsString := LUnidadXML;
+            Q.ExecSQL;
+          finally
+            Q.Free;
+          end;
+
+          LConn.Commit;
+
+          LResponse := TJSONObject.Create;
+          LResponse.AddPair('success', TJSONBool.Create(True));
+          LResponse.AddPair('message', 'Homologación guardada correctamente');
+          Res.Send(LResponse);
+        except
+          on E: Exception do
+          begin
+            LConn.Rollback;
+            raise;
+          end;
+        end;
       finally
-        if Assigned(LJSON) then LJSON.Free;
+        if (LBody <> Req.Body<TJSONObject>) and Assigned(LBody) then
+          LBody.Free;
       end;
     except
       on E: Exception do
       begin
         LResponse := TJSONObject.Create;
         LResponse.AddPair('success', TJSONBool.Create(False));
-        LResponse.AddPair('mensaje', E.Message);
+        LResponse.AddPair('message', E.Message);
         Res.Status(500).Send(LResponse);
       end;
     end;
-  except
-    on E: Exception do
-    begin
-      Res.Status(500).Send(E.Message);
-    end;
+  finally
+    LConn.Free;
   end;
 end;
 
