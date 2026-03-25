@@ -712,6 +712,122 @@ begin
   end;
 end;
 
+procedure GetProductosDocumento(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+var
+  Q: TFDQuery;
+  LResponse: TJSONObject;
+  LProductsArr: TJSONArray;
+  LProductObj: TJSONObject;
+  LFileName: string;
+  LFileID: Integer;
+  LTotalProductos, LTotalPendientes, LTotalHomologados: Integer;
+  LUnidadErp: string;
+begin
+  Res.ContentType('application/json; charset=utf-8');
+  try
+    if not Req.Query.TryGetValue('fileName', LFileName) or LFileName.Trim.IsEmpty then
+    begin
+      Res.Status(400).Send('fileName is required');
+      Exit;
+    end;
+
+    Q := GetBridgeQuery;
+    try
+      // 1. Get File ID
+      Q.SQL.Text := 'SELECT ID FROM XML_FILES WHERE FILE_NAME = :FNAME';
+      Q.ParamByName('FNAME').AsString := LFileName;
+      Q.Open;
+
+      if Q.IsEmpty then
+      begin
+        Res.Status(404).Send('File not found in staging');
+        Exit;
+      end;
+
+      LFileID := Q.FieldByName('ID').AsInteger;
+      Q.Close;
+
+      // 2. Get All Products with LEFT JOIN to EQUIVALENCIA
+      Q.SQL.Text :=
+        'SELECT P.REFERENCIA AS REFERENCIAXML, P.DESCRIPCION AS NOMBREPRODUCTO, P.UNIDAD AS UNIDADXML, ' +
+        '       E.REFERENCIAP AS REFERENCIAERP, E.NOMBREH AS NOMBREERP, E.UNIDADP AS UNIDADERP, E.FACTOR, ' +
+        '       P.EQUIVALENCIA_ID ' +
+        'FROM XML_PRODUCTOS P ' +
+        'LEFT JOIN EQUIVALENCIA E ON P.EQUIVALENCIA_ID = E.ID ' +
+        'WHERE P.XML_FILE_ID = :FILEID';
+
+      Q.ParamByName('FILEID').AsInteger := LFileID;
+      Q.Open;
+
+      LTotalProductos := 0;
+      LTotalPendientes := 0;
+      LTotalHomologados := 0;
+      LProductsArr := TJSONArray.Create;
+
+      while not Q.Eof do
+      begin
+        Inc(LTotalProductos);
+        LProductObj := TJSONObject.Create;
+        LProductObj.AddPair('referenciaXML', Q.FieldByName('REFERENCIAXML').AsString);
+        LProductObj.AddPair('nombreProducto', Q.FieldByName('NOMBREPRODUCTO').AsString);
+        LProductObj.AddPair('unidadXML', Q.FieldByName('UNIDADXML').AsString);
+        LProductObj.AddPair('unidadXMLNombre', TDianUnits.GetUnitName(Q.FieldByName('UNIDADXML').AsString));
+
+        if not Q.FieldByName('EQUIVALENCIA_ID').IsNull then
+        begin
+          Inc(LTotalHomologados);
+          LProductObj.AddPair('estado', 'HOMOLOGADO');
+          LProductObj.AddPair('referenciaErp', Q.FieldByName('REFERENCIAERP').AsString);
+          LProductObj.AddPair('nombreErp', Q.FieldByName('NOMBREERP').AsString);
+
+          LUnidadErp := Q.FieldByName('UNIDADERP').AsString;
+          LProductObj.AddPair('unidadErp', LUnidadErp);
+
+          // For unidadErpNombre, we'd ideally fetch it from Helisa global DB.
+          // Since cross-DB JOIN is not supported and performance is requested,
+          // we could do a separate lookup if needed, but for now we'll use UNIDADERP as name
+          // or leave it as placeholder if we can't easily get it here.
+          // Let's assume for now that unidadErp and unidadErpNombre can be the same if we don't have the sigla.
+          // Wait, HelisaController.pas gets it from INTUXXXX.
+          LProductObj.AddPair('unidadErpNombre', LUnidadErp);
+          LProductObj.AddPair('factor', TJSONNumber.Create(Q.FieldByName('FACTOR').AsFloat));
+        end
+        else
+        begin
+          Inc(LTotalPendientes);
+          LProductObj.AddPair('estado', 'PENDIENTE');
+          LProductObj.AddPair('referenciaErp', TJSONNull.Create);
+          LProductObj.AddPair('nombreErp', TJSONNull.Create);
+          LProductObj.AddPair('unidadErp', TJSONNull.Create);
+          LProductObj.AddPair('unidadErpNombre', TJSONNull.Create);
+          LProductObj.AddPair('factor', TJSONNull.Create);
+        end;
+
+        LProductsArr.AddElement(LProductObj);
+        Q.Next;
+      end;
+
+      LResponse := TJSONObject.Create;
+      LResponse.AddPair('totalProductos', TJSONNumber.Create(LTotalProductos));
+      LResponse.AddPair('totalPendientes', TJSONNumber.Create(LTotalPendientes));
+      LResponse.AddPair('totalHomologados', TJSONNumber.Create(LTotalHomologados));
+      LResponse.AddPair('productos', LProductsArr);
+
+      Res.Send(LResponse);
+    finally
+      Q.Free;
+    end;
+  except
+    on E: Exception do
+    begin
+      LResponse := TJSONObject.Create;
+      LResponse.AddPair('success', TJSONBool.Create(False));
+      LResponse.AddPair('message', E.Message);
+      Res.Status(500).Send(LResponse);
+    end;
+  end;
+end;
+
 procedure Registry;
 begin
   // /xml/list is deprecated, use /xml/files
@@ -722,6 +838,7 @@ begin
   THorse.Get('/xml/files/:id', GetFileById);
   THorse.Post('/xml/procesar', ProcesarBatch);
   THorse.Get('/xml/productos/pendientes', GetProductosPendientes);
+  THorse.Get('/xml/productos/documento', GetProductosDocumento);
   THorse.Post('/xml/homologar', Homologar);
 end;
 
