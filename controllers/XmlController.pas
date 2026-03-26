@@ -914,6 +914,99 @@ begin
   end;
 end;
 
+procedure GetDashboardMetrics(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+var
+  Q: TFDQuery;
+  LResponse: TJSONObject;
+  LTotal, LCargados, LPendientes, LListos, LProcesados, LErrores: Integer;
+  LProcesadosHoy, LErroresHoy: Integer;
+  LEstado: string;
+begin
+  Res.ContentType('application/json; charset=utf-8');
+  LTotal := 0;
+  LCargados := 0;
+  LPendientes := 0;
+  LListos := 0;
+  LProcesados := 0;
+  LErrores := 0;
+  LProcesadosHoy := 0;
+  LErroresHoy := 0;
+
+  try
+    Q := GetBridgeQuery;
+    try
+      // 1) Total de archivos
+      Q.SQL.Text := 'SELECT COUNT(*) AS TOTAL FROM XML_FILES';
+      Q.Open;
+      LTotal := Q.FieldByName('TOTAL').AsInteger;
+      Q.Close;
+
+      // 2) Cantidad por estado usando GROUP BY ESTADO
+      Q.SQL.Text :=
+        'SELECT ESTADO, COUNT(*) AS TOTAL ' +
+        'FROM XML_FILES ' +
+        'GROUP BY ESTADO';
+      Q.Open;
+      while not Q.Eof do
+      begin
+        LEstado := UpperCase(Q.FieldByName('ESTADO').AsString.Trim);
+        if LEstado = 'CARGADO' then
+          LCargados := Q.FieldByName('TOTAL').AsInteger
+        else if LEstado = 'PENDIENTE' then
+          LPendientes := Q.FieldByName('TOTAL').AsInteger
+        else if LEstado = 'LISTO' then
+          LListos := Q.FieldByName('TOTAL').AsInteger
+        else if LEstado = 'PROCESADO' then
+          LProcesados := Q.FieldByName('TOTAL').AsInteger
+        else if LEstado = 'ERROR' then
+          LErrores := Q.FieldByName('TOTAL').AsInteger;
+        Q.Next;
+      end;
+      Q.Close;
+
+      // 3) Métricas de hoy: usa FECHA_PROCESO; si no existe, cae a FECHA_CARGA.
+      Q.SQL.Text :=
+        'SELECT COUNT(*) AS TOTAL ' +
+        'FROM XML_FILES ' +
+        'WHERE ESTADO = ''PROCESADO'' ' +
+        'AND CAST(COALESCE(FECHA_PROCESO, FECHA_CARGA) AS DATE) = CURRENT_DATE';
+      Q.Open;
+      LProcesadosHoy := Q.FieldByName('TOTAL').AsInteger;
+      Q.Close;
+
+      Q.SQL.Text :=
+        'SELECT COUNT(*) AS TOTAL ' +
+        'FROM XML_FILES ' +
+        'WHERE ESTADO = ''ERROR'' ' +
+        'AND CAST(COALESCE(FECHA_PROCESO, FECHA_CARGA) AS DATE) = CURRENT_DATE';
+      Q.Open;
+      LErroresHoy := Q.FieldByName('TOTAL').AsInteger;
+      Q.Close;
+
+      LResponse := TJSONObject.Create;
+      LResponse.AddPair('total', TJSONNumber.Create(LTotal));
+      LResponse.AddPair('cargados', TJSONNumber.Create(LCargados));
+      LResponse.AddPair('pendientes', TJSONNumber.Create(LPendientes));
+      LResponse.AddPair('listos', TJSONNumber.Create(LListos));
+      LResponse.AddPair('procesados', TJSONNumber.Create(LProcesados));
+      LResponse.AddPair('errores', TJSONNumber.Create(LErrores));
+      LResponse.AddPair('procesadosHoy', TJSONNumber.Create(LProcesadosHoy));
+      LResponse.AddPair('erroresHoy', TJSONNumber.Create(LErroresHoy));
+      Res.Send(LResponse);
+    finally
+      Q.Free;
+    end;
+  except
+    on E: Exception do
+    begin
+      LResponse := TJSONObject.Create;
+      LResponse.AddPair('success', TJSONBool.Create(False));
+      LResponse.AddPair('message', E.Message);
+      Res.Status(500).Send(LResponse);
+    end;
+  end;
+end;
+
 procedure Registry;
 begin
   // /xml/list is deprecated, use /xml/files
@@ -926,6 +1019,7 @@ begin
   THorse.Get('/xml/productos/pendientes', GetProductosPendientes);
   THorse.Get('/xml/productos/documento', GetProductosDocumento);
   THorse.Post('/xml/homologar', Homologar);
+  THorse.Get('/dashboard/metrics', GetDashboardMetrics);
 end;
 
 end.
