@@ -21,6 +21,7 @@ var
   Q: TFDQuery;
   LFileID: Integer;
   I: Integer;
+  LExiste: Boolean;
 begin
   Conn := GetBridgeConnection;
   try
@@ -54,8 +55,11 @@ begin
           Q.ParamByName('ID').AsInteger := LFileID;
           Q.ExecSQL;
 
-          // Delete old products to refresh them
-          Q.SQL.Text := 'DELETE FROM XML_PRODUCTOS WHERE XML_FILE_ID = :FILEID';
+          // Delete ONLY non-homologated products to preserve equivalences
+          Q.SQL.Text :=
+            'DELETE FROM XML_PRODUCTOS ' +
+            'WHERE XML_FILE_ID = :FILEID ' +
+            'AND EQUIVALENCIA_ID IS NULL';
           Q.ParamByName('FILEID').AsInteger := LFileID;
           Q.ExecSQL;
         end
@@ -83,22 +87,46 @@ begin
 
         for I := 0 to Length(AParsedInvoice.Products) - 1 do
         begin
+          // 1. Verificar si ya existe el producto
+          Q.Close;
+          Q.SQL.Text :=
+            'SELECT 1 FROM XML_PRODUCTOS ' +
+            'WHERE XML_FILE_ID = :FILEID ' +
+            'AND REFERENCIA = :REF ' +
+            'AND UNIDAD = :UNI';
+
           Q.ParamByName('FILEID').AsInteger := LFileID;
-          Q.ParamByName('DESC').AsString := Copy(AParsedInvoice.Products[I].Descripcion, 1, 255);
           Q.ParamByName('REF').AsString := AParsedInvoice.Products[I].Referencia;
-          Q.ParamByName('REFSTD').AsString := AParsedInvoice.Products[I].ReferenciaEstandar;
-          Q.ParamByName('CANT').AsFloat := AParsedInvoice.Products[I].Cantidad;
           Q.ParamByName('UNI').AsString := AParsedInvoice.Products[I].Unidad;
-          Q.ParamByName('VUNI').AsFloat := AParsedInvoice.Products[I].ValorUnitario;
-          Q.ParamByName('VTOT').AsFloat := AParsedInvoice.Products[I].ValorTotal;
-          Q.ParamByName('IMP').AsFloat := AParsedInvoice.Products[I].Impuesto;
 
-          // Parameters for the EQUIVALENCIA subquery (mapping XML ref/unit)
-          Q.ParamByName('REFX').AsString := AParsedInvoice.Products[I].Referencia;
-          Q.ParamByName('UNIX').AsString := AParsedInvoice.Products[I].Unidad;
+          Q.Open;
+          LExiste := not Q.IsEmpty;
+          Q.Close;
 
-          if not Q.ParamByName('REF').AsString.Trim.IsEmpty then
-            Q.ExecSQL;
+          // 2. Si NO existe, lo insertas
+          if not LExiste then
+          begin
+            Q.SQL.Text :=
+              'INSERT INTO XML_PRODUCTOS (XML_FILE_ID, DESCRIPCION, REFERENCIA, REFERENCIA_STD, CANTIDAD, UNIDAD, VALOR_UNITARIO, VALOR_TOTAL, IMPUESTO, EQUIVALENCIA_ID) ' +
+              'VALUES (:FILEID, :DESC, :REF, :REFSTD, :CANT, :UNI, :VUNI, :VTOT, :IMP, ' +
+              '(SELECT FIRST 1 ID FROM EQUIVALENCIA WHERE REFERENCIAH = :REFX AND UNIDADH = :UNIX))';
+
+            Q.ParamByName('FILEID').AsInteger := LFileID;
+            Q.ParamByName('DESC').AsString := Copy(AParsedInvoice.Products[I].Descripcion, 1, 255);
+            Q.ParamByName('REF').AsString := AParsedInvoice.Products[I].Referencia;
+            Q.ParamByName('REFSTD').AsString := AParsedInvoice.Products[I].ReferenciaEstandar;
+            Q.ParamByName('CANT').AsFloat := AParsedInvoice.Products[I].Cantidad;
+            Q.ParamByName('UNI').AsString := AParsedInvoice.Products[I].Unidad;
+            Q.ParamByName('VUNI').AsFloat := AParsedInvoice.Products[I].ValorUnitario;
+            Q.ParamByName('VTOT').AsFloat := AParsedInvoice.Products[I].ValorTotal;
+            Q.ParamByName('IMP').AsFloat := AParsedInvoice.Products[I].Impuesto;
+
+            Q.ParamByName('REFX').AsString := AParsedInvoice.Products[I].Referencia;
+            Q.ParamByName('UNIX').AsString := AParsedInvoice.Products[I].Unidad;
+
+            if not Q.ParamByName('REF').AsString.Trim.IsEmpty then
+              Q.ExecSQL;
+          end;
         end;
 
         Conn.Commit;
