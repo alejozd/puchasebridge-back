@@ -151,6 +151,23 @@
 							]
 						}
 					}
+				},
+				{
+					"name": "Productos del Documento (Vista Completa)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:9000/xml/productos/documento?fileName=factura1.xml",
+							"protocol": "http",
+							"host": ["localhost"],
+							"port": "9000",
+							"path": ["xml", "productos", "documento"],
+							"query": [
+								{ "key": "fileName", "value": "factura1.xml" }
+							]
+						}
+					}
 				}
 			]
 		},
