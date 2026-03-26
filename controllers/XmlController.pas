@@ -46,6 +46,7 @@ var
   I: Integer;
   LFound: Boolean;
   LFileStream: TFileStream;
+  Q: TFDQuery;
 begin
   Res.ContentType('application/json; charset=utf-8');
   LFound := False;
@@ -93,6 +94,34 @@ begin
       LFileStream.CopyFrom(LFile.Stream, LFile.Stream.Size);
     finally
       LFileStream.Free;
+    end;
+
+    // Se registra/actualiza el archivo en staging y se deja explícitamente en estado CARGADO.
+    Q := GetBridgeQuery;
+    try
+      Q.SQL.Text := 'SELECT ID FROM XML_FILES WHERE FILE_NAME = :FNAME';
+      Q.ParamByName('FNAME').AsString := LFileName;
+      Q.Open;
+      if Q.IsEmpty then
+      begin
+        Q.Close;
+        Q.SQL.Text :=
+          'INSERT INTO XML_FILES (FILE_NAME, ESTADO, MENSAJE_ERROR, FECHA_CARGA) ' +
+          'VALUES (:FNAME, ''CARGADO'', NULL, CURRENT_TIMESTAMP)';
+        Q.ParamByName('FNAME').AsString := LFileName;
+        Q.ExecSQL;
+      end
+      else
+      begin
+        Q.Close;
+        Q.SQL.Text :=
+          'UPDATE XML_FILES SET ESTADO = ''CARGADO'', MENSAJE_ERROR = NULL, FECHA_CARGA = CURRENT_TIMESTAMP ' +
+          'WHERE FILE_NAME = :FNAME';
+        Q.ParamByName('FNAME').AsString := LFileName;
+        Q.ExecSQL;
+      end;
+    finally
+      Q.Free;
     end;
 
     LResponse := TJSONObject.Create;
@@ -352,24 +381,26 @@ begin
         LId := StrToIntDef(LIdsArr.Items[I].Value, 0);
         if LId = 0 then Continue;
 
-        // 1. Check if all products have equivalencies
-        Q.SQL.Text := 'SELECT COUNT(*) as TOTAL FROM XML_PRODUCTOS WHERE XML_FILE_ID = :FILEID AND EQUIVALENCIA_ID IS NULL';
-        Q.ParamByName('FILEID').AsInteger := LId;
-        Q.Open;
-        LHasPendientes := Q.FieldByName('TOTAL').AsInteger > 0;
-        Q.Close;
+        try
+          // 1. Check if all products have equivalencies
+          Q.SQL.Text := 'SELECT COUNT(*) as TOTAL FROM XML_PRODUCTOS WHERE XML_FILE_ID = :FILEID AND EQUIVALENCIA_ID IS NULL';
+          Q.ParamByName('FILEID').AsInteger := LId;
+          Q.Open;
+          LHasPendientes := Q.FieldByName('TOTAL').AsInteger > 0;
+          Q.Close;
 
-        if LHasPendientes then
-        begin
-          LErrorObj := TJSONObject.Create;
-          LErrorObj.AddPair('id', TJSONNumber.Create(LId));
-          LErrorObj.AddPair('error', 'Tiene productos sin equivalencia');
-          LErroresArr.AddElement(LErrorObj);
-        end
-        else
-        begin
+          if LHasPendientes then
+          begin
+            // Se guarda ERROR antes de la excepción para asegurar trazabilidad del batch.
+            Q.SQL.Text := 'UPDATE XML_FILES SET ESTADO = ''ERROR'', MENSAJE_ERROR = :MSG WHERE ID = :ID';
+            Q.ParamByName('MSG').AsString := 'Tiene productos sin equivalencia';
+            Q.ParamByName('ID').AsInteger := LId;
+            Q.ExecSQL;
+            raise Exception.Create('Tiene productos sin equivalencia');
+          end;
+
           // 2. Simulate processing (setting state to PROCESADO)
-          Q.SQL.Text := 'UPDATE XML_FILES SET ESTADO = ''PROCESADO'', FECHA_PROCESO = CURRENT_TIMESTAMP WHERE ID = :ID';
+          Q.SQL.Text := 'UPDATE XML_FILES SET ESTADO = ''PROCESADO'', MENSAJE_ERROR = NULL, FECHA_PROCESO = CURRENT_TIMESTAMP WHERE ID = :ID';
           Q.ParamByName('ID').AsInteger := LId;
           Q.ExecSQL;
 
@@ -377,6 +408,14 @@ begin
           LProcesadoObj.AddPair('id', TJSONNumber.Create(LId));
           LProcesadoObj.AddPair('status', 'OK');
           LProcesadosArr.AddElement(LProcesadoObj);
+        except
+          on E: Exception do
+          begin
+            LErrorObj := TJSONObject.Create;
+            LErrorObj.AddPair('id', TJSONNumber.Create(LId));
+            LErrorObj.AddPair('error', E.Message);
+            LErroresArr.AddElement(LErrorObj);
+          end;
         end;
       end;
 
@@ -682,7 +721,7 @@ begin
           try
             Q.Connection := LConn;
             Q.SQL.Text :=
-              'UPDATE XML_PRODUCTOS SET EQUIVALENCIA_ID = :EID ' +
+              'UPDATE XML_PRODUCTOS SET EQUIVALENCIA_ID = :EID, ESTADO_VALIDACION = ''HOMOLOGADO'', MENSAJE_VALIDACION = NULL ' +
               'WHERE REFERENCIA = :REF AND UNIDAD = :UNI AND EQUIVALENCIA_ID IS NULL';
             Q.ParamByName('EID').AsInteger := LEquivalenciaID;
             Q.ParamByName('REF').AsString := LReferenciaXML;
