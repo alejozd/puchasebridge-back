@@ -135,7 +135,7 @@ begin
 
     try
       EquivalenciaService.CrearEquivalencia(
-        LCodigoH, LSubCodigoH, LNombreH, LReferenciaH, LUnidadH, LUnidadP, LReferenciaP, LFactor
+        LCodigoH, LSubCodigoH, LNombreH, LReferenciaP, LUnidadP, LUnidadH, LReferenciaH, LFactor
       );
 
       LResponse := TJSONObject.Create;

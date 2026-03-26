@@ -598,7 +598,7 @@ var
   LCodigoH, LSubCodigoH: Integer;
   LFactor: Double;
   LEquivalenciaID: Integer;
-  LConn: TFDConnection;
+  LConn, LHelisaConn: TFDConnection;
   Q: TFDQuery;
 begin
   Res.ContentType('application/json; charset=utf-8');
@@ -658,9 +658,14 @@ begin
         LConn.StartTransaction;
         try
           // Convert Unit Code to Sigla before saving
-          LUnidadErpSigla := HelisaService.ObtenerSiglaUnidad(LConn, LUnidadErp);
-          if not LUnidadErpSigla.IsEmpty then
-            LUnidadErp := LUnidadErpSigla;
+          LHelisaConn := GetHelisaConnection;
+          try
+            LUnidadErpSigla := HelisaService.ObtenerSiglaUnidad(LHelisaConn, LUnidadErp);
+            if not LUnidadErpSigla.IsEmpty then
+              LUnidadErp := LUnidadErpSigla;
+          finally
+            LHelisaConn.Free;
+          end;
 
           // 1. Get or Create Equivalencia
           LEquivalenciaID := EquivalenciaService.GetIDEquivalencia(LConn, LReferenciaXML, LUnidadXML);
@@ -668,7 +673,7 @@ begin
           if LEquivalenciaID = 0 then
           begin
             LEquivalenciaID := EquivalenciaService.CrearEquivalencia(
-              LConn, LCodigoH, LSubCodigoH, LNombreH, LReferenciaXML, LUnidadXML, LUnidadErp, LReferenciaErp, LFactor
+              LConn, LCodigoH, LSubCodigoH, LNombreH, LReferenciaErp, LUnidadErp, LUnidadXML, LReferenciaXML, LFactor
             );
           end;
 
