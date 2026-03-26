@@ -1,4 +1,4 @@
-unit XmlController;
+﻿unit XmlController;
 
 interface
 
@@ -22,6 +22,7 @@ uses
   FireDAC.Comp.Client,
   FirebirdConnection,
   EquivalenciaService,
+  HelisaService,
   DianUnits;
 
 type
@@ -593,11 +594,11 @@ end;
 procedure Homologar(Req: THorseRequest; Res: THorseResponse; Next: TProc);
 var
   LBody, LResponse: TJSONObject;
-  LReferenciaXML, LUnidadXML, LReferenciaErp, LUnidadErp, LNombreH: string;
+  LReferenciaXML, LUnidadXML, LReferenciaErp, LUnidadErp, LNombreH, LUnidadErpSigla: string;
   LCodigoH, LSubCodigoH: Integer;
   LFactor: Double;
   LEquivalenciaID: Integer;
-  LConn: TFDConnection;
+  LConn, LHelisaConn: TFDConnection;
   Q: TFDQuery;
 begin
   Res.ContentType('application/json; charset=utf-8');
@@ -656,6 +657,16 @@ begin
 
         LConn.StartTransaction;
         try
+          // Convert Unit Code to Sigla before saving
+          LHelisaConn := GetHelisaConnection;
+          try
+            LUnidadErpSigla := HelisaService.ObtenerSiglaUnidad(LHelisaConn, LUnidadErp);
+            if not LUnidadErpSigla.IsEmpty then
+              LUnidadErp := LUnidadErpSigla;
+          finally
+            LHelisaConn.Free;
+          end;
+
           // 1. Get or Create Equivalencia
           LEquivalenciaID := EquivalenciaService.GetIDEquivalencia(LConn, LReferenciaXML, LUnidadXML);
 
@@ -750,7 +761,7 @@ begin
       // 2. Get All Products with LEFT JOIN to EQUIVALENCIA
       Q.SQL.Text :=
         'SELECT P.REFERENCIA AS REFERENCIAXML, P.DESCRIPCION AS NOMBREPRODUCTO, P.UNIDAD AS UNIDADXML, ' +
-        '       E.REFERENCIAP AS REFERENCIAERP, E.NOMBREH AS NOMBREERP, E.UNIDADP AS UNIDADERP, E.FACTOR, ' +
+        '       E.REFERENCIAP AS REFERENCIAERP, E.NOMBREH AS NOMBREERP, E.UNIDADH AS UNIDADERP, E.FACTOR, ' +
         '       P.EQUIVALENCIA_ID ' +
         'FROM XML_PRODUCTOS P ' +
         'LEFT JOIN EQUIVALENCIA E ON P.EQUIVALENCIA_ID = E.ID ' +

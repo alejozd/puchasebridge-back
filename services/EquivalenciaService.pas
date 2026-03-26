@@ -19,10 +19,10 @@ function CrearEquivalencia(
   ACodigoH: Integer;
   ASubCodigoH: Integer;
   ANombreH: string;
-  AReferenciaH: string;
-  AUnidadH: string;
-  AUnidadP: string;
   AReferenciaP: string;
+  AUnidadP: string;
+  AUnidadH: string;
+  AReferenciaH: string;
   AFactor: Double
 ): Integer; overload;
 
@@ -31,10 +31,10 @@ function CrearEquivalencia(
   ACodigoH: Integer;
   ASubCodigoH: Integer;
   ANombreH: string;
-  AReferenciaH: string;
-  AUnidadH: string;
-  AUnidadP: string;
   AReferenciaP: string;
+  AUnidadP: string;
+  AUnidadH: string;
+  AReferenciaH: string;
   AFactor: Double
 ): Integer; overload;
 
@@ -110,14 +110,14 @@ function CrearEquivalencia(
   ACodigoH: Integer;
   ASubCodigoH: Integer;
   ANombreH: string;
-  AReferenciaH: string;
-  AUnidadH: string;
-  AUnidadP: string;
   AReferenciaP: string;
+  AUnidadP: string;
+  AUnidadH: string;
+  AReferenciaH: string;
   AFactor: Double
 ): Integer;
 begin
-  Result := CrearEquivalencia(nil, ACodigoH, ASubCodigoH, ANombreH, AReferenciaH, AUnidadH, AUnidadP, AReferenciaP, AFactor);
+  Result := CrearEquivalencia(nil, ACodigoH, ASubCodigoH, ANombreH, AReferenciaP, AUnidadP, AUnidadH, AReferenciaH, AFactor);
 end;
 
 function CrearEquivalencia(
@@ -125,10 +125,10 @@ function CrearEquivalencia(
   ACodigoH: Integer;
   ASubCodigoH: Integer;
   ANombreH: string;
-  AReferenciaH: string;
-  AUnidadH: string;
-  AUnidadP: string;
   AReferenciaP: string;
+  AUnidadP: string;
+  AUnidadH: string;
+  AReferenciaH: string;
   AFactor: Double
 ): Integer;
 var
