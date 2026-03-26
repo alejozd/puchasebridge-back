@@ -1,4 +1,4 @@
-unit XmlController;
+﻿unit XmlController;
 
 interface
 
@@ -673,7 +673,7 @@ begin
           if LEquivalenciaID = 0 then
           begin
             LEquivalenciaID := EquivalenciaService.CrearEquivalencia(
-              LConn, LCodigoH, LSubCodigoH, LNombreH, LReferenciaErp, LUnidadErp, LUnidadXML, LReferenciaXML, LFactor
+              LConn, LCodigoH, LSubCodigoH, LNombreH, LReferenciaXML, LUnidadXML, LUnidadErp, LReferenciaErp, LFactor
             );
           end;
 
@@ -761,7 +761,7 @@ begin
       // 2. Get All Products with LEFT JOIN to EQUIVALENCIA
       Q.SQL.Text :=
         'SELECT P.REFERENCIA AS REFERENCIAXML, P.DESCRIPCION AS NOMBREPRODUCTO, P.UNIDAD AS UNIDADXML, ' +
-        '       E.REFERENCIAP AS REFERENCIAERP, E.NOMBREH AS NOMBREERP, E.UNIDADP AS UNIDADERP, E.FACTOR, ' +
+        '       E.REFERENCIAP AS REFERENCIAERP, E.NOMBREH AS NOMBREERP, E.UNIDADH AS UNIDADERP, E.FACTOR, ' +
         '       P.EQUIVALENCIA_ID ' +
         'FROM XML_PRODUCTOS P ' +
         'LEFT JOIN EQUIVALENCIA E ON P.EQUIVALENCIA_ID = E.ID ' +
