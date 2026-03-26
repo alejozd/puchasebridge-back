@@ -637,6 +637,7 @@ var
   LCodigoH, LSubCodigoH: Integer;
   LFactor: Double;
   LEquivalenciaID: Integer;
+  LXMLFileID, LPendientes: Integer;
   LConn, LHelisaConn: TFDConnection;
   Q: TFDQuery;
 begin
@@ -727,6 +728,41 @@ begin
             Q.ParamByName('REF').AsString := LReferenciaXML;
             Q.ParamByName('UNI').AsString := LUnidadXML;
             Q.ExecSQL;
+
+            // 3. Recalcular estado del XML después de homologar para mantener flujo PENDIENTE/LISTO.
+            Q.SQL.Text :=
+              'SELECT FIRST 1 XML_FILE_ID AS XML_FILE_ID ' +
+              'FROM XML_PRODUCTOS ' +
+              'WHERE REFERENCIA = :REF AND UNIDAD = :UNI';
+            Q.ParamByName('REF').AsString := LReferenciaXML;
+            Q.ParamByName('UNI').AsString := LUnidadXML;
+            Q.Open;
+            if not Q.IsEmpty then
+            begin
+              LXMLFileID := Q.FieldByName('XML_FILE_ID').AsInteger;
+              Q.Close;
+
+              // Se cuenta cuántos productos del XML siguen sin equivalencia.
+              Q.SQL.Text :=
+                'SELECT COUNT(*) AS TOTAL ' +
+                'FROM XML_PRODUCTOS ' +
+                'WHERE XML_FILE_ID = :XML_FILE_ID ' +
+                'AND EQUIVALENCIA_ID IS NULL';
+              Q.ParamByName('XML_FILE_ID').AsInteger := LXMLFileID;
+              Q.Open;
+              LPendientes := Q.FieldByName('TOTAL').AsInteger;
+              Q.Close;
+
+              // Si no hay pendientes queda LISTO; si hay pendientes se mantiene PENDIENTE.
+              if LPendientes = 0 then
+                Q.SQL.Text := 'UPDATE XML_FILES SET ESTADO = ''LISTO'' WHERE ID = :XML_FILE_ID'
+              else
+                Q.SQL.Text := 'UPDATE XML_FILES SET ESTADO = ''PENDIENTE'' WHERE ID = :XML_FILE_ID';
+              Q.ParamByName('XML_FILE_ID').AsInteger := LXMLFileID;
+              Q.ExecSQL;
+            end
+            else
+              Q.Close;
           finally
             Q.Free;
           end;
