@@ -22,6 +22,7 @@ uses
   FireDAC.Comp.Client,
   FirebirdConnection,
   EquivalenciaService,
+  HelisaService,
   DianUnits;
 
 type
@@ -593,7 +594,7 @@ end;
 procedure Homologar(Req: THorseRequest; Res: THorseResponse; Next: TProc);
 var
   LBody, LResponse: TJSONObject;
-  LReferenciaXML, LUnidadXML, LReferenciaErp, LUnidadErp, LNombreH: string;
+  LReferenciaXML, LUnidadXML, LReferenciaErp, LUnidadErp, LNombreH, LUnidadErpSigla: string;
   LCodigoH, LSubCodigoH: Integer;
   LFactor: Double;
   LEquivalenciaID: Integer;
@@ -656,6 +657,11 @@ begin
 
         LConn.StartTransaction;
         try
+          // Convert Unit Code to Sigla before saving
+          LUnidadErpSigla := HelisaService.ObtenerSiglaUnidad(LConn, LUnidadErp);
+          if not LUnidadErpSigla.IsEmpty then
+            LUnidadErp := LUnidadErpSigla;
+
           // 1. Get or Create Equivalencia
           LEquivalenciaID := EquivalenciaService.GetIDEquivalencia(LConn, LReferenciaXML, LUnidadXML);
 

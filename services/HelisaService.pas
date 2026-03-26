@@ -39,6 +39,7 @@ type
   end;
 
 function InsertarOrdenCompra(AHeader: THEHeaderOC; ADetalles: TArray<THEDetalleOC>): string;
+function ObtenerSiglaUnidad(AConn: TFDConnection; ACodigo: string): string;
 
 implementation
 
@@ -230,6 +231,27 @@ begin
     end;
   finally
     Conn.Free;
+  end;
+end;
+
+function ObtenerSiglaUnidad(AConn: TFDConnection; ACodigo: string): string;
+var
+  Qry: TFDQuery;
+begin
+  Result := '';
+  if not Assigned(AConn) then Exit;
+
+  Qry := TFDQuery.Create(nil);
+  try
+    Qry.Connection := AConn;
+    Qry.SQL.Text := 'SELECT SIGLA FROM INTUXXXX WHERE CODIGO = :CODIGO';
+    Qry.ParamByName('CODIGO').AsString := ACodigo;
+    Qry.Open;
+
+    if not Qry.IsEmpty then
+      Result := Qry.FieldByName('SIGLA').AsString;
+  finally
+    Qry.Free;
   end;
 end;
 
