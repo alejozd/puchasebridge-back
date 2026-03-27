@@ -38,6 +38,22 @@ type
     LastModified: TDateTime;
   end;
 
+function ResolveUnidadSigla(const AUnidadCodigo: string): string;
+var
+  LCode: string;
+begin
+  LCode := UpperCase(AUnidadCodigo.Trim);
+  // Diccionario mínimo para UI: se retorna sigla empresarial; fallback al código original.
+  if (LCode = '94') or (LCode = 'NIU') then
+    Result := 'UND'
+  else if LCode = 'KGM' then
+    Result := 'KG'
+  else if LCode = 'LTR' then
+    Result := 'LT'
+  else
+    Result := AUnidadCodigo;
+end;
+
 procedure Upload(Req: THorseRequest; Res: THorseResponse; Next: TProc);
 var
   LFile: TAbstractWebRequestFile;
@@ -266,6 +282,7 @@ var
   LFileID: Integer;
   LResponse, LProductObj: TJSONObject;
   LProductsArr: TJSONArray;
+  LUnidadCodigo: string;
 begin
   Res.ContentType('application/json; charset=utf-8');
   try
@@ -315,20 +332,30 @@ begin
       while not Q.Eof do
       begin
         LProductObj := TJSONObject.Create;
+        LUnidadCodigo := Q.FieldByName('UNIDAD').AsString;
         LProductObj.AddPair('id', TJSONNumber.Create(Q.FieldByName('ID').AsInteger));
         LProductObj.AddPair('descripcion', Q.FieldByName('DESCRIPCION').AsString);
         LProductObj.AddPair('referencia', Q.FieldByName('REFERENCIA').AsString);
         LProductObj.AddPair('referenciaStd', Q.FieldByName('REFERENCIA_STD').AsString);
         LProductObj.AddPair('cantidad', TJSONNumber.Create(Q.FieldByName('CANTIDAD').AsFloat));
-        LProductObj.AddPair('unidad', Q.FieldByName('UNIDAD').AsString);
+        // Se envía unidad en sigla para consumo UI y descripción opcional para detalle.
+        LProductObj.AddPair('unidad', ResolveUnidadSigla(LUnidadCodigo));
+        LProductObj.AddPair('unidadDescripcion', TDianUnits.GetUnitName(LUnidadCodigo));
         LProductObj.AddPair('valorUnitario', TJSONNumber.Create(Q.FieldByName('VALOR_UNITARIO').AsFloat));
         LProductObj.AddPair('valorTotal', TJSONNumber.Create(Q.FieldByName('VALOR_TOTAL').AsFloat));
         LProductObj.AddPair('impuesto', TJSONNumber.Create(Q.FieldByName('IMPUESTO').AsFloat));
 
         if not Q.FieldByName('EQUIVALENCIA_ID').IsNull then
-          LProductObj.AddPair('equivalenciaId', TJSONNumber.Create(Q.FieldByName('EQUIVALENCIA_ID').AsInteger))
+        begin
+          LProductObj.AddPair('equivalenciaId', TJSONNumber.Create(Q.FieldByName('EQUIVALENCIA_ID').AsInteger));
+          // Estado del producto listo para frontend empresarial.
+          LProductObj.AddPair('estadoProducto', 'HOMOLOGADO');
+        end
         else
+        begin
           LProductObj.AddPair('equivalenciaId', TJSONNull.Create);
+          LProductObj.AddPair('estadoProducto', 'PENDIENTE');
+        end;
 
         LProductsArr.AddElement(LProductObj);
         Q.Next;
