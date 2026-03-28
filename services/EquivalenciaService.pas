@@ -11,6 +11,7 @@ uses
 
 function BuscarEquivalencia(AReferenciaH: string; AUnidadH: string): TFDQuery; overload;
 function BuscarEquivalencia(AConnection: TFDConnection; AReferenciaH: string; AUnidadH: string): TFDQuery; overload;
+function BuscarEquivalenciaXML(AReferenciaXML: string; AUnidadXML: string): TFDQuery;
 function ExisteEquivalencia(AReferenciaH: string; AUnidadH: string): Boolean;
 function GetIDEquivalencia(AReferenciaH, AUnidadH: string): Integer; overload;
 function GetIDEquivalencia(AConnection: TFDConnection; AReferenciaH, AUnidadH: string): Integer; overload;
@@ -68,6 +69,25 @@ begin
     Result.SQL.Text := 'SELECT * FROM EQUIVALENCIA WHERE REFERENCIAH = :REF AND UNIDADH = :UNI';
     Result.ParamByName('REF').AsString := AReferenciaH;
     Result.ParamByName('UNI').AsString := AUnidadH;
+    Result.Open;
+  except
+    Result.Free;
+    raise;
+  end;
+end;
+
+function BuscarEquivalenciaXML(AReferenciaXML: string; AUnidadXML: string): TFDQuery;
+begin
+  if AReferenciaXML.Trim.IsEmpty or AUnidadXML.Trim.IsEmpty then
+    raise Exception.Create('Referencia XML y Unidad XML son obligatorias para buscar equivalencia');
+
+  Result := GetBridgeQuery;
+  try
+    Result.SQL.Text :=
+      'SELECT * FROM EQUIVALENCIA ' +
+      'WHERE REFERENCIA_XML = :REF AND UNIDAD_XML = :UNI';
+    Result.ParamByName('REF').AsString := AReferenciaXML;
+    Result.ParamByName('UNI').AsString := AUnidadXML;
     Result.Open;
   except
     Result.Free;

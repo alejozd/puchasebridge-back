@@ -140,7 +140,7 @@ begin
               LParsedObj.Free;
             end;
 
-            LValidationResult := ValidarDocumento(LParsedJSONStr);
+            LValidationResult := ValidarDocumentoDesdeXML(LParsedJSONStr);
             LValidationObj := TJSONObject.ParseJSONValue(LValidationResult) as TJSONObject;
             if not Assigned(LValidationObj) then
                raise Exception.Create('Error parseando resultado de validación');
