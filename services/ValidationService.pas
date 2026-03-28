@@ -13,6 +13,19 @@ function ValidarDocumento(AJsonParse: string): string;
 
 implementation
 
+function GetJSONValue(AObj: TJSONObject; AKey: string): string;
+var
+  V: TJSONValue;
+begin
+  Result := '';
+  if not Assigned(AObj) then
+    Exit;
+
+  V := AObj.GetValue(AKey);
+  if Assigned(V) and not (V is TJSONNull) then
+    Result := V.Value;
+end;
+
 function ValidarDocumento(AJsonParse: string): string;
 var
   LInputJSON, LOutputJSON: TJSONObject;
@@ -58,7 +71,7 @@ begin
       LProveedorJSON := LInputJSON.GetValue('proveedor') as TJSONObject;
       if Assigned(LProveedorJSON) then
       begin
-        LNIT := LProveedorJSON.GetValue('nit').Value;
+        LNIT := GetJSONValue(LProveedorJSON, 'nit');
         LProveedorInfo := ObtenerProveedorPorNit(LNIT, '');
         LProveedorExiste := LProveedorInfo.Existe;
       end;
@@ -78,18 +91,33 @@ begin
         for I := 0 to LProductosArray.Count - 1 do
         begin
           LItemJSON := LProductosArray.Items[I] as TJSONObject;
-          LReferencia := LItemJSON.GetValue('referencia').Value;
-          LUnidad := LItemJSON.GetValue('unidadXML').Value;
+          LReferencia := GetJSONValue(LItemJSON, 'referencia');
+          LUnidad := GetJSONValue(LItemJSON, 'unidadXML');
+          if LUnidad = '' then
+            LUnidad := GetJSONValue(LItemJSON, 'unidad');
+
+          if LReferencia.Trim.IsEmpty then
+          begin
+            LTodosProductosExisten := False;
+            LAlgunProductoNoExiste := True;
+            LErroresArray.Add('Producto sin referencia');
+            Continue;
+          end;
+
+          if LUnidad.Trim.IsEmpty then
+          begin
+            LTodosProductosExisten := False;
+            LAlgunProductoNoExiste := True;
+            LErroresArray.Add(Format('Producto %s sin unidad', [LReferencia]));
+            Continue;
+          end;
 
           LValido := False;
-          if not (LReferencia.Trim.IsEmpty or LUnidad.Trim.IsEmpty) then
-          begin
-            LEquivalencia := BuscarEquivalencia(LReferencia, LUnidad);
-            try
-              LValido := not LEquivalencia.IsEmpty;
-            finally
-              LEquivalencia.Free;
-            end;
+          LEquivalencia := BuscarEquivalencia(LReferencia, LUnidad);
+          try
+            LValido := not LEquivalencia.IsEmpty;
+          finally
+            LEquivalencia.Free;
           end;
 
           if not LValido then
