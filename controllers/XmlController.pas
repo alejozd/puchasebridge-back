@@ -392,9 +392,11 @@ var
   LIdsArr: TJSONArray;
   LId: Integer;
   I: Integer;
-  LResponse, LProcesadoObj, LErrorObj: TJSONObject;
-  LProcesadosArr, LErroresArr: TJSONArray;
+  LResponse: TJSONObject;
+  LProcesadosArr, LRechazadosArr: TJSONArray;
   LHasPendientes: Boolean;
+  LProcesadosCount, LRechazadosCount: Integer;
+  LRechazadosLabel: string;
 begin
   Res.ContentType('application/json; charset=utf-8');
   LBody := Req.Body<TJSONObject>;
@@ -405,8 +407,10 @@ begin
   end;
 
   LProcesadosArr := TJSONArray.Create;
-  LErroresArr := TJSONArray.Create;
+  LRechazadosArr := TJSONArray.Create;
   LResponse := TJSONObject.Create;
+  LProcesadosCount := 0;
+  LRechazadosCount := 0;
 
   try
     Q := GetBridgeQuery;
@@ -417,8 +421,12 @@ begin
         if LId = 0 then Continue;
 
         try
-          // 1. Check if all products have equivalencies
-          Q.SQL.Text := 'SELECT COUNT(*) as TOTAL FROM XML_PRODUCTOS WHERE XML_FILE_ID = :FILEID AND EQUIVALENCIA_ID IS NULL';
+          // 1. Regla de negocio: no procesar si hay al menos un producto pendiente de homologación.
+          Q.SQL.Text :=
+            'SELECT COUNT(*) as TOTAL ' +
+            'FROM XML_PRODUCTOS ' +
+            'WHERE XML_FILE_ID = :FILEID ' +
+            'AND COALESCE(ESTADO_VALIDACION, ''PENDIENTE'') <> ''HOMOLOGADO''';
           Q.ParamByName('FILEID').AsInteger := LId;
           Q.Open;
           LHasPendientes := Q.FieldByName('TOTAL').AsInteger > 0;
@@ -426,36 +434,46 @@ begin
 
           if LHasPendientes then
           begin
-            // Se guarda ERROR antes de la excepción para asegurar trazabilidad del batch.
-            Q.SQL.Text := 'UPDATE XML_FILES SET ESTADO = ''ERROR'', MENSAJE_ERROR = :MSG WHERE ID = :ID';
-            Q.ParamByName('MSG').AsString := 'Tiene productos sin equivalencia';
+            Q.SQL.Text := 'UPDATE XML_FILES SET ESTADO = ''PENDIENTE'', MENSAJE_ERROR = :MSG WHERE ID = :ID';
+            Q.ParamByName('MSG').AsString := 'El documento contiene productos sin homologar y no puede ser procesado';
             Q.ParamByName('ID').AsInteger := LId;
             Q.ExecSQL;
-            raise Exception.Create('Tiene productos sin equivalencia');
+            LRechazadosArr.Add(TJSONNumber.Create(LId));
+            Inc(LRechazadosCount);
+            Writeln(Format('Documento %d no procesado: productos pendientes de homologación', [LId]));
+            Continue;
           end;
 
-          // 2. Simulate processing (setting state to PROCESADO)
+          // 2. Procesar documento (marcando estado PROCESADO)
           Q.SQL.Text := 'UPDATE XML_FILES SET ESTADO = ''PROCESADO'', MENSAJE_ERROR = NULL, FECHA_PROCESO = CURRENT_TIMESTAMP WHERE ID = :ID';
           Q.ParamByName('ID').AsInteger := LId;
           Q.ExecSQL;
 
-          LProcesadoObj := TJSONObject.Create;
-          LProcesadoObj.AddPair('id', TJSONNumber.Create(LId));
-          LProcesadoObj.AddPair('status', 'OK');
-          LProcesadosArr.AddElement(LProcesadoObj);
+          LProcesadosArr.Add(TJSONNumber.Create(LId));
+          Inc(LProcesadosCount);
         except
           on E: Exception do
           begin
-            LErrorObj := TJSONObject.Create;
-            LErrorObj.AddPair('id', TJSONNumber.Create(LId));
-            LErrorObj.AddPair('error', E.Message);
-            LErroresArr.AddElement(LErrorObj);
+            LRechazadosArr.Add(TJSONNumber.Create(LId));
+            Inc(LRechazadosCount);
+            Writeln(Format('Documento %d no procesado: %s', [LId, E.Message]));
           end;
         end;
       end;
 
+      if LRechazadosCount = 1 then
+        LRechazadosLabel := 'rechazado'
+      else
+        LRechazadosLabel := 'rechazados';
+
+      LResponse.AddPair('success', TJSONBool.Create(True));
       LResponse.AddPair('procesados', LProcesadosArr);
-      LResponse.AddPair('errores', LErroresArr);
+      LResponse.AddPair('rechazados', LRechazadosArr);
+      LResponse.AddPair(
+        'mensaje',
+        Format('%d documentos procesados, %d %s por productos pendientes',
+          [LProcesadosCount, LRechazadosCount, LRechazadosLabel])
+      );
       Res.Send(LResponse);
     finally
       Q.Free;
