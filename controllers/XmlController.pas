@@ -322,6 +322,14 @@ begin
       LResponse.AddPair('fechaDocumento', FormatDateTime('yyyy-mm-dd', Q.FieldByName('FECHA_DOCUMENTO').AsDateTime));
       LResponse.AddPair('estado', Q.FieldByName('ESTADO').AsString);
       LResponse.AddPair('fechaCarga', FormatDateTime('yyyy-mm-dd HH:nn:ss', Q.FieldByName('FECHA_CARGA').AsDateTime));
+      if not Q.FieldByName('FECHA_VALIDACION').IsNull then
+        LResponse.AddPair('fechaValidacion', FormatDateTime('yyyy-mm-dd HH:nn:ss', Q.FieldByName('FECHA_VALIDACION').AsDateTime))
+      else
+        LResponse.AddPair('fechaValidacion', TJSONNull.Create);
+      if not Q.FieldByName('FECHA_PROCESO').IsNull then
+        LResponse.AddPair('fechaProceso', FormatDateTime('yyyy-mm-dd HH:nn:ss', Q.FieldByName('FECHA_PROCESO').AsDateTime))
+      else
+        LResponse.AddPair('fechaProceso', TJSONNull.Create);
 
       Q.Close;
       Q.SQL.Text := 'SELECT * FROM XML_PRODUCTOS WHERE XML_FILE_ID = :FILEID';
