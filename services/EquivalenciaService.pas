@@ -85,7 +85,8 @@ begin
   try
     Result.SQL.Text :=
       'SELECT * FROM EQUIVALENCIA ' +
-      'WHERE REFERENCIA_XML = :REF AND UNIDAD_XML = :UNI';
+      'WHERE TRIM(REFERENCIAP) = TRIM(:REF) ' +
+      'AND TRIM(UNIDADP) = TRIM(:UNI)';
     Result.ParamByName('REF').AsString := AReferenciaXML;
     Result.ParamByName('UNI').AsString := AUnidadXML;
     Result.Open;
