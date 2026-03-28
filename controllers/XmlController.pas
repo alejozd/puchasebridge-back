@@ -438,7 +438,7 @@ begin
             Q.ParamByName('MSG').AsString := 'El documento contiene productos sin homologar y no puede ser procesado';
             Q.ParamByName('ID').AsInteger := LId;
             Q.ExecSQL;
-            LRechazadosArr.Add(TJSONNumber.Create(LId));
+            LRechazadosArr.AddElement(TJSONNumber.Create(LId));
             Inc(LRechazadosCount);
             Writeln(Format('Documento %d no procesado: productos pendientes de homologación', [LId]));
             Continue;
@@ -449,12 +449,12 @@ begin
           Q.ParamByName('ID').AsInteger := LId;
           Q.ExecSQL;
 
-          LProcesadosArr.Add(TJSONNumber.Create(LId));
+          LProcesadosArr.AddElement(TJSONNumber.Create(LId));
           Inc(LProcesadosCount);
         except
           on E: Exception do
           begin
-            LRechazadosArr.Add(TJSONNumber.Create(LId));
+            LRechazadosArr.AddElement(TJSONNumber.Create(LId));
             Inc(LRechazadosCount);
             Writeln(Format('Documento %d no procesado: %s', [LId, E.Message]));
           end;
