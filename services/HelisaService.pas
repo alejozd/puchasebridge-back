@@ -60,7 +60,10 @@ var
   LArtIca, LSerIca: Double;
   LTotalReteIca, LTotalReteIva, LTotalReteFuente: Double;
 begin
-  LAnioSuffix := AHeader.Anio;
+  LAnioSuffix := FormatDateTime('YYYY', AHeader.Fecha);
+  if LAnioSuffix.Trim.IsEmpty then
+    raise Exception.Create('No se pudo determinar el año del documento');
+
   LDocuTable := 'DOCU' + LAnioSuffix;
   LOcmaTable := 'OCMA' + LAnioSuffix;
   LOctrTable := 'OCTR' + LAnioSuffix;
