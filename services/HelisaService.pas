@@ -63,7 +63,7 @@ begin
   LOcmaTable := 'OCMAXXXX';
   LOctrTable := 'OCTRXXXX';
 
-  Conn := GetHelisaConnection;
+  Conn := GetHelisaParticularConnection;
   try
     Conn.StartTransaction;
     try

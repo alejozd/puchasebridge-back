@@ -10,6 +10,7 @@ function CrearConexionParticular(pCodEmpresa: string): TFDConnection;
 
 // Nuevas funciones para soporte multibase de datos
 function GetHelisaConnection: TFDConnection;
+function GetHelisaParticularConnection: TFDConnection;
 function GetBridgeConnection: TFDConnection;
 function GetHelisaQuery: TFDQuery;
 function GetBridgeQuery: TFDQuery;
@@ -119,6 +120,14 @@ end;
 function GetHelisaConnection: TFDConnection;
 begin
   Result := CrearConexionGlobal;
+end;
+
+function GetHelisaParticularConnection: TFDConnection;
+var
+  Config: THelisaConfig;
+begin
+  Config := THConfig.GetInstance.Config;
+  Result := CrearConexionParticular(Config.Empresa);
 end;
 
 function GetBridgeConnection: TFDConnection;
