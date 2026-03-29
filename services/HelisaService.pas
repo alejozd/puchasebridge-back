@@ -50,7 +50,6 @@ var
   LDocumento, LTipo: string;
   LConsecutivo: Integer;
   I: Integer;
-  LAnioSuffix: string;
   LDocuTable, LOcmaTable, LOctrTable: string;
   LArtBruto, LSerBruto: Double;
   LArtIvaExento, LSerIvaExento: Double;
@@ -60,13 +59,9 @@ var
   LArtIca, LSerIca: Double;
   LTotalReteIca, LTotalReteIva, LTotalReteFuente: Double;
 begin
-  LAnioSuffix := FormatDateTime('YYYY', AHeader.Fecha);
-  if LAnioSuffix.Trim.IsEmpty then
-    raise Exception.Create('No se pudo determinar el año del documento');
-
-  LDocuTable := 'DOCU' + LAnioSuffix;
-  LOcmaTable := 'OCMA' + LAnioSuffix;
-  LOctrTable := 'OCTR' + LAnioSuffix;
+  LDocuTable := 'DOCUXXXX';
+  LOcmaTable := 'OCMAXXXX';
+  LOctrTable := 'OCTRXXXX';
 
   Conn := GetHelisaConnection;
   try
