@@ -66,7 +66,7 @@ begin
     Result := GetBridgeQuery;
 
   try
-    Result.SQL.Text := 'SELECT * FROM EQUIVALENCIA WHERE REFERENCIAH = :REF AND UNIDADH = :UNI';
+    Result.SQL.Text := 'SELECT * FROM EQUIVALENCIA WHERE REFERENCIAP = :REF AND UNIDADP = :UNI';
     Result.ParamByName('REF').AsString := AReferenciaH;
     Result.ParamByName('UNI').AsString := AUnidadH;
     Result.Open;
