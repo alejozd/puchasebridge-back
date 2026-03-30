@@ -1,4 +1,4 @@
-unit HelisaService;
+﻿unit HelisaService;
 
 interface
 
@@ -92,7 +92,7 @@ begin
           '  TF_CARBONO, VR_CARBONO, TF_CANNABIS, VR_CANNABIS, TF_DESCUENTO, VR_DESCUENTO, ' +
           '  TF_ICA, VR_ICA, TF_RETEICA, VR_RETEICA, TF_RETEIVA, VR_RETEIVA, VR_RETE_CREE, ' +
           '  VR_AUTORETE_CREE, TF_RETEHORTIFRUT, VR_RETEHORTIFRUT, TF_RETEBOLSAAGRO, VR_RETEBOLSAAGRO, ' +
-          '  HACE_PARTE_COSTO, HACE_PARTE_COSTO_NIIF, DISPERSION, VR_RETEFUENTE' +
+          '  HACE_PARTE_COSTO, HACE_PARTE_COSTO_NIIF, DISPERSION' +
           ') VALUES (' +
           '  :DOC, :CONS, :CLASE, 1, :CONC, :SUB, ' +
           '  0, :CANT, 0, :VUNIT, :VTOTAL, 0, 0, ' +
@@ -100,7 +100,7 @@ begin
           '  0, 0, 0, 0, :TDESC, :VDESC, ' +
           '  0, :VICA, 0, :VRETEICA, 0, :VRETEIVA, 0, ' +
           '  0, 0, 0, 0, 0, ' +
-          '  ''N'', ''N'', ''N'', :VRETEF' +
+          '  ''N'', ''N'', ''N'' '+
           ')', [LOctrTable]);
 
         for I := 0 to Length(ADetalles) - 1 do
@@ -120,7 +120,6 @@ begin
           Q.ParamByName('VICA').AsFloat := ADetalles[I].VrIca;
           Q.ParamByName('VRETEICA').AsFloat := ADetalles[I].VrReteIca;
           Q.ParamByName('VRETEIVA').AsFloat := ADetalles[I].VrReteIva;
-          Q.ParamByName('VRETEF').AsFloat := ADetalles[I].VrReteFuente;
           Q.ExecSQL;
         end;
 
@@ -140,8 +139,7 @@ begin
           '  SUM(CASE WHEN CLASE = 1 THEN VR_ICA ELSE 0 END) AS ART_ICA, ' +
           '  SUM(CASE WHEN CLASE = 2 THEN VR_ICA ELSE 0 END) AS SER_ICA, ' +
           '  SUM(VR_RETEICA) AS TOTAL_RETEICA, ' +
-          '  SUM(VR_RETEIVA) AS TOTAL_RETEIVA, ' +
-          '  SUM(VR_RETEFUENTE) AS TOTAL_RETEFUENTE ' +
+          '  SUM(VR_RETEIVA) AS TOTAL_RETEIVA ' +
           'FROM %s WHERE DOCUMENTO = :DOC', [LOctrTable]);
         Q.ParamByName('DOC').AsString := LDocumento;
         Q.Open;
@@ -160,7 +158,6 @@ begin
         LSerIca := Q.FieldByName('SER_ICA').AsFloat;
         LTotalReteIca := Q.FieldByName('TOTAL_RETEICA').AsFloat;
         LTotalReteIva := Q.FieldByName('TOTAL_RETEIVA').AsFloat;
-        LTotalReteFuente := Q.FieldByName('TOTAL_RETEFUENTE').AsFloat;
         Q.Close;
 
         // 4. Insertar Encabezado (OCMAXXXX)
@@ -206,7 +203,7 @@ begin
         Q.ParamByName('SER_ICA').AsFloat := LSerIca;
         Q.ParamByName('RETEICA').AsFloat := LTotalReteIca;
         Q.ParamByName('RETEIVA').AsFloat := LTotalReteIva;
-        Q.ParamByName('RETEF').AsFloat := LTotalReteFuente;
+        Q.ParamByName('RETEF').AsFloat := 0; //LTotalReteFuente;
         Q.ParamByName('USER').AsString := AHeader.NombreUsuario;
         Q.ParamByName('USER_COD').AsString := AHeader.CodigoUsuario;
         Q.ExecSQL;
