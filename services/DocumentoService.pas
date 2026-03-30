@@ -68,6 +68,7 @@ var
   Conn: TFDConnection;
   Q: TFDQuery;
   LDocumentoID: Integer;
+  LXmlId: Integer;
   LDocumentoERP: string;
   LEstadoFinal: string;
   LDocumentoERPFinal: string;
@@ -76,6 +77,7 @@ var
   I: Integer;
 begin
   LDocumentoID := 0;
+  LXmlId := 0;
   // 1. Persistir en PurchaseBridge (Documento original y trazabilidad)
   Conn := GetBridgeConnection;
   try
@@ -97,6 +99,16 @@ begin
 
         Q.Open;
         LDocumentoID := Q.FieldByName('ID').AsInteger;
+        Q.Close;
+
+        // Vincular XML_FILES por nombre para sincronizar estado tras procesar en Helisa.
+        Q.SQL.Text := 'SELECT ID FROM XML_FILES WHERE FILE_NAME = :FNAME';
+        Q.ParamByName('FNAME').AsString := AHeader.XMLFileName;
+        Q.Open;
+        if not Q.IsEmpty then
+          LXmlId := Q.FieldByName('ID').AsInteger
+        else
+          LXmlId := 0;
         Q.Close;
 
         Q.SQL.Text :=
@@ -156,6 +168,19 @@ begin
         Q.ParamByName('ID').AsInteger := LDocumentoID;
         Q.ExecSQL;
 
+        // Sincronizar estado final también en XML_FILES.
+        if LXmlId > 0 then
+        begin
+          Q.SQL.Text :=
+            'UPDATE XML_FILES SET ' +
+            'ESTADO = :ESTADO, ' +
+            'FECHA_PROCESO = CURRENT_TIMESTAMP ' +
+            'WHERE ID = :ID';
+          Q.ParamByName('ESTADO').AsString := 'PROCESADO';
+          Q.ParamByName('ID').AsInteger := LXmlId;
+          Q.ExecSQL;
+        end;
+
         // Validación final antes de confirmar transacción.
         Q.SQL.Text := 'SELECT ESTADO, DOCUMENTO_ERP FROM DOCUMENTO WHERE ID = :ID';
         Q.ParamByName('ID').AsInteger := LDocumentoID;
@@ -182,17 +207,28 @@ begin
           Conn.Rollback;
 
         // Si ya existe registro DOCUMENTO, marcarlo en ERROR para trazabilidad.
-        if LDocumentoID > 0 then
+        if (LDocumentoID > 0) or (LXmlId > 0) then
         begin
           Conn.StartTransaction;
           try
             Q := TFDQuery.Create(nil);
             try
               Q.Connection := Conn;
-              Q.SQL.Text := 'UPDATE DOCUMENTO SET ESTADO = :ESTADO WHERE ID = :ID';
-              Q.ParamByName('ESTADO').AsString := 'ERROR';
-              Q.ParamByName('ID').AsInteger := LDocumentoID;
-              Q.ExecSQL;
+              if LDocumentoID > 0 then
+              begin
+                Q.SQL.Text := 'UPDATE DOCUMENTO SET ESTADO = :ESTADO WHERE ID = :ID';
+                Q.ParamByName('ESTADO').AsString := 'ERROR';
+                Q.ParamByName('ID').AsInteger := LDocumentoID;
+                Q.ExecSQL;
+              end;
+
+              if LXmlId > 0 then
+              begin
+                Q.SQL.Text := 'UPDATE XML_FILES SET ESTADO = :ESTADO WHERE ID = :ID';
+                Q.ParamByName('ESTADO').AsString := 'ERROR';
+                Q.ParamByName('ID').AsInteger := LXmlId;
+                Q.ExecSQL;
+              end;
             finally
               Q.Free;
             end;
