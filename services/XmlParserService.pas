@@ -73,6 +73,11 @@ implementation
 
 { TXmlParserService }
 
+procedure Log(const AMsg: string);
+begin
+  Writeln(AMsg);
+end;
+
 class function TXmlParserService.CreateXMLDoc(const AXML: string): IXMLDocument;
 var
   LXMLDoc: TXMLDocument;
@@ -308,7 +313,7 @@ end;
 
 class function TXmlParserService.ParseTotales(ARootNode: IXMLNode): TInvoiceTotals;
 var
-  LegalTotalNode, TaxTotalNode, WithholdingTaxTotalNode: IXMLNode;
+  LegalTotalNode, TaxTotalNode, WithholdingTaxTotalNode, WithholdingTaxAmountNode: IXMLNode;
 begin
   Result := Default(TInvoiceTotals);
   LegalTotalNode := FindNodeByLocalName(ARootNode, 'LegalMonetaryTotal');
@@ -323,14 +328,20 @@ begin
   if TaxTotalNode <> nil then
     Result.ImpuestoTotal := GetNodeDoubleByLocalName(TaxTotalNode, 'TaxAmount');
 
+  // Importante: tomar SOLO el TaxAmount directo de WithholdingTaxTotal (no TaxSubtotal).
   WithholdingTaxTotalNode := FindNodeByLocalName(ARootNode, 'WithholdingTaxTotal');
-  if WithholdingTaxTotalNode = nil then
-    WithholdingTaxTotalNode := FindNodeByLocalNameRecursive(ARootNode, 'WithholdingTaxTotal');
-
   if WithholdingTaxTotalNode <> nil then
-    Result.RetencionTotal := GetNodeDoubleByLocalName(WithholdingTaxTotalNode, 'TaxAmount')
+  begin
+    WithholdingTaxAmountNode := FindNodeByLocalName(WithholdingTaxTotalNode, 'TaxAmount');
+    if WithholdingTaxAmountNode <> nil then
+      Result.RetencionTotal := GetNodeDoubleByLocalName(WithholdingTaxTotalNode, 'TaxAmount')
+    else
+      Result.RetencionTotal := 0;
+  end
   else
     Result.RetencionTotal := 0;
+
+  Log('Retencion detectada: ' + FloatToStr(Result.RetencionTotal));
 
   Result.Total := Result.TaxInclusiveAmount - Result.RetencionTotal;
   if Result.Total < 0 then
