@@ -48,7 +48,7 @@ var
   Conn: TFDConnection;
   Q: TFDQuery;
   LDocumento, LTipo: string;
-  LConsecutivo: Integer;
+  LConsecutivo, LConsecutivoSiguiente: string;
   I: Integer;
   LDocuTable, LOcmaTable, LOctrTable: string;
   LArtBruto, LSerBruto: Double;
@@ -78,10 +78,11 @@ begin
           raise Exception.Create('No se encontró configuración de Orden de Compra en DOCUXXXX');
 
         LTipo := Q.FieldByName('TIPO').AsString;
-        LConsecutivo := Q.FieldByName('CONSECUTIVO').AsInteger;
+        LConsecutivo := Trim(Q.FieldByName('CONSECUTIVO').AsString);
+        LConsecutivoSiguiente := IncrementERPConsecutive(LConsecutivo);
         Q.Close;
 
-        LDocumento := FormatDocumentNumber(LTipo, LConsecutivo);
+        LDocumento := Format('%-4s%s', [LTipo, LConsecutivo]);
 
         // 2. Insertar Detalle (OCTRXXXX)
         Q.SQL.Text := Format(
@@ -209,7 +210,8 @@ begin
         Q.ExecSQL;
 
         // 5. Incrementar consecutivo en DOCUXXXX
-        Q.SQL.Text := Format('UPDATE %s SET CONSECUTIVO = CONSECUTIVO + 1 WHERE MODULO = 10 AND CLASE = 31', [LDocuTable]);
+        Q.SQL.Text := Format('UPDATE %s SET CONSECUTIVO = :CONSECUTIVO WHERE MODULO = 10 AND CLASE = 31', [LDocuTable]);
+        Q.ParamByName('CONSECUTIVO').AsString := LConsecutivoSiguiente;
         Q.ExecSQL;
 
         Conn.Commit;
