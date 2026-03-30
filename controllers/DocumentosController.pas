@@ -1,4 +1,4 @@
-unit DocumentosController;
+﻿unit DocumentosController;
 
 interface
 
@@ -200,6 +200,7 @@ begin
                     LFactor := LEquivalencia.FieldByName('FACTOR').AsFloat;
                     if LFactor = 0 then LFactor := 1;
 
+                    LDetalles[J].Texto := LEquivalencia.FieldByName('NOMBREH').AsString + ' (' + LEquivalencia.FieldByName('REFERENCIAH').AsString + ')';
                     LDetalles[J].CodigoProducto := LEquivalencia.FieldByName('REFERENCIAH').AsString;
                     LDetalles[J].Cantidad := LDetalles[J].Cantidad * LFactor;
                     LDetalles[J].CodigoConcepto := LEquivalencia.FieldByName('CODIGOH').AsInteger;

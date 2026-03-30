@@ -29,6 +29,7 @@ type
     CodigoProducto: string;
     CodigoConcepto: Integer;
     Subcodigo: Integer;
+    Texto: string;
     Cantidad: Double;
     Precio: Double;
     Total: Double;
@@ -123,6 +124,7 @@ begin
           LHEDetalles[I].CodigoConcepto := ADetalles[I].CodigoConcepto;
           LHEDetalles[I].Subcodigo := ADetalles[I].Subcodigo;
           LHEDetalles[I].Cantidad := ADetalles[I].Cantidad;
+          LHEDetalles[I].Texto := ADetalles[I].Texto;
           LHEDetalles[I].ValorUnitario := ADetalles[I].Precio;
           LHEDetalles[I].ValorTotal := ADetalles[I].Total;
           LHEDetalles[I].TfIva := ADetalles[I].TfIva;

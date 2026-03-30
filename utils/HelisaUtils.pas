@@ -5,11 +5,13 @@ interface
 uses
   System.SysUtils,
   System.DateUtils,
+  System.StrUtils,
   FireDAC.Comp.Client,
   FireDAC.Stan.Param;
 
 function DateToHeDate(ADate: TDateTime): Integer;
 function FormatDocumentNumber(const AType: string; AConsecutive: Integer): string;
+function IncrementERPConsecutive(const AValue: string): string;
 
 implementation
 
@@ -50,6 +52,63 @@ begin
   // Concatenar con CONSECUTIVO (relleno con ceros hasta 8 para que de un total razonable,
   // aunque Helisa suele usar 8 para el consecutivo segun UntFncERP)
   Result := Format('%-4s%08d', [AType, AConsecutive]);
+end;
+
+function IncBankCheckERP(const AValue: string): string;
+var
+  I: Integer;
+  LValue: string;
+begin
+  LValue := AValue;
+  if LValue = '' then
+    LValue := '0';
+
+  Result := LValue;
+  I := Length(Result);
+  Result[I] := RightStr(IntToStr(StrToInt(Result[I]) + 1), 1)[1];
+  while (I > 1) and (Result[I] = '0') do
+  begin
+    Result[I - 1] := RightStr(IntToStr(StrToInt(Result[I - 1]) + 1), 1)[1];
+    Dec(I);
+  end;
+
+  if Result[1] = '0' then
+    Result := '1' + Result;
+
+  if Length(Result) > 40 then
+    Result := '0';
+end;
+
+function IncrementERPConsecutive(const AValue: string): string;
+var
+  Tempo, Conteo: Integer;
+  Simbolos, Numeros: string;
+begin
+  Result := '';
+  Numeros := '';
+  Simbolos := StringOfChar(#10, Length(AValue));
+
+  for Tempo := 1 to Length(AValue) do
+    if AValue[Tempo] in ['0'..'9'] then
+      Numeros := Numeros + AValue[Tempo]
+    else
+      Simbolos[Tempo] := AValue[Tempo];
+
+  if Numeros = '' then
+    Numeros := '0';
+
+  Numeros := StringOfChar('0', 40) + IncBankCheckERP(Numeros);
+  Conteo := Length(Numeros);
+
+  for Tempo := Length(Simbolos) downto 1 do
+    if Simbolos[Tempo] = #10 then
+    begin
+      Result := Numeros[Conteo] + Result;
+      Dec(Conteo);
+    end
+    else
+      Result := Simbolos[Tempo] + Result;
+
 end;
 
 end.
