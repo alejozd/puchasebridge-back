@@ -26,6 +26,11 @@ uses
   DianUnits;
 
 type
+  Logger = class
+  public
+    class procedure Info(const AMsg: string); static;
+  end;
+
   TCombinedFileInfo = record
     ID: Integer;
     FileName: string;
@@ -37,6 +42,11 @@ type
     FechaCarga: TDateTime;
     LastModified: TDateTime;
   end;
+
+class procedure Logger.Info(const AMsg: string);
+begin
+  Writeln(AMsg);
+end;
 
 function ResolveUnidadSigla(const AUnidadCodigo: string): string;
 var
@@ -395,6 +405,7 @@ var
   LResponse: TJSONObject;
   LProcesadosArr, LRechazadosArr: TJSONArray;
   LHasPendientes: Boolean;
+  LEstadoFinal: string;
   LProcesadosCount, LRechazadosCount: Integer;
   LRechazadosLabel: string;
 begin
@@ -421,6 +432,9 @@ begin
         if LId = 0 then Continue;
 
         try
+          if not Q.Connection.InTransaction then
+            Q.Connection.StartTransaction;
+
           // 1. Regla de negocio: no procesar si hay al menos un producto pendiente de homologación.
           Q.SQL.Text :=
             'SELECT COUNT(*) as TOTAL ' +
@@ -438,22 +452,37 @@ begin
             Q.ParamByName('MSG').AsString := 'El documento contiene productos sin homologar y no puede ser procesado';
             Q.ParamByName('ID').AsInteger := LId;
             Q.ExecSQL;
+            Q.Connection.Commit;
             LRechazadosArr.AddElement(TJSONNumber.Create(LId));
             Inc(LRechazadosCount);
             Writeln(Format('Documento %d no procesado: productos pendientes de homologación', [LId]));
             Continue;
           end;
 
-          // 2. Procesar documento (marcando estado PROCESADO)
+          // 2. Procesar documento (marcando estado PROCESADO y fecha de proceso)
           Q.SQL.Text := 'UPDATE XML_FILES SET ESTADO = ''PROCESADO'', MENSAJE_ERROR = NULL, FECHA_PROCESO = CURRENT_TIMESTAMP WHERE ID = :ID';
           Q.ParamByName('ID').AsInteger := LId;
           Q.ExecSQL;
+
+          // 3. Validación final de estado en la misma transacción.
+          Q.SQL.Text := 'SELECT ESTADO FROM XML_FILES WHERE ID = :ID';
+          Q.ParamByName('ID').AsInteger := LId;
+          Q.Open;
+          LEstadoFinal := UpperCase(Trim(Q.FieldByName('ESTADO').AsString));
+          Q.Close;
+          if LEstadoFinal <> 'PROCESADO' then
+            raise Exception.CreateFmt('Estado final inválido para ID %d. Estado actual: %s', [LId, LEstadoFinal]);
+
+          Logger.Info('Documento actualizado a PROCESADO ID: ' + IntToStr(LId));
+          Q.Connection.Commit;
 
           LProcesadosArr.AddElement(TJSONNumber.Create(LId));
           Inc(LProcesadosCount);
         except
           on E: Exception do
           begin
+            if Q.Connection.InTransaction then
+              Q.Connection.Rollback;
             LRechazadosArr.AddElement(TJSONNumber.Create(LId));
             Inc(LRechazadosCount);
             Writeln(Format('Documento %d no procesado: %s', [LId, E.Message]));
@@ -782,7 +811,7 @@ begin
             Q.ParamByName('UNI').AsString := LUnidadXML;
             Q.ExecSQL;
 
-            // 3. Recalcular estado del XML después de homologar para mantener flujo PENDIENTE/LISTO.
+            // 3. Recalcular estado del XML después de homologar para mantener flujo PENDIENTE/VALIDADO.
             Q.SQL.Text :=
               'SELECT FIRST 1 XML_FILE_ID AS XML_FILE_ID ' +
               'FROM XML_PRODUCTOS ' +
@@ -806,9 +835,9 @@ begin
               LPendientes := Q.FieldByName('TOTAL').AsInteger;
               Q.Close;
 
-              // Si no hay pendientes queda LISTO; si hay pendientes se mantiene PENDIENTE.
+              // Si no hay pendientes queda VALIDADO; si hay pendientes se mantiene PENDIENTE.
               if LPendientes = 0 then
-                Q.SQL.Text := 'UPDATE XML_FILES SET ESTADO = ''LISTO'' WHERE ID = :XML_FILE_ID'
+                Q.SQL.Text := 'UPDATE XML_FILES SET ESTADO = ''VALIDADO'' WHERE ID = :XML_FILE_ID'
               else
                 Q.SQL.Text := 'UPDATE XML_FILES SET ESTADO = ''PENDIENTE'' WHERE ID = :XML_FILE_ID';
               Q.ParamByName('XML_FILE_ID').AsInteger := LXMLFileID;
@@ -1007,7 +1036,7 @@ begin
           LCargados := Q.FieldByName('TOTAL').AsInteger
         else if LEstado = 'PENDIENTE' then
           LPendientes := Q.FieldByName('TOTAL').AsInteger
-        else if LEstado = 'LISTO' then
+        else if LEstado = 'VALIDADO' then
           LListos := Q.FieldByName('TOTAL').AsInteger
         else if LEstado = 'PROCESADO' then
           LProcesados := Q.FieldByName('TOTAL').AsInteger
