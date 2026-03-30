@@ -64,6 +64,26 @@ begin
     Result := AUnidadCodigo;
 end;
 
+function FindFileFullPath(const AFileName: string): string;
+var
+  LSearchPaths: TArray<string>;
+  LPath, LCandidate: string;
+begin
+  Result := '';
+  LSearchPaths := [
+    TPath.Combine('PurchaseBridge', 'Input'),
+    TPath.Combine('PurchaseBridge', 'Processed'),
+    TPath.Combine('PurchaseBridge', 'Output')
+  ];
+
+  for LPath in LSearchPaths do
+  begin
+    LCandidate := TPath.Combine(LPath, AFileName);
+    if TFile.Exists(LCandidate) then
+      Exit(LCandidate);
+  end;
+end;
+
 procedure Upload(Req: THorseRequest; Res: THorseResponse; Next: TProc);
 var
   LFile: TAbstractWebRequestFile;
@@ -588,7 +608,8 @@ end;
 procedure GetFiles(Req: THorseRequest; Res: THorseResponse; Next: TProc);
 var
   Q: TFDQuery;
-  LPath, LFile, LFileNameOnly: string;
+  LPath, LFile, LFileNameOnly, LPhysicalPath, LKey: string;
+  LSearchPaths: TArray<string>;
   LFiles: TStringDynArray;
   LCombinedList: TList<TCombinedFileInfo>;
   LInfo: TCombinedFileInfo;
@@ -625,33 +646,58 @@ begin
         Q.Free;
       end;
 
-      // 2. Scan physical files and merge/add
-      LPath := TPath.Combine('PurchaseBridge', 'Input');
-      if TDirectory.Exists(LPath) then
+      // 2. Actualizar registros de BD buscando el archivo en múltiples carpetas.
+      for LKey in LDBData.Keys do
       begin
-        LFiles := TDirectory.GetFiles(LPath, '*.xml');
-        for LFile in LFiles do
+        LInfo := LDBData.Items[LKey];
+        LPhysicalPath := FindFileFullPath(LInfo.FileName);
+        if not LPhysicalPath.IsEmpty then
         begin
-          LFileNameOnly := TPath.GetFileName(LFile);
-          if LDBData.TryGetValue(LFileNameOnly.ToLower, LInfo) then
+          LInfo.Size := TFile.GetSize(LPhysicalPath);
+          LInfo.LastModified := TFile.GetLastWriteTime(LPhysicalPath);
+          LDBData.Items[LKey] := LInfo;
+        end;
+      end;
+
+      // 3. Escanear archivos físicos en Input/Processed/Output y agregar faltantes.
+      LSearchPaths := [
+        TPath.Combine('PurchaseBridge', 'Input'),
+        TPath.Combine('PurchaseBridge', 'Processed'),
+        TPath.Combine('PurchaseBridge', 'Output')
+      ];
+
+      for LPath in LSearchPaths do
+      begin
+        if TDirectory.Exists(LPath) then
+        begin
+          LFiles := TDirectory.GetFiles(LPath, '*.xml');
+          for LFile in LFiles do
           begin
-            LInfo.Size := TFile.GetSize(LFile);
-            LInfo.LastModified := TFile.GetLastWriteTime(LFile);
-            LDBData.Items[LFileNameOnly.ToLower] := LInfo;
-          end
-          else
-          begin
-            LInfo := Default(TCombinedFileInfo);
-            LInfo.ID := 0;
-            LInfo.FileName := LFileNameOnly;
-            LInfo.Size := TFile.GetSize(LFile);
-            LInfo.LastModified := TFile.GetLastWriteTime(LFile);
-            LInfo.ProveedorNit := '';
-            LInfo.Proveedor := 'Sin procesar';
-            LInfo.FechaDocumento := 0;
-            LInfo.Estado := 'CARGADO';
-            LInfo.FechaCarga := LInfo.LastModified;
-            LDBData.Add(LFileNameOnly.ToLower, LInfo);
+            LFileNameOnly := TPath.GetFileName(LFile);
+            if LDBData.TryGetValue(LFileNameOnly.ToLower, LInfo) then
+            begin
+              // Solo completar si aún no tenía datos físicos.
+              if (LInfo.Size <= 0) or (LInfo.LastModified <= 0) then
+              begin
+                LInfo.Size := TFile.GetSize(LFile);
+                LInfo.LastModified := TFile.GetLastWriteTime(LFile);
+                LDBData.Items[LFileNameOnly.ToLower] := LInfo;
+              end;
+            end
+            else
+            begin
+              LInfo := Default(TCombinedFileInfo);
+              LInfo.ID := 0;
+              LInfo.FileName := LFileNameOnly;
+              LInfo.Size := TFile.GetSize(LFile);
+              LInfo.LastModified := TFile.GetLastWriteTime(LFile);
+              LInfo.ProveedorNit := '';
+              LInfo.Proveedor := 'Sin procesar';
+              LInfo.FechaDocumento := 0;
+              LInfo.Estado := 'CARGADO';
+              LInfo.FechaCarga := LInfo.LastModified;
+              LDBData.Add(LFileNameOnly.ToLower, LInfo);
+            end;
           end;
         end;
       end;
@@ -691,7 +737,10 @@ begin
           LJSONObj.AddPair('fechaDocumento', TJSONNull.Create);
         LJSONObj.AddPair('estado', LInfo.Estado);
         LJSONObj.AddPair('fechaCarga', FormatDateTime('yyyy-mm-dd HH:nn:ss', LInfo.FechaCarga));
-        LJSONObj.AddPair('lastModified', FormatDateTime('yyyy-mm-dd HH:nn:ss', LInfo.LastModified));
+        if LInfo.LastModified > 0 then
+          LJSONObj.AddPair('lastModified', FormatDateTime('yyyy-mm-dd HH:nn:ss', LInfo.LastModified))
+        else
+          LJSONObj.AddPair('lastModified', TJSONNull.Create);
         LJSONList.AddElement(LJSONObj);
       end;
       Res.Send(LJSONList);
