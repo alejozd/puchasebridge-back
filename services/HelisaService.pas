@@ -26,6 +26,7 @@ type
     CodigoConcepto: Integer;
     Subcodigo: Integer;
     Cantidad: Double;
+    Texto: string;
     ValorUnitario: Double;
     ValorTotal: Double;
     TfIva: Double;
@@ -88,6 +89,7 @@ begin
         Q.SQL.Text := Format(
           'INSERT INTO %s (' +
           '  DOCUMENTO, CONSECUTIVO, CLASE, CODIGO_BODEGA, CODIGO_CONCEPTO, SUBCODIGO, ' +
+          '  TEXTO, CODIGO_SERVICIO_COMISION, CONSECUTIVO_ORIGEN, ' +
           '  LISTAPRECIO, CANTIDAD, UNIDADES_DEVUELTAS, VR_UNITARIO, VR_TOTAL, VR_VPN, VR_ING_GASTO, ' +
           '  TF_IVA, VR_IVA, TF_CONSUMO, VR_CONSUMO, TF_GASOLINA, VR_GASOLINA, TF_BOLSA, VR_BOLSA, ' +
           '  TF_CARBONO, VR_CARBONO, TF_CANNABIS, VR_CANNABIS, TF_DESCUENTO, VR_DESCUENTO, ' +
@@ -96,6 +98,7 @@ begin
           '  HACE_PARTE_COSTO, HACE_PARTE_COSTO_NIIF, DISPERSION' +
           ') VALUES (' +
           '  :DOC, :CONS, :CLASE, 1, :CONC, :SUB, ' +
+          '  :TEXTO, :CODIGO_SERVICIO_COMISION, :CONSECUTIVO_ORIGEN, ' +
           '  0, :CANT, 0, :VUNIT, :VTOTAL, 0, 0, ' +
           '  :TIVA, :VIVA, 0, 0, 0, 0, 0, 0, ' +
           '  0, 0, 0, 0, :TDESC, :VDESC, ' +
@@ -111,6 +114,7 @@ begin
           Q.ParamByName('CLASE').AsInteger := ADetalles[I].Clase;
           Q.ParamByName('CONC').AsInteger := ADetalles[I].CodigoConcepto;
           Q.ParamByName('SUB').AsInteger := ADetalles[I].Subcodigo;
+          Q.ParamByName('TEXTO').AsString := ADetalles[I].Texto;
           Q.ParamByName('CANT').AsFloat := ADetalles[I].Cantidad;
           Q.ParamByName('VUNIT').AsFloat := ADetalles[I].ValorUnitario;
           Q.ParamByName('VTOTAL').AsFloat := ADetalles[I].ValorTotal;
@@ -121,6 +125,8 @@ begin
           Q.ParamByName('VICA').AsFloat := ADetalles[I].VrIca;
           Q.ParamByName('VRETEICA').AsFloat := ADetalles[I].VrReteIca;
           Q.ParamByName('VRETEIVA').AsFloat := ADetalles[I].VrReteIva;
+          Q.ParamByName('CODIGO_SERVICIO_COMISION').AsFloat := 0;
+          Q.ParamByName('CONSECUTIVO_ORIGEN').AsFloat := 0;
           Q.ExecSQL;
         end;
 
@@ -165,6 +171,7 @@ begin
         Q.SQL.Text := Format(
           'INSERT INTO %s (' +
           '  DOCUMENTO, FECHA, CODIGO_TERCERO, CLASE_FAC, ESTADO_DOCUMENTO, ' +
+          '  FECHA_VENCE, OBSERVACIONES, DOC_FUENTE, ' +
           '  ART_TOTAL_BRUTO, SER_TOTAL_BRUTO, ART_TOTAL_IVA_EXENTO, SER_TOTAL_IVA_EXENTO, ' +
           '  ART_TOTAL_IVA_GRAVADO, SER_TOTAL_IVA_GRAVADO, ART_TOTAL_DESCUENTO, SER_TOTAL_DESCUENTO, ' +
           '  ART_TOTAL_DESCUENTO_ADICIONAL, SER_TOTAL_DESCUENTO_ADICIONAL, ART_TOTAL_IVA, SER_TOTAL_IVA, ' +
@@ -176,6 +183,7 @@ begin
           '  TASA_CAMBIO, NOMBRE_PANTALLA, NOMBRE_USUARIO, CODIGO_USUARIO, FECHA_SISTEMA' +
           ') VALUES (' +
           '  :DOC, :FECHA, :TERCERO, 1, 1, ' +
+          '  :FECHA_VENCE, :OBSERVACIONES, :DOC_FUENTE, ' +
           '  :ART_BRUTO, :SER_BRUTO, :ART_IVA_EX, :SER_IVA_EX, ' +
           '  :ART_IVA_GR, :SER_IVA_GR, :ART_DESC, :SER_DESC, ' +
           '  0, 0, :ART_IVA, :SER_IVA, ' +
@@ -190,6 +198,9 @@ begin
         Q.ParamByName('DOC').AsString := LDocumento;
         Q.ParamByName('FECHA').AsInteger := DateToHeDate(AHeader.Fecha);
         Q.ParamByName('TERCERO').AsString := AHeader.CodigoTercero;
+        Q.ParamByName('FECHA_VENCE').AsInteger := DateToHeDate(AHeader.Fecha);
+        Q.ParamByName('OBSERVACIONES').AsString := EmptyStr;
+        Q.ParamByName('DOC_FUENTE').AsString := LDocumento;
         Q.ParamByName('ART_BRUTO').AsFloat := LArtBruto;
         Q.ParamByName('SER_BRUTO').AsFloat := LSerBruto;
         Q.ParamByName('ART_IVA_EX').AsFloat := LArtIvaExento;
