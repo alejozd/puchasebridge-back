@@ -140,7 +140,7 @@ begin
               LParsedObj.Free;
             end;
 
-            LValidationResult := ValidarDocumento(LParsedJSONStr);
+            LValidationResult := ValidarDocumentoDesdeXML(LParsedJSONStr);
             LValidationObj := TJSONObject.ParseJSONValue(LValidationResult) as TJSONObject;
             if not Assigned(LValidationObj) then
                raise Exception.Create('Error parseando resultado de validación');
@@ -189,15 +189,21 @@ begin
 
                   LEquivalencia := BuscarEquivalencia(LParsedInvoice.Products[J].Referencia, LParsedInvoice.Products[J].Unidad);
                   try
-                    if not LEquivalencia.IsEmpty then
+                    if LEquivalencia.IsEmpty then
                     begin
-                      LFactor := LEquivalencia.FieldByName('FACTOR').AsFloat;
-                      if LFactor = 0 then LFactor := 1;
-                      LDetalles[J].CodigoProducto := LEquivalencia.FieldByName('REFERENCIAH').AsString;
-                      LDetalles[J].Cantidad := LDetalles[J].Cantidad * LFactor;
-                      LDetalles[J].CodigoConcepto := LEquivalencia.FieldByName('CODIGOH').AsInteger;
-                      LDetalles[J].Subcodigo := LEquivalencia.FieldByName('SUBCODIGOH').AsInteger;
+                      raise Exception.Create(
+                        Format('No existe equivalencia para la referencia "%s" con unidad "%s"',
+                          [LParsedInvoice.Products[J].Referencia, LParsedInvoice.Products[J].Unidad])
+                      );
                     end;
+
+                    LFactor := LEquivalencia.FieldByName('FACTOR').AsFloat;
+                    if LFactor = 0 then LFactor := 1;
+
+                    LDetalles[J].CodigoProducto := LEquivalencia.FieldByName('REFERENCIAH').AsString;
+                    LDetalles[J].Cantidad := LDetalles[J].Cantidad * LFactor;
+                    LDetalles[J].CodigoConcepto := LEquivalencia.FieldByName('CODIGOH').AsInteger;
+                    LDetalles[J].Subcodigo := LEquivalencia.FieldByName('SUBCODIGOH').AsInteger;
                   finally
                     LEquivalencia.Free;
                   end;
@@ -244,7 +250,7 @@ begin
             begin
               LErrorObj := TJSONObject.Create;
               LErrorObj.AddPair('fileName', LFileName);
-              LErrorObj.AddPair('error', 'Error procesando archivo: ' + E.Message);
+              LErrorObj.AddPair('error', E.Message);
               LErroresArr.Add(LErrorObj);
             end;
           end;

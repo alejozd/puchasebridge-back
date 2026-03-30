@@ -10,8 +10,22 @@ uses
   FireDAC.Comp.Client;
 
 function ValidarDocumento(AJsonParse: string): string;
+function ValidarDocumentoDesdeXML(AJsonParse: string): string;
 
 implementation
+
+function GetJSONValue(AObj: TJSONObject; AKey: string): string;
+var
+  V: TJSONValue;
+begin
+  Result := '';
+  if not Assigned(AObj) then
+    Exit;
+
+  V := AObj.GetValue(AKey);
+  if Assigned(V) and not (V is TJSONNull) then
+    Result := V.Value;
+end;
 
 function ValidarDocumento(AJsonParse: string): string;
 var
@@ -58,7 +72,7 @@ begin
       LProveedorJSON := LInputJSON.GetValue('proveedor') as TJSONObject;
       if Assigned(LProveedorJSON) then
       begin
-        LNIT := LProveedorJSON.GetValue('nit').Value;
+        LNIT := GetJSONValue(LProveedorJSON, 'nit');
         LProveedorInfo := ObtenerProveedorPorNit(LNIT, '');
         LProveedorExiste := LProveedorInfo.Existe;
       end;
@@ -78,18 +92,33 @@ begin
         for I := 0 to LProductosArray.Count - 1 do
         begin
           LItemJSON := LProductosArray.Items[I] as TJSONObject;
-          LReferencia := LItemJSON.GetValue('referencia').Value;
-          LUnidad := LItemJSON.GetValue('unidadXML').Value;
+          LReferencia := GetJSONValue(LItemJSON, 'referencia');
+          LUnidad := GetJSONValue(LItemJSON, 'unidadXML');
+          if LUnidad = '' then
+            LUnidad := GetJSONValue(LItemJSON, 'unidad');
+
+          if LReferencia.Trim.IsEmpty then
+          begin
+            LTodosProductosExisten := False;
+            LAlgunProductoNoExiste := True;
+            LErroresArray.Add('Producto sin referencia');
+            Continue;
+          end;
+
+          if LUnidad.Trim.IsEmpty then
+          begin
+            LTodosProductosExisten := False;
+            LAlgunProductoNoExiste := True;
+            LErroresArray.Add(Format('Producto %s sin unidad', [LReferencia]));
+            Continue;
+          end;
 
           LValido := False;
-          if not (LReferencia.Trim.IsEmpty or LUnidad.Trim.IsEmpty) then
-          begin
-            LEquivalencia := BuscarEquivalencia(LReferencia, LUnidad);
-            try
-              LValido := not LEquivalencia.IsEmpty;
-            finally
-              LEquivalencia.Free;
-            end;
+          LEquivalencia := BuscarEquivalencia(LReferencia, LUnidad);
+          try
+            LValido := not LEquivalencia.IsEmpty;
+          finally
+            LEquivalencia.Free;
           end;
 
           if not LValido then
@@ -142,6 +171,148 @@ begin
       begin
         LErroresArray.Add('Error durante la validación: ' + E.Message);
         // Ensure standard fields are present even on inner exception
+        if LOutputJSON.GetValue('valido') = nil then LOutputJSON.AddPair('valido', TJSONBool.Create(False));
+        if LOutputJSON.GetValue('requiereHomologacion') = nil then LOutputJSON.AddPair('requiereHomologacion', TJSONBool.Create(False));
+        if LOutputJSON.GetValue('proveedorExiste') = nil then LOutputJSON.AddPair('proveedorExiste', TJSONBool.Create(False));
+        Result := LOutputJSON.ToJSON;
+      end;
+    end;
+  finally
+    if Assigned(LInputJSON) then
+      LInputJSON.Free;
+    LOutputJSON.Free;
+  end;
+end;
+
+function ValidarDocumentoDesdeXML(AJsonParse: string): string;
+var
+  LInputJSON, LOutputJSON: TJSONObject;
+  LProveedorJSON, LItemJSON, LResultItemJSON: TJSONObject;
+  LProductosArray, LResultProductosArray, LErroresArray: TJSONArray;
+  LNIT, LReferenciaXML, LUnidadXML: string;
+  LProveedorInfo: TProveedorInfo;
+  LProveedorExiste, LTodosProductosExisten, LAlgunProductoNoExiste: Boolean;
+  LValido, LRequiereHomologacion: Boolean;
+  I: Integer;
+  LEquivalencia: TFDQuery;
+begin
+  LOutputJSON := TJSONObject.Create;
+  LResultProductosArray := TJSONArray.Create;
+  LErroresArray := TJSONArray.Create;
+
+  LOutputJSON.AddPair('productos', LResultProductosArray);
+  LOutputJSON.AddPair('errores', LErroresArray);
+
+  LInputJSON := nil;
+
+  try
+    try
+      LInputJSON := TJSONObject.ParseJSONValue(AJsonParse) as TJSONObject;
+    except
+      LInputJSON := nil;
+    end;
+
+    if not Assigned(LInputJSON) then
+    begin
+      LErroresArray.Add('JSON de entrada inválido');
+      LOutputJSON.AddPair('valido', TJSONBool.Create(False));
+      LOutputJSON.AddPair('requiereHomologacion', TJSONBool.Create(False));
+      LOutputJSON.AddPair('proveedorExiste', TJSONBool.Create(False));
+      Result := LOutputJSON.ToJSON;
+      Exit;
+    end;
+
+    try
+      LProveedorExiste := False;
+      LProveedorJSON := LInputJSON.GetValue('proveedor') as TJSONObject;
+      if Assigned(LProveedorJSON) then
+      begin
+        LNIT := GetJSONValue(LProveedorJSON, 'nit');
+        LProveedorInfo := ObtenerProveedorPorNit(LNIT, '');
+        LProveedorExiste := LProveedorInfo.Existe;
+      end;
+
+      if not LProveedorExiste then
+        LErroresArray.Add('Proveedor no existe en Helisa')
+      else
+        LOutputJSON.AddPair('codigoTercero', LProveedorInfo.Codigo);
+
+      LTodosProductosExisten := True;
+      LAlgunProductoNoExiste := False;
+      LProductosArray := LInputJSON.GetValue('productos') as TJSONArray;
+
+      if Assigned(LProductosArray) then
+      begin
+        for I := 0 to LProductosArray.Count - 1 do
+        begin
+          LItemJSON := LProductosArray.Items[I] as TJSONObject;
+          LReferenciaXML := GetJSONValue(LItemJSON, 'referencia');
+          LUnidadXML := GetJSONValue(LItemJSON, 'unidad');
+
+          if LReferenciaXML.Trim.IsEmpty then
+          begin
+            LTodosProductosExisten := False;
+            LAlgunProductoNoExiste := True;
+            LErroresArray.Add('Producto sin referencia');
+            Continue;
+          end;
+
+          if LUnidadXML.Trim.IsEmpty then
+          begin
+            LTodosProductosExisten := False;
+            LAlgunProductoNoExiste := True;
+            LErroresArray.Add(Format('Producto %s sin unidad', [LReferenciaXML]));
+            Continue;
+          end;
+
+          LValido := False;
+          LEquivalencia := BuscarEquivalenciaXML(LReferenciaXML, LUnidadXML);
+          try
+            LValido := not LEquivalencia.IsEmpty;
+          finally
+            LEquivalencia.Free;
+          end;
+
+          if not LValido then
+          begin
+            LTodosProductosExisten := False;
+            LAlgunProductoNoExiste := True;
+            LErroresArray.Add(Format('Producto %s con unidad %s no tiene equivalencia', [LReferenciaXML, LUnidadXML]));
+          end;
+
+          LResultItemJSON := TJSONObject.Create;
+          LResultItemJSON.AddPair('referencia', LReferenciaXML);
+          LResultItemJSON.AddPair('unidad', LUnidadXML);
+          LResultItemJSON.AddPair('existeEquivalencia', TJSONBool.Create(LValido));
+          LResultProductosArray.Add(LResultItemJSON);
+        end;
+      end;
+
+      LValido := False;
+      LRequiereHomologacion := False;
+
+      if LProveedorExiste then
+      begin
+        if LTodosProductosExisten then
+          LValido := True
+        else if LAlgunProductoNoExiste then
+        begin
+          LValido := True;
+          LRequiereHomologacion := True;
+        end;
+      end
+      else
+        LValido := False;
+
+      LOutputJSON.AddPair('valido', TJSONBool.Create(LValido));
+      LOutputJSON.AddPair('requiereHomologacion', TJSONBool.Create(LRequiereHomologacion));
+      LOutputJSON.AddPair('proveedorExiste', TJSONBool.Create(LProveedorExiste));
+
+      Result := LOutputJSON.ToJSON;
+    except
+      on E: Exception do
+      begin
+        LErroresArray.Add('Error durante la validación: ' + E.Message);
         if LOutputJSON.GetValue('valido') = nil then LOutputJSON.AddPair('valido', TJSONBool.Create(False));
         if LOutputJSON.GetValue('requiereHomologacion') = nil then LOutputJSON.AddPair('requiereHomologacion', TJSONBool.Create(False));
         if LOutputJSON.GetValue('proveedorExiste') = nil then LOutputJSON.AddPair('proveedorExiste', TJSONBool.Create(False));
