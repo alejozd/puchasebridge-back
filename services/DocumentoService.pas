@@ -69,10 +69,13 @@ var
   Q: TFDQuery;
   LDocumentoID: Integer;
   LDocumentoERP: string;
+  LEstadoFinal: string;
+  LDocumentoERPFinal: string;
   LHEHeader: THEHeaderOC;
   LHEDetalles: TArray<THEDetalleOC>;
   I: Integer;
 begin
+  LDocumentoID := 0;
   // 1. Persistir en PurchaseBridge (Documento original y trazabilidad)
   Conn := GetBridgeConnection;
   try
@@ -137,14 +140,36 @@ begin
           LHEDetalles[I].VrReteFuente := ADetalles[I].VrReteFuente;
         end;
 
+        Writeln('Insertando en Helisa...');
         LDocumentoERP := HelisaService.InsertarOrdenCompra(LHEHeader, LHEDetalles);
+        Writeln('Documento ERP generado: ' + LDocumentoERP);
+        Writeln('Actualizando DOCUMENTO ID: ' + IntToStr(LDocumentoID));
 
-        // Actualizar con el numero de documento de Helisa
-        Q.SQL.Text := 'UPDATE DOCUMENTO SET ESTADO = :ESTADO WHERE ID = :ID';
-        Q.ParamByName('ESTADO').AsString := LDocumentoERP;
+        // Actualizar estado final del flujo y guardar documento ERP en columnas separadas.
+        Q.SQL.Text :=
+          'UPDATE DOCUMENTO SET ' +
+          'ESTADO = :ESTADO, ' +
+          'DOCUMENTO_ERP = :DOC ' +
+          'WHERE ID = :ID';
+        Q.ParamByName('ESTADO').AsString := 'PROCESADO';
+        Q.ParamByName('DOC').AsString := LDocumentoERP;
         Q.ParamByName('ID').AsInteger := LDocumentoID;
         Q.ExecSQL;
 
+        // Validación final antes de confirmar transacción.
+        Q.SQL.Text := 'SELECT ESTADO, DOCUMENTO_ERP FROM DOCUMENTO WHERE ID = :ID';
+        Q.ParamByName('ID').AsInteger := LDocumentoID;
+        Q.Open;
+        LEstadoFinal := UpperCase(Trim(Q.FieldByName('ESTADO').AsString));
+        LDocumentoERPFinal := Trim(Q.FieldByName('DOCUMENTO_ERP').AsString);
+        Q.Close;
+        if (LEstadoFinal <> 'PROCESADO') or (LDocumentoERPFinal = '') then
+          raise Exception.CreateFmt(
+            'Validación final falló para DOCUMENTO ID %d (ESTADO=%s, DOCUMENTO_ERP=%s)',
+            [LDocumentoID, LEstadoFinal, LDocumentoERPFinal]
+          );
+
+        Writeln('Estado final: PROCESADO');
         Conn.Commit;
         Result := LDocumentoERP;
       finally
@@ -153,7 +178,31 @@ begin
     except
       on E: Exception do
       begin
-        Conn.Rollback;
+        if Conn.InTransaction then
+          Conn.Rollback;
+
+        // Si ya existe registro DOCUMENTO, marcarlo en ERROR para trazabilidad.
+        if LDocumentoID > 0 then
+        begin
+          Conn.StartTransaction;
+          try
+            Q := TFDQuery.Create(nil);
+            try
+              Q.Connection := Conn;
+              Q.SQL.Text := 'UPDATE DOCUMENTO SET ESTADO = :ESTADO WHERE ID = :ID';
+              Q.ParamByName('ESTADO').AsString := 'ERROR';
+              Q.ParamByName('ID').AsInteger := LDocumentoID;
+              Q.ExecSQL;
+            finally
+              Q.Free;
+            end;
+            Conn.Commit;
+          except
+            if Conn.InTransaction then
+              Conn.Rollback;
+          end;
+        end;
+
         raise;
       end;
     end;
