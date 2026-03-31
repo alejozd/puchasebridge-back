@@ -184,7 +184,7 @@ begin
         else
         begin
           Q.SQL.Text :=
-            'UPDATE XML_FILES SET ESTADO = ''LISTO'', MENSAJE_ERROR = NULL WHERE ID = :ID';
+            'UPDATE XML_FILES SET ESTADO = ''VALIDADO'', MENSAJE_ERROR = NULL WHERE ID = :ID';
           Q.ParamByName('ID').AsInteger := LFileID;
           Q.ExecSQL;
         end;

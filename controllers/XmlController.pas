@@ -26,6 +26,11 @@ uses
   DianUnits;
 
 type
+  Logger = class
+  public
+    class procedure Info(const AMsg: string); static;
+  end;
+
   TCombinedFileInfo = record
     ID: Integer;
     FileName: string;
@@ -37,6 +42,11 @@ type
     FechaCarga: TDateTime;
     LastModified: TDateTime;
   end;
+
+class procedure Logger.Info(const AMsg: string);
+begin
+  Writeln(AMsg);
+end;
 
 function ResolveUnidadSigla(const AUnidadCodigo: string): string;
 var
@@ -52,6 +62,41 @@ begin
     Result := 'LT'
   else
     Result := AUnidadCodigo;
+end;
+
+function FindFileFullPath(const AFileName: string): string;
+var
+  LSearchPaths: TArray<string>;
+  LPath, LCandidate: string;
+begin
+  Result := '';
+  LSearchPaths := [
+    TPath.Combine('PurchaseBridge', 'Input'),
+    TPath.Combine('PurchaseBridge', 'Processed'),
+    TPath.Combine('PurchaseBridge', 'Output')
+  ];
+
+  for LPath in LSearchPaths do
+  begin
+    LCandidate := TPath.Combine(LPath, AFileName);
+    if TFile.Exists(LCandidate) then
+      Exit(LCandidate);
+  end;
+end;
+
+function FindXmlFile(const AFileName: string): string;
+var
+  LInputPath, LProcessedPath: string;
+begin
+  Result := '';
+  LInputPath := TPath.Combine('PurchaseBridge', 'Input');
+  LProcessedPath := TPath.Combine('PurchaseBridge', 'Processed');
+
+  if TFile.Exists(TPath.Combine(LInputPath, AFileName)) then
+    Exit(TPath.Combine(LInputPath, AFileName));
+
+  if TFile.Exists(TPath.Combine(LProcessedPath, AFileName)) then
+    Exit(TPath.Combine(LProcessedPath, AFileName));
 end;
 
 procedure Upload(Req: THorseRequest; Res: THorseResponse; Next: TProc);
@@ -160,7 +205,7 @@ end;
 procedure Parse(Req: THorseRequest; Res: THorseResponse; Next: TProc);
 var
   LBody: TJSONObject;
-  LFileName, LPath, LFullFile: string;
+  LFileName, LFullFile: string;
   LXMLContent: string;
   LParsedInvoice: TParsedInvoice;
   LResponse: TJSONObject;
@@ -183,10 +228,9 @@ begin
     end;
 
     LFileName := TPath.GetFileName(LFileName);
-    LPath := TPath.Combine('PurchaseBridge', 'Input');
-    LFullFile := TPath.Combine(LPath, LFileName);
+    LFullFile := FindXmlFile(LFileName);
 
-    if not TFile.Exists(LFullFile) then
+    if LFullFile.IsEmpty then
     begin
       LResponse := TJSONObject.Create;
       LResponse.AddPair('success', TJSONBool.Create(False));
@@ -194,6 +238,8 @@ begin
       Res.Status(404).Send(LResponse);
       Exit;
     end;
+
+    Writeln('Archivo encontrado para parse en: ' + LFullFile);
 
     try
       LXMLContent := TFile.ReadAllText(LFullFile, TEncoding.UTF8);
@@ -257,6 +303,7 @@ begin
       LTotalesObj.AddPair('taxExclusiveAmount', TJSONNumber.Create(LParsedInvoice.Totals.TaxExclusiveAmount));
       LTotalesObj.AddPair('taxInclusiveAmount', TJSONNumber.Create(LParsedInvoice.Totals.TaxInclusiveAmount));
       LTotalesObj.AddPair('impuestoTotal', TJSONNumber.Create(LParsedInvoice.Totals.ImpuestoTotal));
+      LTotalesObj.AddPair('retencion', TJSONNumber.Create(LParsedInvoice.Totals.RetencionTotal));
       LTotalesObj.AddPair('total', TJSONNumber.Create(LParsedInvoice.Totals.Total));
       LResponse.AddPair('totales', LTotalesObj);
 
@@ -395,6 +442,7 @@ var
   LResponse: TJSONObject;
   LProcesadosArr, LRechazadosArr: TJSONArray;
   LHasPendientes: Boolean;
+  LEstadoFinal: string;
   LProcesadosCount, LRechazadosCount: Integer;
   LRechazadosLabel: string;
 begin
@@ -421,6 +469,9 @@ begin
         if LId = 0 then Continue;
 
         try
+          if not Q.Connection.InTransaction then
+            Q.Connection.StartTransaction;
+
           // 1. Regla de negocio: no procesar si hay al menos un producto pendiente de homologación.
           Q.SQL.Text :=
             'SELECT COUNT(*) as TOTAL ' +
@@ -438,22 +489,37 @@ begin
             Q.ParamByName('MSG').AsString := 'El documento contiene productos sin homologar y no puede ser procesado';
             Q.ParamByName('ID').AsInteger := LId;
             Q.ExecSQL;
+            Q.Connection.Commit;
             LRechazadosArr.AddElement(TJSONNumber.Create(LId));
             Inc(LRechazadosCount);
             Writeln(Format('Documento %d no procesado: productos pendientes de homologación', [LId]));
             Continue;
           end;
 
-          // 2. Procesar documento (marcando estado PROCESADO)
+          // 2. Procesar documento (marcando estado PROCESADO y fecha de proceso)
           Q.SQL.Text := 'UPDATE XML_FILES SET ESTADO = ''PROCESADO'', MENSAJE_ERROR = NULL, FECHA_PROCESO = CURRENT_TIMESTAMP WHERE ID = :ID';
           Q.ParamByName('ID').AsInteger := LId;
           Q.ExecSQL;
+
+          // 3. Validación final de estado en la misma transacción.
+          Q.SQL.Text := 'SELECT ESTADO FROM XML_FILES WHERE ID = :ID';
+          Q.ParamByName('ID').AsInteger := LId;
+          Q.Open;
+          LEstadoFinal := UpperCase(Trim(Q.FieldByName('ESTADO').AsString));
+          Q.Close;
+          if LEstadoFinal <> 'PROCESADO' then
+            raise Exception.CreateFmt('Estado final inválido para ID %d. Estado actual: %s', [LId, LEstadoFinal]);
+
+          Logger.Info('Documento actualizado a PROCESADO ID: ' + IntToStr(LId));
+          Q.Connection.Commit;
 
           LProcesadosArr.AddElement(TJSONNumber.Create(LId));
           Inc(LProcesadosCount);
         except
           on E: Exception do
           begin
+            if Q.Connection.InTransaction then
+              Q.Connection.Rollback;
             LRechazadosArr.AddElement(TJSONNumber.Create(LId));
             Inc(LRechazadosCount);
             Writeln(Format('Documento %d no procesado: %s', [LId, E.Message]));
@@ -559,7 +625,8 @@ end;
 procedure GetFiles(Req: THorseRequest; Res: THorseResponse; Next: TProc);
 var
   Q: TFDQuery;
-  LPath, LFile, LFileNameOnly: string;
+  LPath, LFile, LFileNameOnly, LPhysicalPath, LKey: string;
+  LSearchPaths: TArray<string>;
   LFiles: TStringDynArray;
   LCombinedList: TList<TCombinedFileInfo>;
   LInfo: TCombinedFileInfo;
@@ -596,33 +663,58 @@ begin
         Q.Free;
       end;
 
-      // 2. Scan physical files and merge/add
-      LPath := TPath.Combine('PurchaseBridge', 'Input');
-      if TDirectory.Exists(LPath) then
+      // 2. Actualizar registros de BD buscando el archivo en múltiples carpetas.
+      for LKey in LDBData.Keys do
       begin
-        LFiles := TDirectory.GetFiles(LPath, '*.xml');
-        for LFile in LFiles do
+        LInfo := LDBData.Items[LKey];
+        LPhysicalPath := FindFileFullPath(LInfo.FileName);
+        if not LPhysicalPath.IsEmpty then
         begin
-          LFileNameOnly := TPath.GetFileName(LFile);
-          if LDBData.TryGetValue(LFileNameOnly.ToLower, LInfo) then
+          LInfo.Size := TFile.GetSize(LPhysicalPath);
+          LInfo.LastModified := TFile.GetLastWriteTime(LPhysicalPath);
+          LDBData.Items[LKey] := LInfo;
+        end;
+      end;
+
+      // 3. Escanear archivos físicos en Input/Processed/Output y agregar faltantes.
+      LSearchPaths := [
+        TPath.Combine('PurchaseBridge', 'Input'),
+        TPath.Combine('PurchaseBridge', 'Processed'),
+        TPath.Combine('PurchaseBridge', 'Output')
+      ];
+
+      for LPath in LSearchPaths do
+      begin
+        if TDirectory.Exists(LPath) then
+        begin
+          LFiles := TDirectory.GetFiles(LPath, '*.xml');
+          for LFile in LFiles do
           begin
-            LInfo.Size := TFile.GetSize(LFile);
-            LInfo.LastModified := TFile.GetLastWriteTime(LFile);
-            LDBData.Items[LFileNameOnly.ToLower] := LInfo;
-          end
-          else
-          begin
-            LInfo := Default(TCombinedFileInfo);
-            LInfo.ID := 0;
-            LInfo.FileName := LFileNameOnly;
-            LInfo.Size := TFile.GetSize(LFile);
-            LInfo.LastModified := TFile.GetLastWriteTime(LFile);
-            LInfo.ProveedorNit := '';
-            LInfo.Proveedor := 'Sin procesar';
-            LInfo.FechaDocumento := 0;
-            LInfo.Estado := 'CARGADO';
-            LInfo.FechaCarga := LInfo.LastModified;
-            LDBData.Add(LFileNameOnly.ToLower, LInfo);
+            LFileNameOnly := TPath.GetFileName(LFile);
+            if LDBData.TryGetValue(LFileNameOnly.ToLower, LInfo) then
+            begin
+              // Solo completar si aún no tenía datos físicos.
+              if (LInfo.Size <= 0) or (LInfo.LastModified <= 0) then
+              begin
+                LInfo.Size := TFile.GetSize(LFile);
+                LInfo.LastModified := TFile.GetLastWriteTime(LFile);
+                LDBData.Items[LFileNameOnly.ToLower] := LInfo;
+              end;
+            end
+            else
+            begin
+              LInfo := Default(TCombinedFileInfo);
+              LInfo.ID := 0;
+              LInfo.FileName := LFileNameOnly;
+              LInfo.Size := TFile.GetSize(LFile);
+              LInfo.LastModified := TFile.GetLastWriteTime(LFile);
+              LInfo.ProveedorNit := '';
+              LInfo.Proveedor := 'Sin procesar';
+              LInfo.FechaDocumento := 0;
+              LInfo.Estado := 'CARGADO';
+              LInfo.FechaCarga := LInfo.LastModified;
+              LDBData.Add(LFileNameOnly.ToLower, LInfo);
+            end;
           end;
         end;
       end;
@@ -662,7 +754,10 @@ begin
           LJSONObj.AddPair('fechaDocumento', TJSONNull.Create);
         LJSONObj.AddPair('estado', LInfo.Estado);
         LJSONObj.AddPair('fechaCarga', FormatDateTime('yyyy-mm-dd HH:nn:ss', LInfo.FechaCarga));
-        LJSONObj.AddPair('lastModified', FormatDateTime('yyyy-mm-dd HH:nn:ss', LInfo.LastModified));
+        if LInfo.LastModified > 0 then
+          LJSONObj.AddPair('lastModified', FormatDateTime('yyyy-mm-dd HH:nn:ss', LInfo.LastModified))
+        else
+          LJSONObj.AddPair('lastModified', TJSONNull.Create);
         LJSONList.AddElement(LJSONObj);
       end;
       Res.Send(LJSONList);
@@ -782,7 +877,7 @@ begin
             Q.ParamByName('UNI').AsString := LUnidadXML;
             Q.ExecSQL;
 
-            // 3. Recalcular estado del XML después de homologar para mantener flujo PENDIENTE/LISTO.
+            // 3. Recalcular estado del XML después de homologar para mantener flujo PENDIENTE/VALIDADO.
             Q.SQL.Text :=
               'SELECT FIRST 1 XML_FILE_ID AS XML_FILE_ID ' +
               'FROM XML_PRODUCTOS ' +
@@ -806,9 +901,9 @@ begin
               LPendientes := Q.FieldByName('TOTAL').AsInteger;
               Q.Close;
 
-              // Si no hay pendientes queda LISTO; si hay pendientes se mantiene PENDIENTE.
+              // Si no hay pendientes queda VALIDADO; si hay pendientes se mantiene PENDIENTE.
               if LPendientes = 0 then
-                Q.SQL.Text := 'UPDATE XML_FILES SET ESTADO = ''LISTO'' WHERE ID = :XML_FILE_ID'
+                Q.SQL.Text := 'UPDATE XML_FILES SET ESTADO = ''VALIDADO'' WHERE ID = :XML_FILE_ID'
               else
                 Q.SQL.Text := 'UPDATE XML_FILES SET ESTADO = ''PENDIENTE'' WHERE ID = :XML_FILE_ID';
               Q.ParamByName('XML_FILE_ID').AsInteger := LXMLFileID;
@@ -1007,7 +1102,7 @@ begin
           LCargados := Q.FieldByName('TOTAL').AsInteger
         else if LEstado = 'PENDIENTE' then
           LPendientes := Q.FieldByName('TOTAL').AsInteger
-        else if LEstado = 'LISTO' then
+        else if LEstado = 'VALIDADO' then
           LListos := Q.FieldByName('TOTAL').AsInteger
         else if LEstado = 'PROCESADO' then
           LProcesados := Q.FieldByName('TOTAL').AsInteger

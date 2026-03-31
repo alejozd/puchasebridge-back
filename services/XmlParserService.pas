@@ -42,6 +42,7 @@ type
     TaxExclusiveAmount: Double;
     TaxInclusiveAmount: Double;
     ImpuestoTotal: Double;
+    RetencionTotal: Double;
     Total: Double;
   end;
 
@@ -71,6 +72,11 @@ type
 implementation
 
 { TXmlParserService }
+
+procedure Log(const AMsg: string);
+begin
+  Writeln(AMsg);
+end;
 
 class function TXmlParserService.CreateXMLDoc(const AXML: string): IXMLDocument;
 var
@@ -308,6 +314,10 @@ end;
 class function TXmlParserService.ParseTotales(ARootNode: IXMLNode): TInvoiceTotals;
 var
   LegalTotalNode, TaxTotalNode: IXMLNode;
+  I: Integer;
+  WithholdingNode: IXMLNode;
+  TaxSubtotalNode, TaxCategoryNode, TaxSchemeNode: IXMLNode;
+  IDNode, NameNode, TaxAmountNode: IXMLNode;
 begin
   Result := Default(TInvoiceTotals);
   LegalTotalNode := FindNodeByLocalName(ARootNode, 'LegalMonetaryTotal');
@@ -316,12 +326,52 @@ begin
     Result.Subtotal := GetNodeDoubleByLocalName(LegalTotalNode, 'LineExtensionAmount');
     Result.TaxExclusiveAmount := GetNodeDoubleByLocalName(LegalTotalNode, 'TaxExclusiveAmount');
     Result.TaxInclusiveAmount := GetNodeDoubleByLocalName(LegalTotalNode, 'TaxInclusiveAmount');
-    Result.Total := GetNodeDoubleByLocalName(LegalTotalNode, 'PayableAmount');
   end;
 
   TaxTotalNode := FindNodeByLocalName(ARootNode, 'TaxTotal');
   if TaxTotalNode <> nil then
     Result.ImpuestoTotal := GetNodeDoubleByLocalName(TaxTotalNode, 'TaxAmount');
+
+  // Retención: acumular SOLO WithholdingTaxTotal cuya TaxScheme sea ID=06 y Name=ReteRenta.
+  Result.RetencionTotal := 0;
+  for I := 0 to ARootNode.ChildNodes.Count - 1 do
+  begin
+    WithholdingNode := ARootNode.ChildNodes[I];
+    if (WithholdingNode = nil) or (not SameText(WithholdingNode.LocalName, 'WithholdingTaxTotal')) then
+      Continue;
+
+    TaxSubtotalNode := FindNodeByLocalName(WithholdingNode, 'TaxSubtotal');
+    if TaxSubtotalNode = nil then
+      Continue;
+
+    TaxCategoryNode := FindNodeByLocalName(TaxSubtotalNode, 'TaxCategory');
+    if TaxCategoryNode = nil then
+      Continue;
+
+    TaxSchemeNode := FindNodeByLocalName(TaxCategoryNode, 'TaxScheme');
+    if TaxSchemeNode = nil then
+      Continue;
+
+    IDNode := FindNodeByLocalName(TaxSchemeNode, 'ID');
+    NameNode := FindNodeByLocalName(TaxSchemeNode, 'Name');
+    if (IDNode = nil) or (NameNode = nil) then
+      Continue;
+
+    if SameText(Trim(IDNode.Text), '06') and SameText(Trim(NameNode.Text), 'ReteRenta') then
+    begin
+      TaxAmountNode := FindNodeByLocalName(WithholdingNode, 'TaxAmount');
+      if TaxAmountNode <> nil then
+        Result.RetencionTotal := Result.RetencionTotal +
+          StrToFloat(TaxAmountNode.Text, TFormatSettings.Invariant);
+    end;
+  end;
+
+  Log('TaxInclusiveAmount: ' + FloatToStr(Result.TaxInclusiveAmount));
+  Log('Retencion detectada: ' + FloatToStr(Result.RetencionTotal));
+  Result.Total := Result.TaxInclusiveAmount - Result.RetencionTotal;
+  if Result.Total < 0 then
+    Result.Total := 0;
+  Log('Total final: ' + FloatToStr(Result.Total));
 end;
 
 class function TXmlParserService.Parse(const XMLContent: string): TParsedInvoice;
