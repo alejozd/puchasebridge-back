@@ -33,6 +33,7 @@ uses
   AuthService in 'services\AuthService.pas',
   AuthController in 'controllers\AuthController.pas',
   AuthMiddleware in 'middleware\AuthMiddleware.pas',
+  uLogger in 'utils\uLogger.pas',
   ErrorResponseUtils in 'utils\ErrorResponseUtils.pas';
 
 function IsAllowedOrigin(const AOrigin: string): Boolean;
@@ -62,11 +63,11 @@ begin
   // Initialize configuration at startup
   try
     THConfig.GetInstance;
-    Writeln('Configuracion cargada correctamente.');
+    Log('Configuracion cargada correctamente.', llInfo);
   except
     on E: Exception do
     begin
-      Writeln('Error cargando configuracion: ' + E.Message);
+      Log('Error cargando configuracion: ' + E.Message, llError);
       Exit;
     end;
   end;
@@ -127,7 +128,7 @@ begin
   THorse.Listen(9000,
     procedure
     begin
-      Writeln('Server is running on port ' + IntToStr(THorse.Port));
-      Writeln('Press Enter to stop the server...');
+      Log('Server is running on port ' + IntToStr(THorse.Port), llInfo);
+      Log('Press Enter to stop the server...', llInfo);
     end);
 end.

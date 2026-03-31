@@ -5,7 +5,8 @@ interface
 uses
   Horse,
   System.JSON,
-  System.SysUtils;
+  System.SysUtils,
+  uLogger;
 
 procedure LogError(const AMessage: string);
 procedure SendErrorResponse(const Res: THorseResponse; const AStatus: Integer; const AMessage: string; const ADetail: string = '');
@@ -14,7 +15,7 @@ implementation
 
 procedure LogError(const AMessage: string);
 begin
-  Writeln(FormatDateTime('yyyy-mm-dd hh:nn:ss', Now) + ' [ERROR] ' + AMessage);
+  Log(AMessage, llError);
 end;
 
 procedure SendErrorResponse(const Res: THorseResponse; const AStatus: Integer; const AMessage: string; const ADetail: string = '');

@@ -10,7 +10,8 @@ uses
   Xml.XMLDoc,
   Xml.adomxmldom,
   Xml.xmldom,
-  Xml.XMLIntf;
+  Xml.XMLIntf,
+  uLogger;
 
 type
   TProductInfo = record
@@ -72,11 +73,6 @@ type
 implementation
 
 { TXmlParserService }
-
-procedure Log(const AMsg: string);
-begin
-  Writeln(AMsg);
-end;
 
 class function TXmlParserService.CreateXMLDoc(const AXML: string): IXMLDocument;
 var
@@ -366,12 +362,12 @@ begin
     end;
   end;
 
-  Log('TaxInclusiveAmount: ' + FloatToStr(Result.TaxInclusiveAmount));
-  Log('Retencion detectada: ' + FloatToStr(Result.RetencionTotal));
+  Log('TaxInclusiveAmount: ' + FloatToStr(Result.TaxInclusiveAmount), llDebug);
+  Log('Retencion detectada: ' + FloatToStr(Result.RetencionTotal), llDebug);
   Result.Total := Result.TaxInclusiveAmount - Result.RetencionTotal;
   if Result.Total < 0 then
     Result.Total := 0;
-  Log('Total final: ' + FloatToStr(Result.Total));
+  Log('Total final: ' + FloatToStr(Result.Total), llDebug);
 end;
 
 class function TXmlParserService.Parse(const XMLContent: string): TParsedInvoice;

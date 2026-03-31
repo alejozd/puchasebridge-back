@@ -7,6 +7,7 @@ uses
   System.Classes,
   System.JSON,
   System.IOUtils,
+  uLogger in 'utils/uLogger.pas',
   XmlParserService in 'services/XmlParserService.pas';
 
 var
@@ -17,35 +18,35 @@ begin
   try
     if not FileExists('PurchaseBridge/Input/factura.xml') then
     begin
-      Writeln('File not found: PurchaseBridge/Input/factura.xml');
+      Log('File not found: PurchaseBridge/Input/factura.xml', llError);
       Halt(1);
     end;
 
     XMLContent := TFile.ReadAllText('PurchaseBridge/Input/factura.xml', TEncoding.UTF8);
     ParsedInvoice := TXmlParserService.Parse(XMLContent);
 
-    Writeln('Proveedor:');
-    Writeln('  NIT: ', ParsedInvoice.Provider.NIT);
-    Writeln('  Nombre: ', ParsedInvoice.Provider.Nombre);
-    Writeln('  Direccion: ', ParsedInvoice.Provider.Direccion);
+    Log('Proveedor:', llInfo);
+    Log('  NIT: ' + ParsedInvoice.Provider.NIT, llInfo);
+    Log('  Nombre: ' + ParsedInvoice.Provider.Nombre, llInfo);
+    Log('  Direccion: ' + ParsedInvoice.Provider.Direccion, llInfo);
 
-    Writeln('Productos: ', Length(ParsedInvoice.Products));
+    Log('Productos: ' + IntToStr(Length(ParsedInvoice.Products)), llInfo);
     for I := 0 to Length(ParsedInvoice.Products) - 1 do
     begin
-      Writeln('  - ', ParsedInvoice.Products[I].Descripcion);
-      Writeln('    Referencia: ', ParsedInvoice.Products[I].Referencia);
-      Writeln('    Cantidad: ', ParsedInvoice.Products[I].Cantidad:0:2);
-      Writeln('    Valor Unitario: ', ParsedInvoice.Products[I].ValorUnitario:0:2);
-      Writeln('    Impuesto: ', ParsedInvoice.Products[I].Impuesto:0:2);
+      Log('  - ' + ParsedInvoice.Products[I].Descripcion, llInfo);
+      Log('    Referencia: ' + ParsedInvoice.Products[I].Referencia, llInfo);
+      Log(Format('    Cantidad: %.2f', [ParsedInvoice.Products[I].Cantidad]), llInfo);
+      Log(Format('    Valor Unitario: %.2f', [ParsedInvoice.Products[I].ValorUnitario]), llInfo);
+      Log(Format('    Impuesto: %.2f', [ParsedInvoice.Products[I].Impuesto]), llInfo);
     end;
 
-    Writeln('Totales:');
-    Writeln('  Subtotal: ', ParsedInvoice.Totals.Subtotal:0:2);
-    Writeln('  Impuesto Total: ', ParsedInvoice.Totals.ImpuestoTotal:0:2);
-    Writeln('  Total: ', ParsedInvoice.Totals.Total:0:2);
+    Log('Totales:', llInfo);
+    Log(Format('  Subtotal: %.2f', [ParsedInvoice.Totals.Subtotal]), llInfo);
+    Log(Format('  Impuesto Total: %.2f', [ParsedInvoice.Totals.ImpuestoTotal]), llInfo);
+    Log(Format('  Total: %.2f', [ParsedInvoice.Totals.Total]), llInfo);
 
   except
     on E: Exception do
-      Writeln(E.ClassName, ': ', E.Message);
+      Log(E.ClassName + ': ' + E.Message, llError);
   end;
 end.
