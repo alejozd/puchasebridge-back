@@ -63,10 +63,12 @@ begin
   // Initialize configuration at startup
   try
     THConfig.GetInstance;
+    Writeln('Configuracion cargada correctamente.');
     Log('Configuracion cargada correctamente.', llInfo);
   except
     on E: Exception do
     begin
+      Writeln('Error cargando configuracion: ' + E.Message);
       Log('Error cargando configuracion: ' + E.Message, llError);
       Exit;
     end;
@@ -128,6 +130,8 @@ begin
   THorse.Listen(9000,
     procedure
     begin
+      Writeln('Server is running on port ' + IntToStr(THorse.Port));
+      Writeln('Press Enter to stop the server...');
       Log('Server is running on port ' + IntToStr(THorse.Port), llInfo);
       Log('Press Enter to stop the server...', llInfo);
     end);
