@@ -313,7 +313,11 @@ end;
 
 class function TXmlParserService.ParseTotales(ARootNode: IXMLNode): TInvoiceTotals;
 var
-  LegalTotalNode, TaxTotalNode, WithholdingTaxTotalNode, TaxNode: IXMLNode;
+  LegalTotalNode, TaxTotalNode: IXMLNode;
+  I: Integer;
+  WithholdingNode: IXMLNode;
+  TaxSubtotalNode, TaxCategoryNode, TaxSchemeNode: IXMLNode;
+  IDNode, NameNode, TaxAmountNode: IXMLNode;
 begin
   Result := Default(TInvoiceTotals);
   LegalTotalNode := FindNodeByLocalName(ARootNode, 'LegalMonetaryTotal');
@@ -328,18 +332,39 @@ begin
   if TaxTotalNode <> nil then
     Result.ImpuestoTotal := GetNodeDoubleByLocalName(TaxTotalNode, 'TaxAmount');
 
-  // Buscar WithholdingTaxTotal de forma recursiva y tomar SOLO su TaxAmount directo.
-  WithholdingTaxTotalNode := FindNodeByLocalNameRecursive(ARootNode, 'WithholdingTaxTotal');
-  if WithholdingTaxTotalNode <> nil then
+  // Retención: acumular SOLO WithholdingTaxTotal cuya TaxScheme sea ID=06 y Name=ReteRenta.
+  Result.RetencionTotal := 0;
+  for I := 0 to ARootNode.ChildNodes.Count - 1 do
   begin
-    TaxNode := FindNodeByLocalName(WithholdingTaxTotalNode, 'TaxAmount');
-    if TaxNode <> nil then
-      Result.RetencionTotal := StrToFloat(TaxNode.Text, TFormatSettings.Invariant)
-    else
-      Result.RetencionTotal := 0;
-  end
-  else
-    Result.RetencionTotal := 0;
+    WithholdingNode := ARootNode.ChildNodes[I];
+    if (WithholdingNode = nil) or (not SameText(WithholdingNode.LocalName, 'WithholdingTaxTotal')) then
+      Continue;
+
+    TaxSubtotalNode := FindNodeByLocalName(WithholdingNode, 'TaxSubtotal');
+    if TaxSubtotalNode = nil then
+      Continue;
+
+    TaxCategoryNode := FindNodeByLocalName(TaxSubtotalNode, 'TaxCategory');
+    if TaxCategoryNode = nil then
+      Continue;
+
+    TaxSchemeNode := FindNodeByLocalName(TaxCategoryNode, 'TaxScheme');
+    if TaxSchemeNode = nil then
+      Continue;
+
+    IDNode := FindNodeByLocalName(TaxSchemeNode, 'ID');
+    NameNode := FindNodeByLocalName(TaxSchemeNode, 'Name');
+    if (IDNode = nil) or (NameNode = nil) then
+      Continue;
+
+    if SameText(Trim(IDNode.Text), '06') and SameText(Trim(NameNode.Text), 'ReteRenta') then
+    begin
+      TaxAmountNode := FindNodeByLocalName(WithholdingNode, 'TaxAmount');
+      if TaxAmountNode <> nil then
+        Result.RetencionTotal := Result.RetencionTotal +
+          StrToFloat(TaxAmountNode.Text, TFormatSettings.Invariant);
+    end;
+  end;
 
   Log('TaxInclusiveAmount: ' + FloatToStr(Result.TaxInclusiveAmount));
   Log('Retencion detectada: ' + FloatToStr(Result.RetencionTotal));
