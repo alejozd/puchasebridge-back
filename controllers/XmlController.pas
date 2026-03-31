@@ -84,6 +84,21 @@ begin
   end;
 end;
 
+function FindXmlFile(const AFileName: string): string;
+var
+  LInputPath, LProcessedPath: string;
+begin
+  Result := '';
+  LInputPath := TPath.Combine('PurchaseBridge', 'Input');
+  LProcessedPath := TPath.Combine('PurchaseBridge', 'Processed');
+
+  if TFile.Exists(TPath.Combine(LInputPath, AFileName)) then
+    Exit(TPath.Combine(LInputPath, AFileName));
+
+  if TFile.Exists(TPath.Combine(LProcessedPath, AFileName)) then
+    Exit(TPath.Combine(LProcessedPath, AFileName));
+end;
+
 procedure Upload(Req: THorseRequest; Res: THorseResponse; Next: TProc);
 var
   LFile: TAbstractWebRequestFile;
@@ -190,7 +205,7 @@ end;
 procedure Parse(Req: THorseRequest; Res: THorseResponse; Next: TProc);
 var
   LBody: TJSONObject;
-  LFileName, LPath, LFullFile: string;
+  LFileName, LFullFile: string;
   LXMLContent: string;
   LParsedInvoice: TParsedInvoice;
   LResponse: TJSONObject;
@@ -213,10 +228,9 @@ begin
     end;
 
     LFileName := TPath.GetFileName(LFileName);
-    LPath := TPath.Combine('PurchaseBridge', 'Input');
-    LFullFile := TPath.Combine(LPath, LFileName);
+    LFullFile := FindXmlFile(LFileName);
 
-    if not TFile.Exists(LFullFile) then
+    if LFullFile.IsEmpty then
     begin
       LResponse := TJSONObject.Create;
       LResponse.AddPair('success', TJSONBool.Create(False));
@@ -224,6 +238,8 @@ begin
       Res.Status(404).Send(LResponse);
       Exit;
     end;
+
+    Writeln('Archivo encontrado para parse en: ' + LFullFile);
 
     try
       LXMLContent := TFile.ReadAllText(LFullFile, TEncoding.UTF8);
