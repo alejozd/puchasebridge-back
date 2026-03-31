@@ -12,7 +12,8 @@ uses
   System.SysUtils,
   XMLFacturaService,
   ProveedorRepository,
-  ProductoRepository;
+  ProductoRepository,
+  ErrorResponseUtils;
 
 procedure PostFacturaXML(Req: THorseRequest; Res: THorseResponse; Next: TProc);
 var
@@ -24,14 +25,14 @@ var
   Proveedor: TProveedorInfo;
   ExisteProductoVar: Boolean;
 begin
-  XMLContent := Req.Body;
-  if XMLContent = '' then
-  begin
-    Res.Status(400).Send('Cuerpo XML vac' + #237 + 'o');
-    Exit;
-  end;
-
   try
+    XMLContent := Req.Body;
+    if XMLContent = '' then
+    begin
+      SendErrorResponse(Res, 400, 'Cuerpo XML vacío');
+      Exit;
+    end;
+
     Factura := TXMLFacturaService.Parsear(XMLContent);
 
     ResponseJSON := TJSONObject.Create;
@@ -62,7 +63,10 @@ begin
     Res.Send(ResponseJSON);
   except
     on E: Exception do
-      Res.Status(500).Send('Error procesando XML: ' + E.Message);
+    begin
+      LogError(E.Message);
+      SendErrorResponse(Res, 500, 'Error interno del servidor', E.Message);
+    end;
   end;
 end;
 

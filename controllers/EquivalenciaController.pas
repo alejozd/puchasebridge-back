@@ -11,7 +11,8 @@ uses
   System.JSON,
   System.SysUtils,
   FireDAC.Comp.Client,
-  EquivalenciaService;
+  EquivalenciaService,
+  ErrorResponseUtils;
 
 procedure List(Req: THorseRequest; Res: THorseResponse; Next: TProc);
 var
@@ -61,7 +62,8 @@ begin
   except
     on E: Exception do
     begin
-      Res.Status(500).Send(TJSONObject.Create.AddPair('error', E.Message));
+      LogError(E.Message);
+      SendErrorResponse(Res, 500, 'Error interno del servidor', E.Message);
     end;
   end;
 end;
@@ -155,7 +157,8 @@ begin
         end
         else
         begin
-          LResponse.AddPair('message', E.Message);
+          LResponse.AddPair('message', 'Error interno del servidor');
+          LResponse.AddPair('detail', E.Message);
           Res.Status(500).Send(LResponse);
         end;
       end;
@@ -164,10 +167,8 @@ begin
   except
     on E: Exception do
     begin
-      LResponse := TJSONObject.Create;
-      LResponse.AddPair('success', TJSONBool.Create(False));
-      LResponse.AddPair('message', E.Message);
-      Res.Status(500).Send(LResponse);
+      LogError(E.Message);
+      SendErrorResponse(Res, 500, 'Error interno del servidor', E.Message);
     end;
   end;
 end;
@@ -182,13 +183,13 @@ begin
   try
     if not Req.Query.TryGetValue('referenciaP', LRefP) or LRefP.Trim.IsEmpty then
     begin
-      Res.Status(400).Send(TJSONObject.Create.AddPair('error', 'El parámetro "referenciaP" es obligatorio'));
+      SendErrorResponse(Res, 400, 'El parámetro "referenciaP" es obligatorio');
       Exit;
     end;
 
     if not Req.Query.TryGetValue('unidadP', LUniP) or LUniP.Trim.IsEmpty then
     begin
-      Res.Status(400).Send(TJSONObject.Create.AddPair('error', 'El parámetro "unidadP" es obligatorio'));
+      SendErrorResponse(Res, 400, 'El parámetro "unidadP" es obligatorio');
       Exit;
     end;
 
@@ -205,7 +206,8 @@ begin
   except
     on E: Exception do
     begin
-      Res.Status(500).Send(TJSONObject.Create.AddPair('error', E.Message));
+      LogError(E.Message);
+      SendErrorResponse(Res, 500, 'Error interno del servidor', E.Message);
     end;
   end;
 end;

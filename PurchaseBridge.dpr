@@ -32,7 +32,8 @@ uses
   DocumentosController in 'controllers\DocumentosController.pas',
   AuthService in 'services\AuthService.pas',
   AuthController in 'controllers\AuthController.pas',
-  AuthMiddleware in 'middleware\AuthMiddleware.pas';
+  AuthMiddleware in 'middleware\AuthMiddleware.pas',
+  ErrorResponseUtils in 'utils\ErrorResponseUtils.pas';
 
 function IsAllowedOrigin(const AOrigin: string): Boolean;
 begin
@@ -84,7 +85,26 @@ begin
 
         Next();
       end)
-    .Use(HandleException)
+    .Use(HandleException(
+      procedure(const E: Exception; const Req: THorseRequest; const Res: THorseResponse; var ASendException: Boolean)
+      var
+        LStatus: Integer;
+        LMessage: string;
+      begin
+        LogError(E.Message);
+        LStatus := Integer(THTTPStatus.InternalServerError);
+        LMessage := 'Error interno del servidor';
+
+        if E is EHorseException then
+        begin
+          LStatus := Integer(EHorseException(E).Status);
+          if not EHorseException(E).Error.Trim.IsEmpty then
+            LMessage := EHorseException(E).Error;
+        end;
+
+        SendErrorResponse(Res, LStatus, LMessage, E.Message);
+        ASendException := False;
+      end))
     .Use(Jhonson())
     .Use(OctetStream)
     .Use(Auth);
