@@ -10,7 +10,8 @@ uses
   Horse,
   System.JSON,
   System.SysUtils,
-  AuthService;
+  AuthService,
+  ErrorResponseUtils;
 
 procedure Login(Req: THorseRequest; Res: THorseResponse; Next: TProc);
 var
@@ -30,9 +31,15 @@ begin
     Res.Send<TJSONObject>(LResponse);
   except
     on E: EHorseException do
-      Res.Status(E.Status).Send(TJSONObject.Create.AddPair('error', E.Error));
+    begin
+      LogError(E.Message);
+      SendErrorResponse(Res, Integer(E.Status), E.Error, E.Message);
+    end;
     on E: Exception do
-      Res.Status(THTTPStatus.InternalServerError).Send(TJSONObject.Create.AddPair('error', E.Message));
+    begin
+      LogError(E.Message);
+      SendErrorResponse(Res, Integer(THTTPStatus.InternalServerError), 'Error interno del servidor', E.Message);
+    end;
   end;
 end;
 

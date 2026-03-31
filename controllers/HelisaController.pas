@@ -11,7 +11,8 @@ uses
   System.JSON,
   System.SysUtils,
   FireDAC.Comp.Client,
-  FirebirdConnection;
+  FirebirdConnection,
+  ErrorResponseUtils;
 
 procedure GetProductos(Req: THorseRequest; Res: THorseResponse; Next: TProc);
 var
@@ -25,7 +26,7 @@ begin
   try
     if not Req.Query.TryGetValue('search', LFiltro) or LFiltro.Trim.IsEmpty then
     begin
-      Res.Status(400).Send(TJSONObject.Create.AddPair('error', 'El parámetro "search" es obligatorio'));
+      SendErrorResponse(Res, 400, 'El parámetro "search" es obligatorio');
       Exit;
     end;
 
@@ -89,7 +90,8 @@ begin
   except
     on E: Exception do
     begin
-      Res.Status(500).Send(TJSONObject.Create.AddPair('error', E.Message));
+      LogError(E.Message);
+      SendErrorResponse(Res, 500, 'Error interno del servidor', E.Message);
     end;
   end;
 end;
@@ -127,7 +129,8 @@ begin
   except
     on E: Exception do
     begin
-      Res.Status(500).Send(TJSONObject.Create.AddPair('error', E.Message));
+      LogError(E.Message);
+      SendErrorResponse(Res, 500, 'Error interno del servidor', E.Message);
     end;
   end;
 end;

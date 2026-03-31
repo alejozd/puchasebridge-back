@@ -5,8 +5,8 @@ interface
 uses
   Horse,
   System.SysUtils,
-  System.JSON,
-  AuthService;
+  AuthService,
+  ErrorResponseUtils;
 
 procedure Auth(Req: THorseRequest; Res: THorseResponse; Next: TProc);
 
@@ -24,7 +24,6 @@ var
   LToken: string;
   LSession: TSessionInfo;
   LPath: string;
-  LResponse: TJSONObject;
 begin
   // CRITICO: nunca bloquear preflight en autenticacion
   if SameText(Req.RawWebRequest.Method, 'OPTIONS') then
@@ -45,25 +44,28 @@ begin
 
   if LToken.IsEmpty then
   begin
-    LResponse := TJSONObject.Create;
-    LResponse.AddPair('success', TJSONBool.Create(False));
-    LResponse.AddPair('message', 'Token requerido');
-    Res.Status(THTTPStatus.Unauthorized).Send(LResponse);
+    SendErrorResponse(Res, Integer(THTTPStatus.Unauthorized), 'Sesión expirada');
     Exit;
   end;
 
   if not LToken.StartsWith('Bearer ', True) then
   begin
-    LResponse := TJSONObject.Create;
-    LResponse.AddPair('success', TJSONBool.Create(False));
-    LResponse.AddPair('message', 'Token inválido');
-    Res.Status(THTTPStatus.Unauthorized).Send(LResponse);
+    SendErrorResponse(Res, Integer(THTTPStatus.Unauthorized), 'Sesión expirada');
     Exit;
   end;
 
   LToken := LToken.Replace('Bearer ', '', [rfReplaceAll, rfIgnoreCase]).Trim;
 
-  LSession := AuthService.ValidateToken(LToken);
+  try
+    LSession := AuthService.ValidateToken(LToken);
+  except
+    on E: Exception do
+    begin
+      LogError(E.Message);
+      SendErrorResponse(Res, Integer(THTTPStatus.Unauthorized), 'Sesión expirada', E.Message);
+      Exit;
+    end;
+  end;
 
   // Inyectar usuario en el contexto
   Req.Session(TSessionInfoObj.Create(LSession));
