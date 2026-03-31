@@ -10,7 +10,8 @@ uses
   FireDAC.Stan.Param,
   FirebirdConnection,
   XmlParserService,
-  HelisaService;
+  HelisaService,
+  uLogger;
 
 type
   TDocumentoHeader = record
@@ -152,10 +153,10 @@ begin
           LHEDetalles[I].VrReteFuente := ADetalles[I].VrReteFuente;
         end;
 
-        Writeln('Insertando en Helisa...');
+        Log('Insertando en Helisa...', llInfo);
         LDocumentoERP := HelisaService.InsertarOrdenCompra(LHEHeader, LHEDetalles);
-        Writeln('Documento ERP generado: ' + LDocumentoERP);
-        Writeln('Actualizando DOCUMENTO ID: ' + IntToStr(LDocumentoID));
+        Log('Documento ERP generado: ' + LDocumentoERP, llInfo);
+        Log('Actualizando DOCUMENTO ID: ' + IntToStr(LDocumentoID), llInfo);
 
         // Actualizar estado final del flujo y guardar documento ERP en columnas separadas.
         Q.SQL.Text :=
@@ -194,7 +195,7 @@ begin
             [LDocumentoID, LEstadoFinal, LDocumentoERPFinal]
           );
 
-        Writeln('Estado final: PROCESADO');
+        Log('Estado final: PROCESADO', llInfo);
         Conn.Commit;
         Result := LDocumentoERP;
       finally

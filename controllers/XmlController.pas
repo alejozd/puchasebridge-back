@@ -23,14 +23,10 @@ uses
   FirebirdConnection,
   EquivalenciaService,
   HelisaService,
-  DianUnits;
+  DianUnits,
+  uLogger;
 
 type
-  Logger = class
-  public
-    class procedure Info(const AMsg: string); static;
-  end;
-
   TCombinedFileInfo = record
     ID: Integer;
     FileName: string;
@@ -43,10 +39,6 @@ type
     LastModified: TDateTime;
   end;
 
-class procedure Logger.Info(const AMsg: string);
-begin
-  Writeln(AMsg);
-end;
 
 function ResolveUnidadSigla(const AUnidadCodigo: string): string;
 var
@@ -239,7 +231,7 @@ begin
       Exit;
     end;
 
-    Writeln('Archivo encontrado para parse en: ' + LFullFile);
+    Log('Archivo encontrado para parse en: ' + LFullFile, llInfo);
 
     try
       LXMLContent := TFile.ReadAllText(LFullFile, TEncoding.UTF8);
@@ -492,7 +484,7 @@ begin
             Q.Connection.Commit;
             LRechazadosArr.AddElement(TJSONNumber.Create(LId));
             Inc(LRechazadosCount);
-            Writeln(Format('Documento %d no procesado: productos pendientes de homologación', [LId]));
+            Log(Format('Documento %d no procesado: productos pendientes de homologación', [LId]), llWarn);
             Continue;
           end;
 
@@ -510,7 +502,7 @@ begin
           if LEstadoFinal <> 'PROCESADO' then
             raise Exception.CreateFmt('Estado final inválido para ID %d. Estado actual: %s', [LId, LEstadoFinal]);
 
-          Logger.Info('Documento actualizado a PROCESADO ID: ' + IntToStr(LId));
+          Log('Documento actualizado a PROCESADO ID: ' + IntToStr(LId), llInfo);
           Q.Connection.Commit;
 
           LProcesadosArr.AddElement(TJSONNumber.Create(LId));
@@ -522,7 +514,7 @@ begin
               Q.Connection.Rollback;
             LRechazadosArr.AddElement(TJSONNumber.Create(LId));
             Inc(LRechazadosCount);
-            Writeln(Format('Documento %d no procesado: %s', [LId, E.Message]));
+            Log(Format('Documento %d no procesado: %s', [LId, E.Message]), llError);
           end;
         end;
       end;
