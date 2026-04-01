@@ -31,7 +31,9 @@ uses
   HelisaController in 'controllers\HelisaController.pas',
   DocumentosController in 'controllers\DocumentosController.pas',
   AuthService in 'services\AuthService.pas',
+  LicenciaService in 'services\LicenciaService.pas',
   AuthController in 'controllers\AuthController.pas',
+  uLicenciaController in 'controllers\uLicenciaController.pas',
   AuthMiddleware in 'middleware\AuthMiddleware.pas',
   uLogger in 'utils\uLogger.pas',
   ErrorResponseUtils in 'utils\ErrorResponseUtils.pas';
@@ -126,6 +128,7 @@ begin
   HelisaController.Registry;
   DocumentosController.Registry;
   AuthController.Registry;
+  uLicenciaController.Registry;
 
   THorse.Listen(9000,
     procedure
