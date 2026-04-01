@@ -34,7 +34,8 @@ uses
   AuthController in 'controllers\AuthController.pas',
   AuthMiddleware in 'middleware\AuthMiddleware.pas',
   uLogger in 'utils\uLogger.pas',
-  ErrorResponseUtils in 'utils\ErrorResponseUtils.pas';
+  ErrorResponseUtils in 'utils\ErrorResponseUtils.pas',
+  LicenseService in 'services\LicenseService.pas';
 
 function IsAllowedOrigin(const AOrigin: string): Boolean;
 begin
@@ -70,6 +71,18 @@ begin
     begin
       Writeln('Error cargando configuracion: ' + E.Message);
       Log('Error cargando configuracion: ' + E.Message, llError);
+      Exit;
+    end;
+  end;
+
+  // Initialize licensing
+  try
+    TLicenseService.InicializarLicencia;
+  except
+    on E: Exception do
+    begin
+      Writeln('Error en validacion de licencia: ' + E.Message);
+      Log('Error en validacion de licencia: ' + E.Message, llError);
       Exit;
     end;
   end;

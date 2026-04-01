@@ -15,9 +15,16 @@ type
     Empresa: string;
   end;
 
+  TLicensingConfig = record
+    URLServidor: string;
+    Nit: string;
+    AppName: string;
+  end;
+
   THConfig = class
   private
     FConfig: THelisaConfig;
+    FLicense: TLicensingConfig;
     class var FInstance: THConfig;
     class var FLock: TCriticalSection;
     constructor Create;
@@ -25,6 +32,7 @@ type
   public
     class function GetInstance: THConfig;
     property Config: THelisaConfig read FConfig;
+    property License: TLicensingConfig read FLicense;
   end;
 
 const
@@ -88,6 +96,10 @@ begin
   Ini := TIniFile.Create(TPath.Combine(AppPath, 'config.ini'));
   try
     FConfig.Empresa := Ini.ReadString('HELISA', 'Empresa', '0');
+
+    FLicense.URLServidor := Ini.ReadString('LICENCIA', 'URLServidor', 'http://localhost:3000');
+    FLicense.Nit := Ini.ReadString('LICENCIA', 'Nit', '');
+    FLicense.AppName := Ini.ReadString('LICENCIA', 'AppName', 'purchasebridge');
   finally
     Ini.Free;
   end;
