@@ -8,6 +8,7 @@ uses
   System.JSON,
   System.Net.HttpClient,
   System.Net.HttpClientComponent,
+  System.Net.URLClient,
   System.IOUtils,
   System.Classes,
   HConfig,
@@ -183,7 +184,8 @@ begin
     try
       try
         SetLength(LHeaders, 1);
-        LHeaders[0] := TNetHeader.Create('Content-Type', 'application/json');
+        LHeaders[0].Name := 'Content-Type';
+        LHeaders[0].Value := 'application/json';
 
         LResponse := LHTTP.Post(LConfig.URLServidor + '/api/licencias/activar', LBody, nil, LHeaders);
 
@@ -254,7 +256,8 @@ begin
     try
       try
         SetLength(LHeaders, 1);
-        LHeaders[0] := TNetHeader.Create('Content-Type', 'application/json');
+        LHeaders[0].Name := 'Content-Type';
+        LHeaders[0].Value := 'application/json';
 
         LResponse := LHTTP.Post(LConfig.URLServidor + '/api/licencias/validar', LBody, nil, LHeaders);
 
@@ -316,7 +319,6 @@ begin
 
     if LEstado.Value = 'bloqueado' then Exit(False);
 
-    // Explicit string cast and explicit use of 2-parameter TryISO8601ToDate (most compatible)
     LDateStr := string(LExpiraStr.Value);
     if TryISO8601ToDate(LDateStr, LExpira) then
     begin
