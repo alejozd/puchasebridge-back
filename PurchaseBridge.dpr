@@ -33,12 +33,75 @@ uses
   AuthService in 'services\AuthService.pas',
   AuthController in 'controllers\AuthController.pas',
   AuthMiddleware in 'middleware\AuthMiddleware.pas',
+  LicenseService in 'services\LicenseService.pas',
   uLogger in 'utils\uLogger.pas',
   ErrorResponseUtils in 'utils\ErrorResponseUtils.pas';
 
 function IsAllowedOrigin(const AOrigin: string): Boolean;
 begin
   Result := MatchText(AOrigin, ['http://localhost:5173', 'http://127.0.0.1:5173']);
+end;
+
+procedure InicializarLicencia;
+var
+  LService: TLicenciaService;
+  LInfo: TLicenciaInfo;
+  LHash: string;
+  LNit: string;
+  LCodigo: string;
+begin
+  LInfo := nil;
+  LHash := THConfig.GetInstance.Config.InstalacionHash;
+  if LHash.IsEmpty then
+  begin
+    LHash := TLicenciaService.GenerarHashInstalacion;
+    THConfig.GetInstance.UpdateInstalacionHash(LHash);
+    Log('Nuevo Hash de Instalacion generado: ' + LHash, llInfo);
+  end;
+
+  LNit := THConfig.GetInstance.Config.Nit;
+  LService := TLicenciaService.Create(THConfig.GetInstance.Config.URLServidorLicencia);
+  try
+    Log('Validando licencia para NIT: ' + LNit, llInfo);
+    if not LService.ValidarLicencia(LNit, LHash, LInfo) then
+    begin
+      Log('Licencia no valida. Estado: ' + LInfo.Estado, llWarn);
+      Writeln('La licencia actual no es valida o ha expirado (Estado: ' + LInfo.Estado + ').');
+
+      if LInfo.Estado = 'bloqueado' then
+      begin
+        Log('Sistema bloqueado por el servidor de licencias.', llError);
+        raise Exception.Create('Acceso denegado: El sistema se encuentra bloqueado.');
+      end;
+
+      Write('Ingrese codigo de activacion: ');
+      Readln(LCodigo);
+
+      LInfo.Free;
+      if LService.RegistrarLicencia(LNit, LHash, LCodigo, LInfo) then
+      begin
+        Writeln('Activacion exitosa! Estado: ' + LInfo.Estado + '. Expira: ' + DateToStr(LInfo.Expira));
+        Log('Activacion exitosa.', llInfo);
+      end
+      else
+      begin
+        Log('Fallo la activacion: ' + LInfo.Mensaje, llError);
+        raise Exception.Create('Error de activacion: ' + LInfo.Mensaje);
+      end;
+    end
+    else
+    begin
+      Log('Licencia validada correctamente. Estado: ' + LInfo.Estado, llInfo);
+      if LInfo.Estado = 'demo' then
+      begin
+        Writeln('ADVERTENCIA: El sistema esta operando en modo DEMO. Dias restantes: ' + IntToStr(LInfo.DiasRestantes));
+        Log('Sistema en modo DEMO. Dias restantes: ' + IntToStr(LInfo.DiasRestantes), llWarn);
+      end;
+    end;
+  finally
+    LInfo.Free;
+    LService.Free;
+  end;
 end;
 
 procedure ApplyCORSHeaders(const Req: THorseRequest; const Res: THorseResponse);
@@ -60,16 +123,16 @@ begin
 end;
 
 begin
-  // Initialize configuration at startup
+  // Initialize configuration and licensing at startup
   try
     THConfig.GetInstance;
-    Writeln('Configuracion cargada correctamente.');
     Log('Configuracion cargada correctamente.', llInfo);
+    InicializarLicencia;
   except
     on E: Exception do
     begin
-      Writeln('Error cargando configuracion: ' + E.Message);
-      Log('Error cargando configuracion: ' + E.Message, llError);
+      Writeln('Error en el inicio del sistema: ' + E.Message);
+      Log('Error en el inicio del sistema: ' + E.Message, llError);
       Exit;
     end;
   end;

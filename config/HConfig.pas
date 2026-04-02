@@ -13,6 +13,9 @@ type
     Servidor: string;
     Tipo: string;
     Empresa: string;
+    Nit: string;
+    URLServidorLicencia: string;
+    InstalacionHash: string;
   end;
 
   THConfig = class
@@ -24,6 +27,7 @@ type
     procedure Load;
   public
     class function GetInstance: THConfig;
+    procedure UpdateInstalacionHash(const AHash: string);
     property Config: THelisaConfig read FConfig;
   end;
 
@@ -88,6 +92,24 @@ begin
   Ini := TIniFile.Create(TPath.Combine(AppPath, 'config.ini'));
   try
     FConfig.Empresa := Ini.ReadString('HELISA', 'Empresa', '0');
+    FConfig.Nit := Ini.ReadString('LICENCIA', 'Nit', '');
+    FConfig.URLServidorLicencia := Ini.ReadString('LICENCIA', 'URLServidor', 'https://api.zdevs.uk');
+    FConfig.InstalacionHash := Ini.ReadString('LICENCIA', 'InstalacionHash', '');
+  finally
+    Ini.Free;
+  end;
+end;
+
+procedure THConfig.UpdateInstalacionHash(const AHash: string);
+var
+  Ini: TIniFile;
+  AppPath: string;
+begin
+  FConfig.InstalacionHash := AHash;
+  AppPath := TPath.GetDirectoryName(GetModuleName(HInstance));
+  Ini := TIniFile.Create(TPath.Combine(AppPath, 'config.ini'));
+  try
+    Ini.WriteString('LICENCIA', 'InstalacionHash', AHash);
   finally
     Ini.Free;
   end;
