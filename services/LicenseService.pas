@@ -72,6 +72,7 @@ end;
 class function TLicenseService.GetInstalacionHash: string;
 var
   RawString: string;
+  LConfig: THConfig;
 {$IFDEF MSWINDOWS}
   ComputerName: array[0..MAX_COMPUTERNAME_LENGTH] of Char;
   Size: DWORD;
@@ -82,21 +83,34 @@ var
   FileSystemFlags: DWORD;
 {$ENDIF}
 begin
+  LConfig := THConfig.GetInstance;
+  Result := LConfig.License.InstalacionHash;
+
+  if Result.IsEmpty then
+  begin
+    Log('Generando nuevo hash de instalacion...', llInfo);
 {$IFDEF MSWINDOWS}
-  Size := MAX_COMPUTERNAME_LENGTH + 1;
-  GetComputerName(ComputerName, Size);
+    Size := MAX_COMPUTERNAME_LENGTH + 1;
+    GetComputerName(ComputerName, Size);
 
-  UserSize := UNLEN + 1;
-  GetUserName(UserName, UserSize);
+    UserSize := UNLEN + 1;
+    GetUserName(UserName, UserSize);
 
-  VolumeSerialNumber := 0;
-  GetVolumeInformation('C:\', nil, 0, @VolumeSerialNumber, MaximumComponentLength, FileSystemFlags, nil, 0);
+    VolumeSerialNumber := 0;
+    GetVolumeInformation('C:\', nil, 0, @VolumeSerialNumber, MaximumComponentLength, FileSystemFlags, nil, 0);
 
-  RawString := string(ComputerName) + '|' + string(UserName) + '|' + IntToHex(VolumeSerialNumber, 8);
+    RawString := string(ComputerName) + '|' + string(UserName) + '|' + IntToHex(VolumeSerialNumber, 8);
 {$ELSE}
-  RawString := 'NON_WINDOWS_MACHINE';
+    RawString := 'NON_WINDOWS_MACHINE';
 {$ENDIF}
-  Result := THashSHA2.GetHashString(RawString);
+    Result := THashSHA2.GetHashString(RawString);
+    LConfig.UpdateInstalacionHash(Result);
+    Log('Nuevo hash generado y guardado: ' + Result, llInfo);
+  end
+  else
+  begin
+    Log('Usando hash de instalacion persistido: ' + Result, llDebug);
+  end;
 end;
 
 class function TLicenseService.GetLicenseFilePath: string;
