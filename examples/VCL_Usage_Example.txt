@@ -1,0 +1,74 @@
+{
+  Ejemplo de uso de TLicenciaService desde un Form VCL.
+}
+
+procedure TFormPrincipal.FormCreate(Sender: TObject);
+var
+  LHash: string;
+  LNit: string;
+begin
+  // 1. Inicializar configuración (HConfig) y Licencia
+  try
+    THConfig.GetInstance; // Carga config.ini
+    LNit := THConfig.GetInstance.License.Nit;
+    LHash := TLicenciaService.GenerarHashInstalacion;
+
+    // 2. Intentar validar
+    if not TLicenciaService.ValidarLicencia(LNit, LHash) then
+    begin
+      // 3. Si falla, intentar modo offline
+      if not TLicenciaService.ValidarOffline then
+      begin
+        // 4. Si todo falla, solicitar código (Ejemplo simple)
+        ShowMessage('Licencia no valida o expirada. Por favor, registre su aplicacion.');
+        SolicitarRegistro;
+      end;
+    end;
+
+    // 5. Manejar estados informativos
+    if Assigned(TLicenciaService.LicenciaActual) then
+    begin
+      if TLicenciaService.LicenciaActual.Estado = 'demo' then
+        ShowMessage('Usted esta usando una version DEMO. Dias restantes: ' +
+          IntToStr(TLicenciaService.LicenciaActual.DiasRestantes));
+
+      if TLicenciaService.LicenciaActual.Estado = 'bloqueado' then
+      begin
+        ShowMessage('Su licencia ha sido BLOQUEADA. El sistema se cerrara.');
+        Application.Terminate;
+      end;
+    end;
+
+  except
+    on E: Exception do
+    begin
+      ShowMessage('Error critico de licencia: ' + E.Message);
+      Application.Terminate;
+    end;
+  end;
+end;
+
+procedure TFormPrincipal.SolicitarRegistro;
+var
+  LCodigo: string;
+  LNit: string;
+  LHash: string;
+begin
+  LNit := THConfig.GetInstance.License.Nit;
+  LHash := TLicenciaService.GenerarHashInstalacion;
+
+  if InputQuery('Registro de Licencia', 'Ingrese el codigo de activacion:', LCodigo) then
+  begin
+    if TLicenciaService.RegistrarLicencia(LNit, LHash, LCodigo) then
+    begin
+      ShowMessage('Licencia registrada con exito! Estado: ' + TLicenciaService.LicenciaActual.Estado);
+    end
+    else
+    begin
+      ShowMessage('Codigo invalido o error de conexion. El sistema se cerrara.');
+      Application.Terminate;
+    end;
+  end
+  else
+    Application.Terminate;
+end;

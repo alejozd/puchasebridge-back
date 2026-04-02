@@ -77,7 +77,7 @@ begin
 
   // Initialize licensing
   try
-    TLicenseService.InicializarLicencia;
+    TLicenciaService.InicializarLicencia;
   except
     on E: Exception do
     begin
