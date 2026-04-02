@@ -22,6 +22,7 @@ type
     class function ValidarOffline: Boolean;
     class procedure BloquearSistema(const AMsg: string);
     class function GetLicenseFilePath: string;
+    class function CloneJSON(const AJSON: TJSONObject): TJSONObject;
   public
     class procedure InicializarLicencia;
     class function ActivarLicencia: Boolean;
@@ -30,9 +31,14 @@ type
 
 implementation
 
+{$IFDEF MSWINDOWS}
 uses
   Winapi.Windows,
   System.Hash;
+{$ELSE}
+uses
+  System.Hash;
+{$ENDIF}
 
 const
   UNLEN = 256;
@@ -46,22 +52,35 @@ begin
   Writeln('ERROR DE LICENCIA: ' + AMsg);
   Writeln('El servidor no puede iniciar sin una licencia valida.');
   Writeln('---------------------------------------------------------');
-  // En una aplicación de consola como esta, podemos lanzar una excepción
-  // que detendrá el flujo antes de que Horse inicie.
   raise Exception.Create('Licencia Invalida: ' + AMsg);
+end;
+
+class function TLicenseService.CloneJSON(const AJSON: TJSONObject): TJSONObject;
+var
+  LValue: TJSONValue;
+begin
+  Result := nil;
+  LValue := TJSONObject.ParseJSONValue(AJSON.ToJSON);
+  if LValue is TJSONObject then
+    Result := TJSONObject(LValue)
+  else if Assigned(LValue) then
+    LValue.Free;
 end;
 
 class function TLicenseService.GetInstalacionHash: string;
 var
+  RawString: string;
+{$IFDEF MSWINDOWS}
   ComputerName: array[0..MAX_COMPUTERNAME_LENGTH] of Char;
   Size: DWORD;
   UserName: array[0..UNLEN] of Char;
   UserSize: DWORD;
-  RawString: string;
   VolumeSerialNumber: DWORD;
   MaximumComponentLength: DWORD;
   FileSystemFlags: DWORD;
+{$ENDIF}
 begin
+{$IFDEF MSWINDOWS}
   Size := MAX_COMPUTERNAME_LENGTH + 1;
   GetComputerName(ComputerName, Size);
 
@@ -72,6 +91,9 @@ begin
   GetVolumeInformation('C:\', nil, 0, @VolumeSerialNumber, MaximumComponentLength, FileSystemFlags, nil, 0);
 
   RawString := string(ComputerName) + '|' + string(UserName) + '|' + IntToHex(VolumeSerialNumber, 8);
+{$ELSE}
+  RawString := 'NON_WINDOWS_MACHINE';
+{$ENDIF}
   Result := THashSHA2.GetHashString(RawString);
 end;
 
@@ -98,13 +120,18 @@ end;
 class function TLicenseService.LeerLicenciaLocal: TJSONObject;
 var
   LContent: string;
+  LValue: TJSONValue;
 begin
   Result := nil;
   if TFile.Exists(GetLicenseFilePath) then
   begin
     try
       LContent := TFile.ReadAllText(GetLicenseFilePath);
-      Result := TJSONObject.ParseJSONValue(LContent) as TJSONObject;
+      LValue := TJSONObject.ParseJSONValue(LContent);
+      if LValue is TJSONObject then
+        Result := TJSONObject(LValue)
+      else if Assigned(LValue) then
+        LValue.Free;
     except
       on E: Exception do
         Log('Error leyendo licencia local: ' + E.Message, llError);
@@ -119,7 +146,6 @@ begin
   begin
     if not ValidarOffline then
     begin
-       // Intentar activar automáticamente si no hay nada
        if not ActivarLicencia then
          BloquearSistema('No se pudo validar ni activar la licencia online, y no hay respaldo local valido.');
     end;
@@ -131,9 +157,11 @@ class function TLicenseService.ActivarLicencia: Boolean;
 var
   LHTTP: TNetHTTPClient;
   LResponse: IHTTPResponse;
-  LJSON, LClone: TJSONObject;
+  LJSON, LResponseJSON, LClone: TJSONObject;
   LBody: TStringStream;
   LConfig: TLicensingConfig;
+  LValue: TJSONValue;
+  LHeaders: TNetHeaders;
 begin
   Result := False;
   LConfig := THConfig.GetInstance.License;
@@ -154,21 +182,33 @@ begin
     LBody := TStringStream.Create(LJSON.ToJSON, TEncoding.UTF8);
     try
       try
-        LHTTP.ContentType := 'application/json';
-        LResponse := LHTTP.Post(LConfig.URLServidor + '/api/licencias/activar', LBody);
+        SetLength(LHeaders, 1);
+        LHeaders[0] := TNetHeader.Create('Content-Type', 'application/json');
+
+        LResponse := LHTTP.Post(LConfig.URLServidor + '/api/licencias/activar', LBody, nil, LHeaders);
 
         if LResponse.StatusCode = 200 then
         begin
           Log('Activacion exitosa.', llInfo);
-          LJSON.Free;
-          LJSON := TJSONObject.ParseJSONValue(LResponse.ContentAsString) as TJSONObject;
-          LClone := LJSON.Clone as TJSONObject;
-          try
-            GuardarLicenciaLocal(LClone);
-          finally
-            LClone.Free;
-          end;
-          Result := True;
+          LValue := TJSONObject.ParseJSONValue(LResponse.ContentAsString);
+          if LValue is TJSONObject then
+          begin
+            LResponseJSON := TJSONObject(LValue);
+            try
+              LClone := CloneJSON(LResponseJSON);
+              if Assigned(LClone) then
+              try
+                GuardarLicenciaLocal(LClone);
+                Result := True;
+              finally
+                LClone.Free;
+              end;
+            finally
+              LResponseJSON.Free;
+            end;
+          end
+          else if Assigned(LValue) then
+            LValue.Free;
         end
         else
           Log('Error en activacion: ' + LResponse.ContentAsString, llWarn);
@@ -189,9 +229,11 @@ class function TLicenseService.ValidarLicencia: Boolean;
 var
   LHTTP: TNetHTTPClient;
   LResponse: IHTTPResponse;
-  LJSON, LClone: TJSONObject;
+  LJSON, LResponseJSON, LClone: TJSONObject;
   LBody: TStringStream;
   LConfig: TLicensingConfig;
+  LValue, LEstadoValue: TJSONValue;
+  LHeaders: TNetHeaders;
 begin
   Result := False;
   LConfig := THConfig.GetInstance.License;
@@ -211,23 +253,36 @@ begin
     LBody := TStringStream.Create(LJSON.ToJSON, TEncoding.UTF8);
     try
       try
-        LHTTP.ContentType := 'application/json';
-        LResponse := LHTTP.Post(LConfig.URLServidor + '/api/licencias/validar', LBody);
+        SetLength(LHeaders, 1);
+        LHeaders[0] := TNetHeader.Create('Content-Type', 'application/json');
+
+        LResponse := LHTTP.Post(LConfig.URLServidor + '/api/licencias/validar', LBody, nil, LHeaders);
 
         if LResponse.StatusCode = 200 then
         begin
-          LJSON.Free;
-          LJSON := TJSONObject.ParseJSONValue(LResponse.ContentAsString) as TJSONObject;
-          if Assigned(LJSON) and (LJSON.GetValue('estado').Value <> 'bloqueado') then
+          LValue := TJSONObject.ParseJSONValue(LResponse.ContentAsString);
+          if LValue is TJSONObject then
           begin
-            LClone := LJSON.Clone as TJSONObject;
+            LResponseJSON := TJSONObject(LValue);
             try
-              GuardarLicenciaLocal(LClone);
+              LEstadoValue := LResponseJSON.GetValue('estado');
+              if Assigned(LEstadoValue) and (LEstadoValue.Value <> 'bloqueado') then
+              begin
+                LClone := CloneJSON(LResponseJSON);
+                if Assigned(LClone) then
+                try
+                  GuardarLicenciaLocal(LClone);
+                  Result := True;
+                finally
+                  LClone.Free;
+                end;
+              end;
             finally
-              LClone.Free;
+              LResponseJSON.Free;
             end;
-            Result := True;
-          end;
+          end
+          else if Assigned(LValue) then
+            LValue.Free;
         end;
       except
         on E: Exception do
@@ -245,25 +300,33 @@ end;
 class function TLicenseService.ValidarOffline: Boolean;
 var
   LJSON: TJSONObject;
-  LExpira: TDate;
-  LEstado: string;
+  LExpira: TDateTime;
+  LEstado, LExpiraStr: TJSONValue;
+  LDateStr: string;
 begin
   Result := False;
   LJSON := LeerLicenciaLocal;
   if Assigned(LJSON) then
   try
-    LEstado := LJSON.GetValue('estado').Value;
-    if LEstado = 'bloqueado' then Exit(False);
+    LEstado := LJSON.GetValue('estado');
+    LExpiraStr := LJSON.GetValue('expira');
 
-    if TryISO8601ToDate(LJSON.GetValue('expira').Value, LExpira) then
+    if not Assigned(LEstado) or not Assigned(LExpiraStr) then
+      Exit(False);
+
+    if LEstado.Value = 'bloqueado' then Exit(False);
+
+    // Explicit string cast and explicit use of 2-parameter TryISO8601ToDate (most compatible)
+    LDateStr := string(LExpiraStr.Value);
+    if TryISO8601ToDate(LDateStr, LExpira) then
     begin
       if Date <= LExpira then
       begin
-        Log('Validacion offline exitosa. Expira: ' + DateToStr(LExpira), llInfo);
+        Log('Validacion offline exitosa. Expira: ' + DateToStr(TDate(LExpira)), llInfo);
         Result := True;
       end
       else
-        Log('Licencia local expirada: ' + DateToStr(LExpira), llWarn);
+        Log('Licencia local expirada: ' + DateToStr(TDate(LExpira)), llWarn);
     end;
   finally
     LJSON.Free;
