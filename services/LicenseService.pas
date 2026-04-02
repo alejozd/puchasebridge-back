@@ -24,6 +24,7 @@ type
     class procedure BloquearSistema(const AMsg: string);
     class function GetLicenseFilePath: string;
     class function CloneJSON(const AJSON: TJSONObject): TJSONObject;
+    class function NormalizeURL(const ABaseURL: string): string;
   public
     class procedure InicializarLicencia;
     class function ActivarLicencia: Boolean;
@@ -140,8 +141,24 @@ begin
   end;
 end;
 
-class procedure TLicenseService.InicializarLicencia;
+class function TLicenseService.NormalizeURL(const ABaseURL: string): string;
 begin
+  Result := ABaseURL.Trim;
+  if Result.IsEmpty then
+    raise Exception.Create('La URL del servidor de licencias no esta configurada');
+
+  if Result.EndsWith('/') then
+    Result := Result.Substring(0, Result.Length - 1);
+end;
+
+class procedure TLicenseService.InicializarLicencia;
+var
+  LConfig: TLicensingConfig;
+begin
+  LConfig := THConfig.GetInstance.License;
+  if LConfig.URLServidor.Trim.IsEmpty then
+    BloquearSistema('URL de licencias no configurada en [LICENCIA] URLServidor');
+
   Log('Iniciando validacion de licencia...', llInfo);
   if not ValidarLicencia then
   begin
@@ -163,6 +180,7 @@ var
   LConfig: TLicensingConfig;
   LValue: TJSONValue;
   LHeaders: TNetHeaders;
+  LURL: string;
 begin
   Result := False;
   LConfig := THConfig.GetInstance.License;
@@ -172,6 +190,21 @@ begin
     Log('NIT no configurado en config.ini [LICENCIA]', llError);
     Exit;
   end;
+
+  try
+    LURL := NormalizeURL(LConfig.URLServidor) + '/api/licencias/activar';
+  except
+    on E: Exception do
+    begin
+      Log('Error en configuracion de URL: ' + E.Message, llError);
+      Exit;
+    end;
+  end;
+
+{$IFDEF MSWINDOWS}
+  OutputDebugString(PChar('Licencias URL Base: ' + LConfig.URLServidor));
+  OutputDebugString(PChar('Endpoint activar: ' + LURL));
+{$ENDIF}
 
   LHTTP := TNetHTTPClient.Create(nil);
   LJSON := TJSONObject.Create;
@@ -187,7 +220,7 @@ begin
         LHeaders[0].Name := 'Content-Type';
         LHeaders[0].Value := 'application/json';
 
-        LResponse := LHTTP.Post(LConfig.URLServidor + '/api/licencias/activar', LBody, nil, LHeaders);
+        LResponse := LHTTP.Post(LURL, LBody, nil, LHeaders);
 
         if LResponse.StatusCode = 200 then
         begin
@@ -209,11 +242,16 @@ begin
               LResponseJSON.Free;
             end;
           end
-          else if Assigned(LValue) then
-            LValue.Free;
+          else
+          begin
+            Log('JSON de activacion invalido recibido del servidor', llError);
+            if Assigned(LValue) then LValue.Free;
+          end;
         end
         else
-          Log('Error en activacion: ' + LResponse.ContentAsString, llWarn);
+        begin
+          Log('Error en activacion (Status ' + IntToStr(LResponse.StatusCode) + '): ' + LResponse.ContentAsString, llWarn);
+        end;
       except
         on E: Exception do
           Log('Error de conexion al activar licencia: ' + E.Message, llError);
@@ -236,11 +274,27 @@ var
   LConfig: TLicensingConfig;
   LValue, LEstadoValue: TJSONValue;
   LHeaders: TNetHeaders;
+  LURL: string;
 begin
   Result := False;
   LConfig := THConfig.GetInstance.License;
 
   if LConfig.Nit.IsEmpty then Exit;
+
+  try
+    LURL := NormalizeURL(LConfig.URLServidor) + '/api/licencias/validar';
+  except
+    on E: Exception do
+    begin
+      Log('Error en configuracion de URL: ' + E.Message, llError);
+      Exit;
+    end;
+  end;
+
+{$IFDEF MSWINDOWS}
+  OutputDebugString(PChar('Licencias URL Base: ' + LConfig.URLServidor));
+  OutputDebugString(PChar('Endpoint validar: ' + LURL));
+{$ENDIF}
 
   LHTTP := TNetHTTPClient.Create(nil);
   LHTTP.ConnectionTimeout := 5000;
@@ -259,7 +313,7 @@ begin
         LHeaders[0].Name := 'Content-Type';
         LHeaders[0].Value := 'application/json';
 
-        LResponse := LHTTP.Post(LConfig.URLServidor + '/api/licencias/validar', LBody, nil, LHeaders);
+        LResponse := LHTTP.Post(LURL, LBody, nil, LHeaders);
 
         if LResponse.StatusCode = 200 then
         begin
@@ -279,13 +333,24 @@ begin
                 finally
                   LClone.Free;
                 end;
+              end
+              else if Assigned(LEstadoValue) and (LEstadoValue.Value = 'bloqueado') then
+              begin
+                Log('La licencia ha sido bloqueada por el servidor', llWarn);
               end;
             finally
               LResponseJSON.Free;
             end;
           end
-          else if Assigned(LValue) then
-            LValue.Free;
+          else
+          begin
+            Log('JSON de validacion invalido recibido del servidor', llError);
+            if Assigned(LValue) then LValue.Free;
+          end;
+        end
+        else
+        begin
+          Log('Error en validacion (Status ' + IntToStr(LResponse.StatusCode) + '): ' + LResponse.ContentAsString, llDebug);
         end;
       except
         on E: Exception do

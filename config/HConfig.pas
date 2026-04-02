@@ -97,9 +97,9 @@ begin
   try
     FConfig.Empresa := Ini.ReadString('HELISA', 'Empresa', '0');
 
-    FLicense.URLServidor := Ini.ReadString('LICENCIA', 'URLServidor', 'http://localhost:3000');
+    FLicense.URLServidor := Ini.ReadString('LICENCIA', 'URLServidor', '');
     FLicense.Nit := Ini.ReadString('LICENCIA', 'Nit', '');
-    FLicense.AppName := Ini.ReadString('LICENCIA', 'AppName', 'purchasebridge');
+    FLicense.AppName := Ini.ReadString('LICENCIA', 'App', 'purchasebridge');
   finally
     Ini.Free;
   end;
