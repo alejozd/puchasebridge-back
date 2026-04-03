@@ -45,6 +45,7 @@ type
     class procedure InicializarLicencia;
     class function ValidarLicencia(const ANit, AInstalacionHash: string): Boolean;
     class function RegistrarLicencia(const ANit, AInstalacionHash, ACodigo: string): Boolean;
+    class function ActivarOnline: Boolean;
     class property LicenciaActual: TLicenciaInfo read FLicenciaActual;
   end;
 
@@ -210,6 +211,96 @@ begin
     end;
   end;
   Log('Licencia procesada correctamente.', llInfo);
+end;
+
+class function TLicenciaService.ActivarOnline: Boolean;
+var
+  LHTTP: TNetHTTPClient;
+  LResponse: IHTTPResponse;
+  LJSON, LResponseJSON, LClone: TJSONObject;
+  LBody: TStringStream;
+  LConfig: TLicensingConfig;
+  LValue, LExpiraValue, LDiasValue: TJSONValue;
+  LHeaders: TNetHeaders;
+  LURL: string;
+begin
+  Result := False;
+  LConfig := THConfig.GetInstance.License;
+
+  try
+    LURL := NormalizeURL(LConfig.URLServidor) + '/api/licencias/activar-online';
+  except
+    on E: Exception do
+    begin
+      Log('Error en configuracion de URL: ' + E.Message, llError);
+      Exit;
+    end;
+  end;
+
+  LHTTP := TNetHTTPClient.Create(nil);
+  LJSON := TJSONObject.Create;
+  try
+    LJSON.AddPair('nit', LConfig.Nit);
+    LJSON.AddPair('instalacion_hash', LConfig.InstalacionHash);
+    LJSON.AddPair('app', LConfig.AppName);
+
+    LBody := TStringStream.Create(LJSON.ToJSON, TEncoding.UTF8);
+    try
+      try
+        SetLength(LHeaders, 1);
+        LHeaders[0].Name := 'Content-Type';
+        LHeaders[0].Value := 'application/json';
+
+        LResponse := LHTTP.Post(LURL, LBody, nil, LHeaders);
+        Log('Respuesta servidor (activar-online): ' + LResponse.ContentAsString, llDebug);
+
+        if LResponse.StatusCode = 200 then
+        begin
+          LValue := TJSONObject.ParseJSONValue(LResponse.ContentAsString);
+          if LValue is TJSONObject then
+          begin
+            LResponseJSON := TJSONObject(LValue);
+            try
+              if not Assigned(FLicenciaActual) then FLicenciaActual := TLicenciaInfo.Create;
+
+              FLicenciaActual.Estado := LResponseJSON.GetValue('estado').Value;
+              LExpiraValue := LResponseJSON.GetValue('expira');
+              if Assigned(LExpiraValue) then
+                TryISO8601ToDate(string(LExpiraValue.Value), FLicenciaActual.FExpira);
+
+              LDiasValue := LResponseJSON.GetValue('dias_restantes');
+              if Assigned(LDiasValue) then
+                FLicenciaActual.DiasRestantes := StrToIntDef(LDiasValue.Value, 0);
+
+              LClone := CloneJSON(LResponseJSON);
+              try
+                GuardarLicenciaLocal(LClone);
+              finally
+                LClone.Free;
+              end;
+
+              Log('Activacion online exitosa. Estado: ' + FLicenciaActual.Estado, llInfo);
+              Result := True;
+            finally
+              LResponseJSON.Free;
+            end;
+          end
+          else if Assigned(LValue) then
+            LValue.Free;
+        end
+        else
+          Log('Error en activacion online (Status ' + IntToStr(LResponse.StatusCode) + '): ' + LResponse.ContentAsString, llWarn);
+      except
+        on E: Exception do
+          Log('Error de conexion al activar licencia online: ' + E.Message, llError);
+      end;
+    finally
+      LBody.Free;
+    end;
+  finally
+    LJSON.Free;
+    LHTTP.Free;
+  end;
 end;
 
 class function TLicenciaService.RegistrarLicencia(const ANit, AInstalacionHash, ACodigo: string): Boolean;

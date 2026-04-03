@@ -16,6 +16,7 @@ type
   public
     class procedure GetEstado(Req: THorseRequest; Res: THorseResponse; Next: TProc);
     class procedure Registrar(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+    class procedure ActivarOnline(Req: THorseRequest; Res: THorseResponse; Next: TProc);
     class procedure Registry;
   end;
 
@@ -96,11 +97,42 @@ begin
   end;
 end;
 
+class procedure TLicenciaController.ActivarOnline(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+var
+  LSuccess: Boolean;
+  LResponse: TJSONObject;
+begin
+  Log('Intento de activacion online de licencia', llInfo);
+
+  LSuccess := TLicenciaService.ActivarOnline;
+
+  LResponse := TJSONObject.Create;
+  try
+    LResponse.AddPair('success', TJSONBool.Create(LSuccess));
+    if LSuccess and Assigned(TLicenciaService.LicenciaActual) then
+    begin
+      LResponse.AddPair('estado', TLicenciaService.LicenciaActual.Estado);
+      LResponse.AddPair('expira', DateToISO8601(TLicenciaService.LicenciaActual.Expira));
+      LResponse.AddPair('dias_restantes', TJSONNumber.Create(TLicenciaService.LicenciaActual.DiasRestantes));
+    end
+    else
+    begin
+      LResponse.AddPair('mensaje', 'Error al activar la licencia online. Verifique su conexi' + #243 + ' n.');
+    end;
+
+    Res.Send(LResponse);
+  except
+    LResponse.Free;
+    raise;
+  end;
+end;
+
 class procedure TLicenciaController.Registry;
 begin
   THorse.Get('/licencia/estado', GetEstado);
   THorse.Post('/licencia/registrar', Registrar);
   THorse.Post('/licencia/activar', Registrar);
+  THorse.Post('/licencia/activar-online', ActivarOnline);
 end;
 
 end.
