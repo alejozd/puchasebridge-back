@@ -1,0 +1,96 @@
+unit LicenciaController;
+
+interface
+
+uses
+  Horse,
+  System.SysUtils,
+  System.JSON,
+  System.DateUtils,
+  LicenseService,
+  HConfig,
+  uLogger;
+
+type
+  TLicenciaController = class
+  public
+    class procedure GetEstado(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+    class procedure Registrar(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+    class procedure Registry;
+  end;
+
+implementation
+
+{ TLicenciaController }
+
+class procedure TLicenciaController.GetEstado(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+var
+  LConfig: TLicensingConfig;
+  LResponse: TJSONObject;
+begin
+  LConfig := THConfig.GetInstance.License;
+
+  // Refrescar estado validando contra el servidor
+  TLicenciaService.ValidarLicencia(LConfig.Nit, LConfig.InstalacionHash);
+
+  if Assigned(TLicenciaService.LicenciaActual) then
+  begin
+    LResponse := TJSONObject.Create;
+    try
+      LResponse.AddPair('estado', TLicenciaService.LicenciaActual.Estado);
+      LResponse.AddPair('expira', DateToISO8601(TLicenciaService.LicenciaActual.Expira));
+      LResponse.AddPair('dias_restantes', TJSONNumber.Create(TLicenciaService.LicenciaActual.DiasRestantes));
+      Res.Send(LResponse);
+    except
+      LResponse.Free;
+      raise;
+    end;
+  end
+  else
+  begin
+    Res.Status(THTTPStatus.NotFound).Send('No se pudo obtener el estado de la licencia');
+  end;
+end;
+
+class procedure TLicenciaController.Registrar(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+var
+  LBody: TJSONObject;
+  LCodigo: string;
+  LConfig: TLicensingConfig;
+  LSuccess: Boolean;
+  LResponse: TJSONObject;
+begin
+  LBody := Req.Body<TJSONObject>;
+  if not Assigned(LBody) or not LBody.TryGetValue('codigo', LCodigo) then
+  begin
+    Res.Status(THTTPStatus.BadRequest).Send('C' + #243 + ' digo de registro no proporcionado');
+    Exit;
+  end;
+
+  LConfig := THConfig.GetInstance.License;
+  Log('Intento de registro de licencia con c' + #243 + ' digo: ' + LCodigo, llInfo);
+
+  LSuccess := TLicenciaService.RegistrarLicencia(LConfig.Nit, LConfig.InstalacionHash, LCodigo);
+
+  LResponse := TJSONObject.Create;
+  try
+    LResponse.AddPair('success', TJSONBool.Create(LSuccess));
+    if LSuccess and Assigned(TLicenciaService.LicenciaActual) then
+      LResponse.AddPair('mensaje', TLicenciaService.LicenciaActual.Mensaje)
+    else
+      LResponse.AddPair('mensaje', 'Error al registrar la licencia. Verifique el c' + #243 + ' digo o la conexi' + #243 + ' n.');
+
+    Res.Send(LResponse);
+  except
+    LResponse.Free;
+    raise;
+  end;
+end;
+
+class procedure TLicenciaController.Registry;
+begin
+  THorse.Get('/licencia/estado', GetEstado);
+  THorse.Post('/licencia/registrar', Registrar);
+end;
+
+end.
