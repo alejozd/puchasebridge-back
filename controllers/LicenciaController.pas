@@ -40,6 +40,7 @@ begin
       LResponse.AddPair('estado', TLicenciaService.LicenciaActual.Estado);
       LResponse.AddPair('expira', DateToISO8601(TLicenciaService.LicenciaActual.Expira));
       LResponse.AddPair('dias_restantes', TJSONNumber.Create(TLicenciaService.LicenciaActual.DiasRestantes));
+      LResponse.AddPair('instalacion_hash', LConfig.InstalacionHash);
       Res.Send(LResponse);
     except
       LResponse.Free;
