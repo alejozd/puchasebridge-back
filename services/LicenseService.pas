@@ -21,11 +21,13 @@ type
     FExpira: TDateTime;
     FDiasRestantes: Integer;
     FMensaje: string;
+    FInstalacionHash: string;
   public
     property Estado: string read FEstado write FEstado;
     property Expira: TDateTime read FExpira write FExpira;
     property DiasRestantes: Integer read FDiasRestantes write FDiasRestantes;
     property Mensaje: string read FMensaje write FMensaje;
+    property InstalacionHash: string read FInstalacionHash write FInstalacionHash;
   end;
 
   TLicenciaService = class
@@ -266,6 +268,20 @@ begin
                 TryISO8601ToDate(string(LExpiraValue.Value), FLicenciaActual.FExpira);
 
               FLicenciaActual.Mensaje := LResponseJSON.GetValue('mensaje').Value;
+
+              // Obtener hash del servidor para validación
+              if Assigned(LResponseJSON.GetValue('instalacion_hash')) then
+                FLicenciaActual.InstalacionHash := LResponseJSON.GetValue('instalacion_hash').Value;
+
+              Log('Instalacion Hash LOCAL: ' + AInstalacionHash, llInfo);
+              Log('Instalacion Hash CODIGO: ' + FLicenciaActual.InstalacionHash, llInfo);
+
+              if not FLicenciaActual.InstalacionHash.IsEmpty and
+                 (FLicenciaActual.InstalacionHash <> AInstalacionHash) then
+              begin
+                FLicenciaActual.Mensaje := 'Licencia no v' + #225 + ' lida para este equipo';
+                Exit(False);
+              end;
 
               LClone := CloneJSON(LResponseJSON);
               try

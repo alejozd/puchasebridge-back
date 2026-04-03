@@ -74,11 +74,19 @@ begin
 
   LResponse := TJSONObject.Create;
   try
-    LResponse.AddPair('success', TJSONBool.Create(LSuccess));
-    if LSuccess and Assigned(TLicenciaService.LicenciaActual) then
-      LResponse.AddPair('mensaje', TLicenciaService.LicenciaActual.Mensaje)
+    if not LSuccess and Assigned(TLicenciaService.LicenciaActual) and
+       (TLicenciaService.LicenciaActual.Mensaje = 'Licencia no v' + #225 + ' lida para este equipo') then
+    begin
+      LResponse.AddPair('error', TLicenciaService.LicenciaActual.Mensaje);
+    end
     else
-      LResponse.AddPair('mensaje', 'Error al registrar la licencia. Verifique el c' + #243 + ' digo o la conexi' + #243 + ' n.');
+    begin
+      LResponse.AddPair('success', TJSONBool.Create(LSuccess));
+      if LSuccess and Assigned(TLicenciaService.LicenciaActual) then
+        LResponse.AddPair('mensaje', TLicenciaService.LicenciaActual.Mensaje)
+      else
+        LResponse.AddPair('mensaje', 'Error al registrar la licencia. Verifique el c' + #243 + ' digo o la conexi' + #243 + ' n.');
+    end;
 
     Res.Send(LResponse);
   except
@@ -91,6 +99,7 @@ class procedure TLicenciaController.Registry;
 begin
   THorse.Get('/licencia/estado', GetEstado);
   THorse.Post('/licencia/registrar', Registrar);
+  THorse.Post('/licencia/activar', Registrar);
 end;
 
 end.
