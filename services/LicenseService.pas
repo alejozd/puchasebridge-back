@@ -37,6 +37,7 @@ type
   TLicenciaService = class
   private
     class var FLicenciaActual: TLicenciaInfo;
+    class var FIsValidating: Boolean;
     class function GuardarLicenciaLocal(const AJSON: TJSONObject): Boolean;
     class function LeerLicenciaLocal: TJSONObject;
     class function ValidarOffline: Boolean;
@@ -52,6 +53,7 @@ type
     class function ValidarLicencia(const ANit, AInstalacionHash: string): Boolean;
     class function RegistrarLicencia(const ANit, AInstalacionHash, ACodigo: string): Boolean;
     class function ActivarOnline: Boolean;
+    class procedure StartPeriodicValidation;
     class property LicenciaActual: TLicenciaInfo read FLicenciaActual;
   end;
 
@@ -236,6 +238,41 @@ begin
     Log('Licencia parseada - Tipo: ' + FLicenciaActual.TipoLicencia + ' (Permanente)', llDebug);
 end;
 
+class procedure TLicenciaService.StartPeriodicValidation;
+begin
+  TThread.CreateAnonymousThread(
+    procedure
+    begin
+      while True do
+      begin
+        // Esperar 24 horas
+        TThread.Sleep(24 * 60 * 60 * 1000);
+
+        if FIsValidating then Continue;
+
+        FIsValidating := True;
+        try
+          Log('Validaci' + #243 + ' n peri' + #243 + ' dica de licencia ejecutada', llInfo);
+          try
+            InicializarLicencia;
+            Log('Licencia v' + #225 + ' lida', llInfo);
+          except
+            on E: Exception do
+            begin
+              Log('Licencia expirada o inv' + #225 + ' lida detectada en validaci' + #243 + ' n peri' + #243 + ' dica: ' + E.Message, llError);
+              // En un backend Horse, si la licencia expira en runtime,
+              // la siguiente peticion fallara porque InicializarLicencia
+              // habra actualizado FLicenciaActual o habra lanzado excepcion.
+            end;
+          end;
+        finally
+          FIsValidating := False;
+        end;
+      end;
+    end
+  ).Start;
+end;
+
 class procedure TLicenciaService.InicializarLicencia;
 var
   LConfig: TLicensingConfig;
@@ -367,6 +404,7 @@ begin
               // Validación: requiere reactivación
               if (FLicenciaActual.Estado = 'activa') and
                  (FLicenciaActual.DiasRestantes = 0) and
+                 (not FLicenciaActual.EsPermanente) and
                  (not Assigned(LResponseJSON.GetValue('expira')) or (LResponseJSON.GetValue('expira') is TJSONNull)) then
               begin
                 FLicenciaActual.Mensaje := 'Licencia requiere reactivaci' + #243 + ' n';
@@ -460,6 +498,7 @@ begin
               // Validación: requiere reactivación
               if (FLicenciaActual.Estado = 'activa') and
                  (FLicenciaActual.DiasRestantes = 0) and
+                 (not FLicenciaActual.EsPermanente) and
                  (not Assigned(LResponseJSON.GetValue('expira')) or (LResponseJSON.GetValue('expira') is TJSONNull)) then
               begin
                 FLicenciaActual.Mensaje := 'Licencia requiere reactivaci' + #243 + ' n';
@@ -579,6 +618,7 @@ begin
               // Validación: requiere reactivación
               if (FLicenciaActual.Estado = 'activa') and
                  (FLicenciaActual.DiasRestantes = 0) and
+                 (not FLicenciaActual.EsPermanente) and
                  (not Assigned(LResponseJSON.GetValue('expira')) or (LResponseJSON.GetValue('expira') is TJSONNull)) then
               begin
                 FLicenciaActual.Mensaje := 'Licencia requiere reactivaci' + #243 + ' n';
@@ -651,8 +691,10 @@ begin
     if LExpiraStr is TJSONNull then
     begin
       // Validación: requiere reactivación (offline)
+      // Se diferencia de permanente porque permanente tiene dias_restantes null
       if (FLicenciaActual.Estado = 'activa') and
          Assigned(LJSON.GetValue('dias_restantes')) and
+         not (LJSON.GetValue('dias_restantes') is TJSONNull) and
          (StrToIntDef(LJSON.GetValue('dias_restantes').Value, -1) = 0) then
       begin
         FLicenciaActual.Mensaje := 'Licencia requiere reactivaci' + #243 + ' n';

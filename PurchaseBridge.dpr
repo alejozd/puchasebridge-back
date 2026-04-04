@@ -34,6 +34,7 @@ uses
   AuthController in 'controllers\AuthController.pas',
   LicenciaController in 'controllers\LicenciaController.pas',
   AuthMiddleware in 'middleware\AuthMiddleware.pas',
+  LicenseMiddleware in 'middleware\LicenseMiddleware.pas',
   uLogger in 'utils\uLogger.pas',
   ErrorResponseUtils in 'utils\ErrorResponseUtils.pas',
   LicenseService in 'services\LicenseService.pas';
@@ -79,6 +80,7 @@ begin
   // Initialize licensing
   try
     TLicenciaService.InicializarLicencia;
+    TLicenciaService.StartPeriodicValidation;
   except
     on E: Exception do
     begin
@@ -124,6 +126,7 @@ begin
       end))
     .Use(Jhonson())
     .Use(OctetStream)
+    .Use(LicenseGuard)
     .Use(Auth);
 
   THorse.Get('/ping',
