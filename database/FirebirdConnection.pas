@@ -19,7 +19,7 @@ function TestBridgeConnection: Boolean;
 implementation
 
 uses
-  System.SysUtils, System.IniFiles, System.IOUtils, HConfig, ConfigCrypto;
+  System.SysUtils, System.IniFiles, System.IOUtils, HConfig;
 
 type
   TDBConfig = record
