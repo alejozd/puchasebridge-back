@@ -47,7 +47,8 @@ uses
   System.Win.Registry,
   Winapi.Windows,
   System.IniFiles,
-  System.IOUtils;
+  System.IOUtils,
+  ConfigCrypto;
 
 { THConfig }
 
@@ -106,7 +107,9 @@ begin
   try
     FConfig.Empresa := Ini.ReadString('HELISA', 'Empresa', '0');
 
-    FLicense.URLServidor := Ini.ReadString('LICENCIA', 'URLServidor', '');
+    FLicense.URLServidor := DecodeIfEncoded(
+      Ini.ReadString('LICENCIA', 'URLServidor', ''), CONFIG_SECRET
+    );
     FLicense.Nit := Ini.ReadString('LICENCIA', 'Nit', '');
     FLicense.AppName := Ini.ReadString('LICENCIA', 'App', 'purchasebridge');
     FLicense.InstalacionHash := Ini.ReadString('LICENCIA', 'InstalacionHash', '');
