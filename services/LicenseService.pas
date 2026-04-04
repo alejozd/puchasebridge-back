@@ -253,6 +253,8 @@ var
   LValue: TJSONValue;
   LHeaders: TNetHeaders;
   LURL: string;
+  LTipo: string;
+  LDias: Integer;
 begin
   Result := False;
   LConfig := THConfig.GetInstance.License;
@@ -290,6 +292,44 @@ begin
           begin
             LResponseJSON := TJSONObject(LValue);
             try
+              // Cálculo de expiración según tipo_licencia
+              LTipo := 'demo';
+              if Assigned(LResponseJSON.GetValue('tipo_licencia')) then
+                LTipo := LResponseJSON.GetValue('tipo_licencia').Value;
+
+              // Limpiar campos para recalcular
+              if LResponseJSON.GetValue('expira') <> nil then LResponseJSON.RemovePair('expira').Free;
+              if LResponseJSON.GetValue('dias_restantes') <> nil then LResponseJSON.RemovePair('dias_restantes').Free;
+              if LResponseJSON.GetValue('fecha_activacion') <> nil then LResponseJSON.RemovePair('fecha_activacion').Free;
+
+              if LTipo = 'permanente' then
+              begin
+                LResponseJSON.AddPair('expira', TJSONNull.Create);
+                LResponseJSON.AddPair('dias_restantes', TJSONNull.Create);
+              end
+              else
+              begin
+                LDias := 0;
+                if LTipo = 'anual' then
+                begin
+                  if Assigned(LResponseJSON.GetValue('dias_licencia')) then
+                    LDias := StrToIntDef(LResponseJSON.GetValue('dias_licencia').Value, 365)
+                  else
+                    LDias := 365;
+                end
+                else
+                begin
+                  if Assigned(LResponseJSON.GetValue('dias_demo')) then
+                    LDias := StrToIntDef(LResponseJSON.GetValue('dias_demo').Value, 15)
+                  else
+                    LDias := 15;
+                end;
+
+                LResponseJSON.AddPair('expira', DateToISO8601(IncDay(Now, LDias)));
+                LResponseJSON.AddPair('dias_restantes', TJSONNumber.Create(LDias));
+              end;
+              LResponseJSON.AddPair('fecha_activacion', DateToISO8601(Now));
+
               ParseLicenseResponse(LResponseJSON);
 
               // Validación: requiere reactivación
