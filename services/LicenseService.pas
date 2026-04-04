@@ -23,12 +23,14 @@ type
     FMensaje: string;
     FInstalacionHash: string;
     FEsPermanente: Boolean;
+    FTipoLicencia: string;
   public
     property Estado: string read FEstado write FEstado;
     property Expira: TDateTime read FExpira write FExpira;
     property DiasRestantes: Integer read FDiasRestantes write FDiasRestantes;
     property Mensaje: string read FMensaje write FMensaje;
     property EsPermanente: Boolean read FEsPermanente write FEsPermanente;
+    property TipoLicencia: string read FTipoLicencia write FTipoLicencia;
     property InstalacionHash: string read FInstalacionHash write FInstalacionHash;
   end;
 
@@ -42,6 +44,7 @@ type
     class function GetLicenseFilePath: string;
     class function CloneJSON(const AJSON: TJSONObject): TJSONObject;
     class function NormalizeURL(const ABaseURL: string): string;
+    class procedure ParseLicenseResponse(const AResponseJSON: TJSONObject);
   public
     class function GenerarHashInstalacion: string;
     class procedure InicializarLicencia;
@@ -192,6 +195,32 @@ begin
     Result := Result.Substring(0, Result.Length - 1);
 end;
 
+class procedure TLicenciaService.ParseLicenseResponse(const AResponseJSON: TJSONObject);
+var
+  LExpiraValue, LDiasValue, LTipoValue: TJSONValue;
+begin
+  if not Assigned(FLicenciaActual) then FLicenciaActual := TLicenciaInfo.Create;
+
+  FLicenciaActual.Estado := AResponseJSON.GetValue('estado').Value;
+
+  LTipoValue := AResponseJSON.GetValue('tipo_licencia');
+  if Assigned(LTipoValue) and not (LTipoValue is TJSONNull) then
+    FLicenciaActual.TipoLicencia := LTipoValue.Value
+  else
+    FLicenciaActual.TipoLicencia := 'demo';
+
+  LDiasValue := AResponseJSON.GetValue('dias_restantes');
+  FLicenciaActual.EsPermanente := not Assigned(LDiasValue) or (LDiasValue is TJSONNull);
+
+  if not FLicenciaActual.EsPermanente then
+  begin
+    FLicenciaActual.DiasRestantes := StrToIntDef(LDiasValue.Value, 0);
+    LExpiraValue := AResponseJSON.GetValue('expira');
+    if Assigned(LExpiraValue) and not (LExpiraValue is TJSONNull) then
+      TryISO8601ToDate(string(LExpiraValue.Value), FLicenciaActual.FExpira);
+  end;
+end;
+
 class procedure TLicenciaService.InicializarLicencia;
 var
   LConfig: TLicensingConfig;
@@ -221,7 +250,7 @@ var
   LJSON, LResponseJSON, LClone: TJSONObject;
   LBody: TStringStream;
   LConfig: TLicensingConfig;
-  LValue, LExpiraValue, LDiasValue: TJSONValue;
+  LValue: TJSONValue;
   LHeaders: TNetHeaders;
   LURL: string;
 begin
@@ -261,20 +290,7 @@ begin
           begin
             LResponseJSON := TJSONObject(LValue);
             try
-              if not Assigned(FLicenciaActual) then FLicenciaActual := TLicenciaInfo.Create;
-
-              FLicenciaActual.Estado := LResponseJSON.GetValue('estado').Value;
-
-              LDiasValue := LResponseJSON.GetValue('dias_restantes');
-              FLicenciaActual.EsPermanente := not Assigned(LDiasValue) or (LDiasValue is TJSONNull);
-
-              if not FLicenciaActual.EsPermanente then
-              begin
-                FLicenciaActual.DiasRestantes := StrToIntDef(LDiasValue.Value, 0);
-                LExpiraValue := LResponseJSON.GetValue('expira');
-                if Assigned(LExpiraValue) and not (LExpiraValue is TJSONNull) then
-                  TryISO8601ToDate(string(LExpiraValue.Value), FLicenciaActual.FExpira);
-              end;
+              ParseLicenseResponse(LResponseJSON);
 
               // Validación: requiere reactivación
               if (FLicenciaActual.Estado = 'activa') and
@@ -327,7 +343,7 @@ var
   LJSON, LResponseJSON, LClone: TJSONObject;
   LBody: TStringStream;
   LConfig: TLicensingConfig;
-  LValue, LExpiraValue, LDiasValue: TJSONValue;
+  LValue: TJSONValue;
   LHeaders: TNetHeaders;
   LURL: string;
 begin
@@ -367,20 +383,7 @@ begin
           begin
             LResponseJSON := TJSONObject(LValue);
             try
-              if not Assigned(FLicenciaActual) then FLicenciaActual := TLicenciaInfo.Create;
-
-              FLicenciaActual.Estado := LResponseJSON.GetValue('estado').Value;
-
-              LDiasValue := LResponseJSON.GetValue('dias_restantes');
-              FLicenciaActual.EsPermanente := not Assigned(LDiasValue) or (LDiasValue is TJSONNull);
-
-              if not FLicenciaActual.EsPermanente then
-              begin
-                FLicenciaActual.DiasRestantes := StrToIntDef(LDiasValue.Value, 0);
-                LExpiraValue := LResponseJSON.GetValue('expira');
-                if Assigned(LExpiraValue) and not (LExpiraValue is TJSONNull) then
-                  TryISO8601ToDate(string(LExpiraValue.Value), FLicenciaActual.FExpira);
-              end;
+              ParseLicenseResponse(LResponseJSON);
 
               // Validación: requiere reactivación
               if (FLicenciaActual.Estado = 'activa') and
@@ -447,7 +450,7 @@ var
   LJSON, LResponseJSON, LClone: TJSONObject;
   LBody: TStringStream;
   LConfig: TLicensingConfig;
-  LValue, LEstadoValue, LExpiraValue, LDiasValue: TJSONValue;
+  LValue: TJSONValue;
   LHeaders: TNetHeaders;
   LURL: string;
 begin
@@ -489,45 +492,28 @@ begin
           begin
             LResponseJSON := TJSONObject(LValue);
             try
-              if not Assigned(FLicenciaActual) then FLicenciaActual := TLicenciaInfo.Create;
+              ParseLicenseResponse(LResponseJSON);
 
-              LEstadoValue := LResponseJSON.GetValue('estado');
-              if Assigned(LEstadoValue) then
+              // Validación: requiere reactivación
+              if (FLicenciaActual.Estado = 'activa') and
+                 (FLicenciaActual.DiasRestantes = 0) and
+                 (not Assigned(LResponseJSON.GetValue('expira')) or (LResponseJSON.GetValue('expira') is TJSONNull)) then
               begin
-                FLicenciaActual.Estado := LEstadoValue.Value;
+                FLicenciaActual.Mensaje := 'Licencia requiere reactivaci' + #243 + ' n';
+                Result := False;
+              end
+              else if (FLicenciaActual.Estado <> 'bloqueado') then
+              begin
+                Result := True;
+              end;
 
-                LDiasValue := LResponseJSON.GetValue('dias_restantes');
-                FLicenciaActual.EsPermanente := not Assigned(LDiasValue) or (LDiasValue is TJSONNull);
-
-                if not FLicenciaActual.EsPermanente then
-                begin
-                  FLicenciaActual.DiasRestantes := StrToIntDef(LDiasValue.Value, 0);
-                  LExpiraValue := LResponseJSON.GetValue('expira');
-                  if Assigned(LExpiraValue) and not (LExpiraValue is TJSONNull) then
-                    TryISO8601ToDate(string(LExpiraValue.Value), FLicenciaActual.FExpira);
-                end;
-
-                // Validación: requiere reactivación
-                if (FLicenciaActual.Estado = 'activa') and
-                   (FLicenciaActual.DiasRestantes = 0) and
-                   (not Assigned(LResponseJSON.GetValue('expira')) or (LResponseJSON.GetValue('expira') is TJSONNull)) then
-                begin
-                  FLicenciaActual.Mensaje := 'Licencia requiere reactivaci' + #243 + ' n';
-                  Result := False;
-                end
-                else if (FLicenciaActual.Estado <> 'bloqueado') then
-                begin
-                  Result := True;
-                end;
-
-                if (FLicenciaActual.Estado <> 'bloqueado') then
-                begin
-                  LClone := CloneJSON(LResponseJSON);
-                  try
-                    GuardarLicenciaLocal(LClone);
-                  finally
-                    LClone.Free;
-                  end;
+              if (FLicenciaActual.Estado <> 'bloqueado') then
+              begin
+                LClone := CloneJSON(LResponseJSON);
+                try
+                  GuardarLicenciaLocal(LClone);
+                finally
+                  LClone.Free;
                 end;
               end;
             finally
@@ -554,7 +540,7 @@ class function TLicenciaService.ValidarOffline: Boolean;
 var
   LJSON: TJSONObject;
   LExpira: TDateTime;
-  LEstadoValue, LExpiraStr: TJSONValue;
+  LEstadoValue, LExpiraStr, LTipoValue: TJSONValue;
   LDateStr: string;
 begin
   Result := False;
@@ -569,11 +555,17 @@ begin
 
     if LEstadoValue.Value = 'bloqueado' then Exit(False);
 
+    if not Assigned(FLicenciaActual) then FLicenciaActual := TLicenciaInfo.Create;
+    FLicenciaActual.Estado := LEstadoValue.Value;
+
+    LTipoValue := LJSON.GetValue('tipo_licencia');
+    if Assigned(LTipoValue) and not (LTipoValue is TJSONNull) then
+      FLicenciaActual.TipoLicencia := LTipoValue.Value
+    else
+      FLicenciaActual.TipoLicencia := 'demo';
+
     if LExpiraStr is TJSONNull then
     begin
-      if not Assigned(FLicenciaActual) then FLicenciaActual := TLicenciaInfo.Create;
-      FLicenciaActual.Estado := LEstadoValue.Value;
-
       // Validación: requiere reactivación (offline)
       if (FLicenciaActual.Estado = 'activa') and
          Assigned(LJSON.GetValue('dias_restantes')) and
@@ -594,8 +586,6 @@ begin
       LDateStr := string(LExpiraStr.Value);
       if TryISO8601ToDate(LDateStr, LExpira) then
       begin
-        if not Assigned(FLicenciaActual) then FLicenciaActual := TLicenciaInfo.Create;
-        FLicenciaActual.Estado := LEstadoValue.Value;
         FLicenciaActual.Expira := LExpira;
         FLicenciaActual.DiasRestantes := DaysBetween(Now, LExpira);
         FLicenciaActual.EsPermanente := False;

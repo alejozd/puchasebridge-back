@@ -61,6 +61,10 @@ begin
       end;
 
       LResponse.AddPair('instalacion_hash', LConfig.InstalacionHash);
+      if TLicenciaService.LicenciaActual.TipoLicencia.Trim.IsEmpty then
+        LResponse.AddPair('tipo_licencia', 'demo')
+      else
+        LResponse.AddPair('tipo_licencia', TLicenciaService.LicenciaActual.TipoLicencia);
       Res.Send(LResponse.ToJSON);
     finally
       LResponse.Free;
@@ -149,6 +153,11 @@ begin
         LResponse.AddPair('expira', DateToISO8601(TLicenciaService.LicenciaActual.Expira));
         LResponse.AddPair('dias_restantes', TJSONNumber.Create(TLicenciaService.LicenciaActual.DiasRestantes));
       end;
+
+    if TLicenciaService.LicenciaActual.TipoLicencia.Trim.IsEmpty then
+      LResponse.AddPair('tipo_licencia', 'demo')
+    else
+      LResponse.AddPair('tipo_licencia', TLicenciaService.LicenciaActual.TipoLicencia);
     end
     else
     begin
