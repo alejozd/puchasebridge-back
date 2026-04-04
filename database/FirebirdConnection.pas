@@ -38,14 +38,22 @@ begin
   try
     if Section = 'HELISA' then
     begin
-      Result.User := Ini.ReadString('HELISA', 'User', 'HELISAADMON');
-      Result.Pass := Ini.ReadString('HELISA', 'Pass', '');
+      Result.User := DecodeIfEncoded(
+        Ini.ReadString('HELISA', 'User', 'HELISAADMON'), CONFIG_SECRET
+      );
+      Result.Pass := DecodeIfEncoded(
+        Ini.ReadString('HELISA', 'Pass', ''), CONFIG_SECRET
+      );
       Result.Path := '';
     end
     else if Section = 'BRIDGE' then
     begin
-      Result.User := Ini.ReadString('BRIDGE', 'User', 'SYSDBA');
-      Result.Pass := Ini.ReadString('BRIDGE', 'Pass', '');
+      Result.User := DecodeIfEncoded(
+        Ini.ReadString('BRIDGE', 'User', 'SYSDBA'), CONFIG_SECRET
+      );
+      Result.Pass := DecodeIfEncoded(
+        Ini.ReadString('BRIDGE', 'Pass', ''), CONFIG_SECRET
+      );
       Result.Path := Ini.ReadString('BRIDGE', 'Path', 'F:\Proyectos\delphi_backend\purchasebridge\backend\database\purchasebridge.fdb');
     end;
   finally
