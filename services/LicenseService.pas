@@ -45,6 +45,7 @@ type
     class function CloneJSON(const AJSON: TJSONObject): TJSONObject;
     class function NormalizeURL(const ABaseURL: string): string;
     class procedure ParseLicenseResponse(const AResponseJSON: TJSONObject);
+    class procedure LimpiarLicenciaLocal;
   public
     class function GenerarHashInstalacion: string;
     class procedure InicializarLicencia;
@@ -78,6 +79,14 @@ begin
   Writeln('El servidor no puede iniciar sin una licencia valida.');
   Writeln('---------------------------------------------------------');
   raise Exception.Create('Licencia Invalida: ' + AMsg);
+end;
+
+class procedure TLicenciaService.LimpiarLicenciaLocal;
+begin
+  if TFile.Exists(GetLicenseFilePath) then
+    TFile.Delete(GetLicenseFilePath);
+  if Assigned(FLicenciaActual) then
+    FreeAndNil(FLicenciaActual);
 end;
 
 class function TLicenciaService.CloneJSON(const AJSON: TJSONObject): TJSONObject;
@@ -238,9 +247,11 @@ begin
 
   LHash := GenerarHashInstalacion;
 
-  Log('Iniciando validacion de licencia...', llInfo);
+  Log('Iniciando validacion de licencia (Sincronizacion obligatoria)...', llInfo);
+  // El método ValidarLicencia ya maneja la limpieza y creación de demo si no existe en servidor.
   if not ValidarLicencia(LConfig.Nit, LHash) then
   begin
+    // Si no fue validado online (puede ser error de red o requiere reactivacion)
     if not ValidarOffline then
     begin
        BloquearSistema('No se pudo validar la licencia online ni offline. El sistema requiere registro.');
@@ -545,6 +556,16 @@ begin
         LHeaders[0].Value := 'application/json';
 
         LResponse := LHTTP.Post(LURL, LBody, nil, LHeaders);
+        Log('Respuesta servidor (validar): ' + LResponse.ContentAsString, llDebug);
+
+        if LResponse.StatusCode = 404 then
+        begin
+          Log('No existe licencia en servidor. Limpiando datos locales...', llWarn);
+          LimpiarLicenciaLocal;
+          Log('Creando nueva licencia demo...', llInfo);
+          Result := ActivarOnline;
+          Exit;
+        end;
 
         if LResponse.StatusCode = 200 then
         begin
@@ -607,6 +628,8 @@ begin
   Result := False;
   LJSON := LeerLicenciaLocal;
   if Assigned(LJSON) then
+  begin
+    Log('Usando licencia local...', llInfo);
   try
     LEstadoValue := LJSON.GetValue('estado');
     LExpiraStr := LJSON.GetValue('expira');
@@ -662,6 +685,7 @@ begin
     end;
   finally
     LJSON.Free;
+  end;
   end;
 end;
 
