@@ -15,6 +15,8 @@ uses
   uLogger;
 
 type
+  TValidationResult = (vrValid, vrInvalid, vrConnectionError);
+
   TLicenciaInfo = class
   private
     FEstado: string;
@@ -50,7 +52,7 @@ type
   public
     class function GenerarHashInstalacion: string;
     class procedure InicializarLicencia;
-    class function ValidarLicencia(const ANit, AInstalacionHash: string): Boolean;
+    class function ValidarLicencia(const ANit, AInstalacionHash: string): TValidationResult;
     class function RegistrarLicencia(const ANit, AInstalacionHash, ACodigo: string): Boolean;
     class function ActivarOnline: Boolean;
     class procedure StartPeriodicValidation;
@@ -277,6 +279,7 @@ class procedure TLicenciaService.InicializarLicencia;
 var
   LConfig: TLicensingConfig;
   LHash: string;
+  LResult: TValidationResult;
 begin
   LConfig := THConfig.GetInstance.License;
   if LConfig.URLServidor.Trim.IsEmpty then
@@ -285,16 +288,32 @@ begin
   LHash := GenerarHashInstalacion;
 
   Log('Iniciando validacion de licencia (Sincronizacion obligatoria)...', llInfo);
-  // El método ValidarLicencia ya maneja la limpieza y creación de demo si no existe en servidor.
-  if not ValidarLicencia(LConfig.Nit, LHash) then
-  begin
-    // Si no fue validado online (puede ser error de red o requiere reactivacion)
-    if not ValidarOffline then
+
+  LResult := ValidarLicencia(LConfig.Nit, LHash);
+
+  case LResult of
+    vrValid:
+      Log('Licencia procesada correctamente.', llInfo);
+
+    vrInvalid:
     begin
-       BloquearSistema('No se pudo validar la licencia online ni offline. El sistema requiere registro.');
+      Log('Acceso denegado: Servidor rechaza licencia', llWarn);
+      if Assigned(FLicenciaActual) and not FLicenciaActual.Mensaje.IsEmpty then
+        BloquearSistema(FLicenciaActual.Mensaje)
+      else
+        BloquearSistema('Licencia expirada o bloqueada por el servidor');
+    end;
+
+    vrConnectionError:
+    begin
+      Log('Fallback a licencia local (sin conexion)', llInfo);
+      if not ValidarOffline then
+      begin
+        BloquearSistema('No se pudo validar la licencia online ni offline. El sistema requiere registro.');
+      end;
+      Log('Licencia procesada correctamente (Modo Offline).', llInfo);
     end;
   end;
-  Log('Licencia procesada correctamente.', llInfo);
 end;
 
 class function TLicenciaService.ActivarOnline: Boolean;
@@ -554,7 +573,7 @@ begin
   end;
 end;
 
-class function TLicenciaService.ValidarLicencia(const ANit, AInstalacionHash: string): Boolean;
+class function TLicenciaService.ValidarLicencia(const ANit, AInstalacionHash: string): TValidationResult;
 var
   LHTTP: TNetHTTPClient;
   LResponse: IHTTPResponse;
@@ -565,7 +584,7 @@ var
   LHeaders: TNetHeaders;
   LURL: string;
 begin
-  Result := False;
+  Result := vrConnectionError;
   LConfig := THConfig.GetInstance.License;
 
   try
@@ -602,7 +621,10 @@ begin
           Log('No existe licencia en servidor. Limpiando datos locales...', llWarn);
           LimpiarLicenciaLocal;
           Log('Creando nueva licencia demo...', llInfo);
-          Result := ActivarOnline;
+          if ActivarOnline then
+             Result := vrValid
+          else
+             Result := vrInvalid;
           Exit;
         end;
 
@@ -622,11 +644,22 @@ begin
                  (not Assigned(LResponseJSON.GetValue('expira')) or (LResponseJSON.GetValue('expira') is TJSONNull)) then
               begin
                 FLicenciaActual.Mensaje := 'Licencia requiere reactivaci' + #243 + ' n';
-                Result := False;
+                Result := vrInvalid;
               end
-              else if (FLicenciaActual.Estado <> 'bloqueado') then
+              else if (FLicenciaActual.Estado = 'bloqueado') then
               begin
-                Result := True;
+                Log('Servidor responde licencia bloqueada', llWarn);
+                Result := vrInvalid;
+              end
+              else if not FLicenciaActual.EsPermanente and (Date > FLicenciaActual.Expira) then
+              begin
+                Log('Servidor responde licencia expirada', llWarn);
+                FLicenciaActual.Mensaje := 'Licencia expirada';
+                Result := vrInvalid;
+              end
+              else
+              begin
+                Result := vrValid;
               end;
 
               if (FLicenciaActual.Estado <> 'bloqueado') then
