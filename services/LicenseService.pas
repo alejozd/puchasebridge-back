@@ -40,6 +40,7 @@ type
   private
     class var FLicenciaActual: TLicenciaInfo;
     class var FIsValidating: Boolean;
+    class var FSistemaBloqueado: Boolean;
     class function GuardarLicenciaLocal(const AJSON: TJSONObject): Boolean;
     class function LeerLicenciaLocal: TJSONObject;
     class function ValidarOffline: Boolean;
@@ -57,6 +58,7 @@ type
     class function ActivarOnline: Boolean;
     class procedure StartPeriodicValidation;
     class property LicenciaActual: TLicenciaInfo read FLicenciaActual;
+    class property SistemaBloqueado: Boolean read FSistemaBloqueado;
   end;
 
 implementation
@@ -77,12 +79,13 @@ const
 
 class procedure TLicenciaService.BloquearSistema(const AMsg: string);
 begin
+  FSistemaBloqueado := True;
   Log('SISTEMA BLOQUEADO: ' + AMsg, llError);
   Writeln('---------------------------------------------------------');
-  Writeln('ERROR DE LICENCIA: ' + AMsg);
-  Writeln('El servidor no puede iniciar sin una licencia valida.');
+  Writeln('ADVERTENCIA DE LICENCIA: ' + AMsg);
+  Writeln('El sistema ha iniciado en modo restringido.');
+  Writeln('Solo los endpoints de licencia estan disponibles.');
   Writeln('---------------------------------------------------------');
-  raise Exception.Create('Licencia Invalida: ' + AMsg);
 end;
 
 class procedure TLicenciaService.LimpiarLicenciaLocal;
@@ -293,7 +296,10 @@ begin
 
   case LResult of
     vrValid:
+    begin
+      FSistemaBloqueado := False;
       Log('Licencia procesada correctamente.', llInfo);
+    end;
 
     vrInvalid:
     begin
@@ -310,8 +316,12 @@ begin
       if not ValidarOffline then
       begin
         BloquearSistema('No se pudo validar la licencia online ni offline. El sistema requiere registro.');
+      end
+      else
+      begin
+        FSistemaBloqueado := False;
+        Log('Licencia procesada correctamente (Modo Offline).', llInfo);
       end;
-      Log('Licencia procesada correctamente (Modo Offline).', llInfo);
     end;
   end;
 end;
@@ -427,10 +437,14 @@ begin
                  (not Assigned(LResponseJSON.GetValue('expira')) or (LResponseJSON.GetValue('expira') is TJSONNull)) then
               begin
                 FLicenciaActual.Mensaje := 'Licencia requiere reactivaci' + #243 + ' n';
+                FSistemaBloqueado := True;
                 Result := False;
               end
               else
+              begin
+                FSistemaBloqueado := False;
                 Result := True;
+              end;
 
               if FLicenciaActual.Estado <> 'bloqueado' then
               begin
@@ -521,10 +535,14 @@ begin
                  (not Assigned(LResponseJSON.GetValue('expira')) or (LResponseJSON.GetValue('expira') is TJSONNull)) then
               begin
                 FLicenciaActual.Mensaje := 'Licencia requiere reactivaci' + #243 + ' n';
+                FSistemaBloqueado := True;
                 Result := False;
               end
               else
+              begin
+                FSistemaBloqueado := False;
                 Result := True;
+              end;
 
               if Assigned(LResponseJSON.GetValue('mensaje')) then
                 FLicenciaActual.Mensaje := LResponseJSON.GetValue('mensaje').Value;
@@ -659,6 +677,7 @@ begin
               end
               else
               begin
+                FSistemaBloqueado := False;
                 Result := vrValid;
               end;
 

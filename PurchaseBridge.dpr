@@ -86,7 +86,7 @@ begin
     begin
       Writeln('Error en validacion de licencia: ' + E.Message);
       Log('Error en validacion de licencia: ' + E.Message, llError);
-      Exit;
+      // El sistema continua cargando pero estara bloqueado por middleware
     end;
   end;
 
