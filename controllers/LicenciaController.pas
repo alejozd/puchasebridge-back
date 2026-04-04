@@ -39,13 +39,23 @@ begin
     LResponse := TJSONObject.Create;
     try
       LResponse.AddPair('estado', TLicenciaService.LicenciaActual.Estado);
-      LResponse.AddPair('expira', DateToISO8601(TLicenciaService.LicenciaActual.Expira));
-      LResponse.AddPair('dias_restantes', TJSONNumber.Create(TLicenciaService.LicenciaActual.DiasRestantes));
+
+      if TLicenciaService.LicenciaActual.EsPermanente then
+      begin
+        LResponse.AddPair('expira', TJSONNull.Create);
+        LResponse.AddPair('dias_restantes', TJSONNull.Create);
+        LResponse.AddPair('mensaje_vencimiento', 'Licencia permanente');
+      end
+      else
+      begin
+        LResponse.AddPair('expira', DateToISO8601(TLicenciaService.LicenciaActual.Expira));
+        LResponse.AddPair('dias_restantes', TJSONNumber.Create(TLicenciaService.LicenciaActual.DiasRestantes));
+      end;
+
       LResponse.AddPair('instalacion_hash', LConfig.InstalacionHash);
-      Res.Send(LResponse);
-    except
+      Res.Send(LResponse.ToJSON);
+    finally
       LResponse.Free;
-      raise;
     end;
   end
   else
@@ -90,10 +100,9 @@ begin
         LResponse.AddPair('mensaje', 'Error al registrar la licencia. Verifique el c' + #243 + ' digo o la conexi' + #243 + ' n.');
     end;
 
-    Res.Send(LResponse);
-  except
+    Res.Send(LResponse.ToJSON);
+  finally
     LResponse.Free;
-    raise;
   end;
 end;
 
@@ -112,18 +121,27 @@ begin
     if LSuccess and Assigned(TLicenciaService.LicenciaActual) then
     begin
       LResponse.AddPair('estado', TLicenciaService.LicenciaActual.Estado);
-      LResponse.AddPair('expira', DateToISO8601(TLicenciaService.LicenciaActual.Expira));
-      LResponse.AddPair('dias_restantes', TJSONNumber.Create(TLicenciaService.LicenciaActual.DiasRestantes));
+
+      if TLicenciaService.LicenciaActual.EsPermanente then
+      begin
+        LResponse.AddPair('expira', TJSONNull.Create);
+        LResponse.AddPair('dias_restantes', TJSONNull.Create);
+        LResponse.AddPair('mensaje_vencimiento', 'Licencia permanente');
+      end
+      else
+      begin
+        LResponse.AddPair('expira', DateToISO8601(TLicenciaService.LicenciaActual.Expira));
+        LResponse.AddPair('dias_restantes', TJSONNumber.Create(TLicenciaService.LicenciaActual.DiasRestantes));
+      end;
     end
     else
     begin
       LResponse.AddPair('mensaje', 'Error al activar la licencia online. Verifique su conexi' + #243 + ' n.');
     end;
 
-    Res.Send(LResponse);
-  except
+    Res.Send(LResponse.ToJSON);
+  finally
     LResponse.Free;
-    raise;
   end;
 end;
 
