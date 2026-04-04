@@ -32,9 +32,12 @@ uses
   DocumentosController in 'controllers\DocumentosController.pas',
   AuthService in 'services\AuthService.pas',
   AuthController in 'controllers\AuthController.pas',
+  LicenciaController in 'controllers\LicenciaController.pas',
   AuthMiddleware in 'middleware\AuthMiddleware.pas',
+  LicenseMiddleware in 'middleware\LicenseMiddleware.pas',
   uLogger in 'utils\uLogger.pas',
-  ErrorResponseUtils in 'utils\ErrorResponseUtils.pas';
+  ErrorResponseUtils in 'utils\ErrorResponseUtils.pas',
+  LicenseService in 'services\LicenseService.pas';
 
 function IsAllowedOrigin(const AOrigin: string): Boolean;
 begin
@@ -74,6 +77,19 @@ begin
     end;
   end;
 
+  // Initialize licensing
+  try
+    TLicenciaService.InicializarLicencia;
+    TLicenciaService.StartPeriodicValidation;
+  except
+    on E: Exception do
+    begin
+      Writeln('Error en validacion de licencia: ' + E.Message);
+      Log('Error en validacion de licencia: ' + E.Message, llError);
+      // El sistema continua cargando pero estara bloqueado por middleware
+    end;
+  end;
+
   THorse
     .Use(
       procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
@@ -110,6 +126,7 @@ begin
       end))
     .Use(Jhonson())
     .Use(OctetStream)
+    .Use(LicenseGuard)
     .Use(Auth);
 
   THorse.Get('/ping',
@@ -126,6 +143,7 @@ begin
   HelisaController.Registry;
   DocumentosController.Registry;
   AuthController.Registry;
+  TLicenciaController.Registry;
 
   THorse.Listen(9000,
     procedure

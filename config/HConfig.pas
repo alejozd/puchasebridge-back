@@ -15,16 +15,27 @@ type
     Empresa: string;
   end;
 
+  TLicensingConfig = record
+    URLServidor: string;
+    Nit: string;
+    AppName: string;
+    InstalacionHash: string;
+  end;
+
   THConfig = class
   private
     FConfig: THelisaConfig;
+    FLicense: TLicensingConfig;
     class var FInstance: THConfig;
     class var FLock: TCriticalSection;
     constructor Create;
     procedure Load;
+    function GetConfigPath: string;
   public
     class function GetInstance: THConfig;
+    procedure UpdateInstalacionHash(const AHash: string);
     property Config: THelisaConfig read FConfig;
+    property License: TLicensingConfig read FLicense;
   end;
 
 const
@@ -60,12 +71,19 @@ begin
   Result := FInstance;
 end;
 
+function THConfig.GetConfigPath: string;
+var
+  AppPath: string;
+begin
+  AppPath := TPath.GetDirectoryName(GetModuleName(HInstance));
+  Result := TPath.Combine(AppPath, 'config.ini');
+end;
+
 procedure THConfig.Load;
 var
   Reg: TRegistry;
   Clave: string;
   Ini: TIniFile;
-  AppPath: string;
 begin
   Reg := TRegistry.Create(KEY_READ);
   try
@@ -84,10 +102,27 @@ begin
     Reg.Free;
   end;
 
-  AppPath := TPath.GetDirectoryName(GetModuleName(HInstance));
-  Ini := TIniFile.Create(TPath.Combine(AppPath, 'config.ini'));
+  Ini := TIniFile.Create(GetConfigPath);
   try
     FConfig.Empresa := Ini.ReadString('HELISA', 'Empresa', '0');
+
+    FLicense.URLServidor := Ini.ReadString('LICENCIA', 'URLServidor', '');
+    FLicense.Nit := Ini.ReadString('LICENCIA', 'Nit', '');
+    FLicense.AppName := Ini.ReadString('LICENCIA', 'App', 'purchasebridge');
+    FLicense.InstalacionHash := Ini.ReadString('LICENCIA', 'InstalacionHash', '');
+  finally
+    Ini.Free;
+  end;
+end;
+
+procedure THConfig.UpdateInstalacionHash(const AHash: string);
+var
+  Ini: TIniFile;
+begin
+  Ini := TIniFile.Create(GetConfigPath);
+  try
+    Ini.WriteString('LICENCIA', 'InstalacionHash', AHash);
+    FLicense.InstalacionHash := AHash;
   finally
     Ini.Free;
   end;
