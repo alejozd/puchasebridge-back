@@ -40,7 +40,15 @@ begin
     try
       LResponse.AddPair('estado', TLicenciaService.LicenciaActual.Estado);
 
-      if TLicenciaService.LicenciaActual.EsPermanente then
+      if TLicenciaService.LicenciaActual.Mensaje = 'Licencia requiere reactivaci' + #243 + ' n' then
+      begin
+        LResponse.AddPair('expira', TJSONNull.Create);
+        LResponse.AddPair('dias_restantes', TJSONNumber.Create(0));
+        LResponse.AddPair('mensaje', TLicenciaService.LicenciaActual.Mensaje);
+        LResponse.AddPair('detalle', 'Licencia activa sin expiraci' + #243 + ' n calculada');
+        LResponse.AddPair('requiere_reactivacion', TJSONBool.Create(True));
+      end
+      else if TLicenciaService.LicenciaActual.EsPermanente then
       begin
         LResponse.AddPair('expira', TJSONNull.Create);
         LResponse.AddPair('dias_restantes', TJSONNull.Create);
@@ -122,7 +130,15 @@ begin
     begin
       LResponse.AddPair('estado', TLicenciaService.LicenciaActual.Estado);
 
-      if TLicenciaService.LicenciaActual.EsPermanente then
+      if TLicenciaService.LicenciaActual.Mensaje = 'Licencia requiere reactivaci' + #243 + ' n' then
+      begin
+        LResponse.AddPair('expira', TJSONNull.Create);
+        LResponse.AddPair('dias_restantes', TJSONNumber.Create(0));
+        LResponse.AddPair('mensaje', TLicenciaService.LicenciaActual.Mensaje);
+        LResponse.AddPair('detalle', 'Licencia activa sin expiraci' + #243 + ' n calculada');
+        LResponse.AddPair('requiere_reactivacion', TJSONBool.Create(True));
+      end
+      else if TLicenciaService.LicenciaActual.EsPermanente then
       begin
         LResponse.AddPair('expira', TJSONNull.Create);
         LResponse.AddPair('dias_restantes', TJSONNull.Create);

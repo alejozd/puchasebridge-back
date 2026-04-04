@@ -208,7 +208,6 @@ begin
   begin
     if not ValidarOffline then
     begin
-       // En un backend/consola esto debe ser un bloqueo directo si no es interactivo.
        BloquearSistema('No se pudo validar la licencia online ni offline. El sistema requiere registro.');
     end;
   end;
@@ -254,7 +253,6 @@ begin
         LHeaders[0].Value := 'application/json';
 
         LResponse := LHTTP.Post(LURL, LBody, nil, LHeaders);
-        Log('Respuesta servidor (activar-online): ' + LResponse.ContentAsString, llDebug);
 
         if LResponse.StatusCode = 200 then
         begin
@@ -278,15 +276,28 @@ begin
                   TryISO8601ToDate(string(LExpiraValue.Value), FLicenciaActual.FExpira);
               end;
 
-              LClone := CloneJSON(LResponseJSON);
-              try
-                GuardarLicenciaLocal(LClone);
-              finally
-                LClone.Free;
+              // Validación: requiere reactivación
+              if (FLicenciaActual.Estado = 'activa') and
+                 (FLicenciaActual.DiasRestantes = 0) and
+                 (not Assigned(LResponseJSON.GetValue('expira')) or (LResponseJSON.GetValue('expira') is TJSONNull)) then
+              begin
+                FLicenciaActual.Mensaje := 'Licencia requiere reactivaci' + #243 + ' n';
+                Result := False;
+              end
+              else
+                Result := True;
+
+              if FLicenciaActual.Estado <> 'bloqueado' then
+              begin
+                LClone := CloneJSON(LResponseJSON);
+                try
+                  GuardarLicenciaLocal(LClone);
+                finally
+                  LClone.Free;
+                end;
               end;
 
               Log('Activacion online exitosa. Estado: ' + FLicenciaActual.Estado, llInfo);
-              Result := True;
             finally
               LResponseJSON.Free;
             end;
@@ -348,7 +359,6 @@ begin
         LHeaders[0].Value := 'application/json';
 
         LResponse := LHTTP.Post(LURL, LBody, nil, LHeaders);
-        Log('Respuesta servidor (registrar): ' + LResponse.ContentAsString, llDebug);
 
         if LResponse.StatusCode = 200 then
         begin
@@ -372,31 +382,42 @@ begin
                   TryISO8601ToDate(string(LExpiraValue.Value), FLicenciaActual.FExpira);
               end;
 
-              FLicenciaActual.Mensaje := LResponseJSON.GetValue('mensaje').Value;
+              // Validación: requiere reactivación
+              if (FLicenciaActual.Estado = 'activa') and
+                 (FLicenciaActual.DiasRestantes = 0) and
+                 (not Assigned(LResponseJSON.GetValue('expira')) or (LResponseJSON.GetValue('expira') is TJSONNull)) then
+              begin
+                FLicenciaActual.Mensaje := 'Licencia requiere reactivaci' + #243 + ' n';
+                Result := False;
+              end
+              else
+                Result := True;
+
+              if Assigned(LResponseJSON.GetValue('mensaje')) then
+                FLicenciaActual.Mensaje := LResponseJSON.GetValue('mensaje').Value;
 
               // Obtener hash del servidor para validación
               if Assigned(LResponseJSON.GetValue('instalacion_hash')) then
                 FLicenciaActual.InstalacionHash := LResponseJSON.GetValue('instalacion_hash').Value;
 
-              Log('Instalacion Hash LOCAL: ' + AInstalacionHash, llInfo);
-              Log('Instalacion Hash CODIGO: ' + FLicenciaActual.InstalacionHash, llInfo);
-
               if not FLicenciaActual.InstalacionHash.IsEmpty and
                  (FLicenciaActual.InstalacionHash <> AInstalacionHash) then
               begin
                 FLicenciaActual.Mensaje := 'Licencia no v' + #225 + ' lida para este equipo';
-                Exit(False);
+                Result := False;
               end;
 
-              LClone := CloneJSON(LResponseJSON);
-              try
-                GuardarLicenciaLocal(LClone);
-              finally
-                LClone.Free;
+              if Result and (FLicenciaActual.Estado <> 'bloqueado') then
+              begin
+                LClone := CloneJSON(LResponseJSON);
+                try
+                  GuardarLicenciaLocal(LClone);
+                finally
+                  LClone.Free;
+                end;
               end;
 
               Log('Registro de licencia exitoso. Estado: ' + FLicenciaActual.Estado, llInfo);
-              Result := True;
             finally
               LResponseJSON.Free;
             end;
@@ -460,7 +481,6 @@ begin
         LHeaders[0].Value := 'application/json';
 
         LResponse := LHTTP.Post(LURL, LBody, nil, LHeaders);
-        Log('Respuesta servidor (validar): ' + LResponse.ContentAsString, llDebug);
 
         if LResponse.StatusCode = 200 then
         begin
@@ -487,6 +507,19 @@ begin
                     TryISO8601ToDate(string(LExpiraValue.Value), FLicenciaActual.FExpira);
                 end;
 
+                // Validación: requiere reactivación
+                if (FLicenciaActual.Estado = 'activa') and
+                   (FLicenciaActual.DiasRestantes = 0) and
+                   (not Assigned(LResponseJSON.GetValue('expira')) or (LResponseJSON.GetValue('expira') is TJSONNull)) then
+                begin
+                  FLicenciaActual.Mensaje := 'Licencia requiere reactivaci' + #243 + ' n';
+                  Result := False;
+                end
+                else if (FLicenciaActual.Estado <> 'bloqueado') then
+                begin
+                  Result := True;
+                end;
+
                 if (FLicenciaActual.Estado <> 'bloqueado') then
                 begin
                   LClone := CloneJSON(LResponseJSON);
@@ -495,7 +528,6 @@ begin
                   finally
                     LClone.Free;
                   end;
-                  Result := True;
                 end;
               end;
             finally
@@ -504,9 +536,7 @@ begin
           end
           else if Assigned(LValue) then
             LValue.Free;
-        end
-        else
-          Log('Error en validacion (Status ' + IntToStr(LResponse.StatusCode) + '): ' + LResponse.ContentAsString, llDebug);
+        end;
       except
         on E: Exception do
           Log('Error de conexion al validar licencia: ' + E.Message, llDebug);
@@ -543,9 +573,21 @@ begin
     begin
       if not Assigned(FLicenciaActual) then FLicenciaActual := TLicenciaInfo.Create;
       FLicenciaActual.Estado := LEstadoValue.Value;
-      FLicenciaActual.EsPermanente := True;
-      Log('Validacion offline exitosa. Licencia permanente.', llInfo);
-      Result := True;
+
+      // Validación: requiere reactivación (offline)
+      if (FLicenciaActual.Estado = 'activa') and
+         Assigned(LJSON.GetValue('dias_restantes')) and
+         (StrToIntDef(LJSON.GetValue('dias_restantes').Value, -1) = 0) then
+      begin
+        FLicenciaActual.Mensaje := 'Licencia requiere reactivaci' + #243 + ' n';
+        Result := False;
+      end
+      else
+      begin
+        FLicenciaActual.EsPermanente := True;
+        Log('Validacion offline exitosa. Licencia permanente.', llInfo);
+        Result := True;
+      end;
     end
     else
     begin
