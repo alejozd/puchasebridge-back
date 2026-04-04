@@ -206,7 +206,7 @@ begin
   LTipoValue := AResponseJSON.GetValue('tipo_licencia');
   if Assigned(LTipoValue) and not (LTipoValue is TJSONNull) then
     FLicenciaActual.TipoLicencia := LTipoValue.Value
-  else
+  else if FLicenciaActual.TipoLicencia.Trim.IsEmpty then
     FLicenciaActual.TipoLicencia := 'demo';
 
   LDiasValue := AResponseJSON.GetValue('dias_restantes');
@@ -217,8 +217,14 @@ begin
     FLicenciaActual.DiasRestantes := StrToIntDef(LDiasValue.Value, 0);
     LExpiraValue := AResponseJSON.GetValue('expira');
     if Assigned(LExpiraValue) and not (LExpiraValue is TJSONNull) then
-      TryISO8601ToDate(string(LExpiraValue.Value), FLicenciaActual.FExpira);
-  end;
+    begin
+      if TryISO8601ToDate(string(LExpiraValue.Value), FLicenciaActual.FExpira) then
+        Log('Licencia parseada - Tipo: ' + FLicenciaActual.TipoLicencia +
+            ', Expiracion: ' + DateToStr(FLicenciaActual.FExpira), llDebug);
+    end;
+  end
+  else
+    Log('Licencia parseada - Tipo: ' + FLicenciaActual.TipoLicencia + ' (Permanente)', llDebug);
 end;
 
 class procedure TLicenciaService.InicializarLicencia;
@@ -250,11 +256,12 @@ var
   LJSON, LResponseJSON, LClone: TJSONObject;
   LBody: TStringStream;
   LConfig: TLicensingConfig;
-  LValue: TJSONValue;
+  LValue, LServerExp: TJSONValue;
   LHeaders: TNetHeaders;
   LURL: string;
   LTipo: string;
   LDias: Integer;
+  LExpiraTmp: TDateTime;
 begin
   Result := False;
   LConfig := THConfig.GetInstance.License;
@@ -292,12 +299,18 @@ begin
           begin
             LResponseJSON := TJSONObject(LValue);
             try
-              // Cálculo de expiración según tipo_licencia
+              // Cálculo de expiración según tipo_licencia detectado
               LTipo := 'demo';
               if Assigned(LResponseJSON.GetValue('tipo_licencia')) then
                 LTipo := LResponseJSON.GetValue('tipo_licencia').Value;
 
-              // Limpiar campos para recalcular
+              Log('Activacion online detectada - Tipo: ' + LTipo, llInfo);
+
+              // Priorizar fecha_expiracion enviada por el servidor
+              LServerExp := LResponseJSON.GetValue('fecha_expiracion');
+              if not Assigned(LServerExp) then LServerExp := LResponseJSON.GetValue('expira');
+
+              // Limpiar campos para estandarizar
               if LResponseJSON.GetValue('expira') <> nil then LResponseJSON.RemovePair('expira').Free;
               if LResponseJSON.GetValue('dias_restantes') <> nil then LResponseJSON.RemovePair('dias_restantes').Free;
               if LResponseJSON.GetValue('fecha_activacion') <> nil then LResponseJSON.RemovePair('fecha_activacion').Free;
@@ -306,6 +319,12 @@ begin
               begin
                 LResponseJSON.AddPair('expira', TJSONNull.Create);
                 LResponseJSON.AddPair('dias_restantes', TJSONNull.Create);
+                Log('Activacion permanente completada.', llInfo);
+              end
+              else if Assigned(LServerExp) and not (LServerExp is TJSONNull) then
+              begin
+                LResponseJSON.AddPair('expira', TJSONString.Create(LServerExp.Value));
+                Log('Usando expiracion definida por el servidor: ' + LServerExp.Value, llInfo);
               end
               else
               begin
@@ -325,8 +344,10 @@ begin
                     LDias := 15;
                 end;
 
-                LResponseJSON.AddPair('expira', DateToISO8601(IncDay(Now, LDias)));
+                LExpiraTmp := IncDay(Now, LDias);
+                LResponseJSON.AddPair('expira', DateToISO8601(LExpiraTmp));
                 LResponseJSON.AddPair('dias_restantes', TJSONNumber.Create(LDias));
+                Log('Expiracion calculada: ' + DateToStr(LExpiraTmp) + ' (' + IntToStr(LDias) + ' dias)', llInfo);
               end;
               LResponseJSON.AddPair('fecha_activacion', DateToISO8601(Now));
 
@@ -353,7 +374,7 @@ begin
                 end;
               end;
 
-              Log('Activacion online exitosa. Estado: ' + FLicenciaActual.Estado, llInfo);
+              Log('Activacion online exitosa. Estado: ' + FLicenciaActual.Estado + ' (Resultado: ' + BoolToStr(Result, True) + ')', llInfo);
             finally
               LResponseJSON.Free;
             end;
@@ -601,7 +622,7 @@ begin
     LTipoValue := LJSON.GetValue('tipo_licencia');
     if Assigned(LTipoValue) and not (LTipoValue is TJSONNull) then
       FLicenciaActual.TipoLicencia := LTipoValue.Value
-    else
+    else if FLicenciaActual.TipoLicencia.Trim.IsEmpty then
       FLicenciaActual.TipoLicencia := 'demo';
 
     if LExpiraStr is TJSONNull then
