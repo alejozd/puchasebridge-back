@@ -4,7 +4,7 @@ program PurchaseBridge;
 
 uses
   System.SysUtils,
-  ServerMain in 'ServerMain.pas',
+  ServerBootstrap in 'ServerBootstrap.pas',
   HConfig in 'config\HConfig.pas',
   FirebirdConnection in 'database\FirebirdConnection.pas',
   ProveedorRepository in 'repositories\ProveedorRepository.pas',
@@ -36,7 +36,7 @@ uses
 
 begin
   try
-    StartServer(False);
+    StartServer;
   except
     on E: Exception do
     begin
