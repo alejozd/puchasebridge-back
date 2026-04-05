@@ -16,6 +16,8 @@ uses
   Horse.Exception,
   Horse.HandleException,
   System.SysUtils,
+  System.DateUtils,
+  System.JSON,
   System.StrUtils,
   System.Classes,
   System.SyncObjs,
@@ -64,6 +66,26 @@ var
   GStopRequested: Boolean;
   GMaxStartAttempts: Integer;
   GRetryDelayMs: Cardinal;
+  GApplicationStartTicks: UInt64;
+
+function GetCurrentUtcIsoTimestamp: string;
+begin
+  Result := DateToISO8601(TTimeZone.Local.ToUniversalTime(Now), True);
+end;
+
+function GetUptimeSeconds: Int64;
+begin
+  Result := (TThread.GetTickCount64 - GApplicationStartTicks) div 1000;
+end;
+
+function BuildPingResponse: TJSONObject;
+begin
+  Result := TJSONObject.Create;
+  Result.AddPair('status', 'ok');
+  Result.AddPair('service', 'PurchaseBridge');
+  Result.AddPair('timestamp', GetCurrentUtcIsoTimestamp);
+  Result.AddPair('uptime_seconds', TJSONNumber.Create(GetUptimeSeconds));
+end;
 
 function IsAllowedOrigin(const AOrigin: string): Boolean;
 begin
@@ -134,8 +156,17 @@ begin
 
   THorse.Get('/ping',
     procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
+    var
+      LPingResponse: TJSONObject;
     begin
-      Res.Send('pong');
+      LPingResponse := BuildPingResponse;
+      try
+        Res.ContentType('application/json')
+          .Status(THTTPStatus.OK)
+          .Send(LPingResponse.ToJSON);
+      finally
+        LPingResponse.Free;
+      end;
     end);
 
   ImportController.Registry;
@@ -282,6 +313,7 @@ begin
 end;
 
 initialization
+  GApplicationStartTicks := TThread.GetTickCount64;
   GServerLock := TCriticalSection.Create;
   GStopEvent := TEvent.Create(nil, True, False, '');
   GConfigured := False;
