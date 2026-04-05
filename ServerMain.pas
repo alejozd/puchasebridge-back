@@ -127,9 +127,9 @@ begin
         if LPath.IsEmpty then
           LPath := Req.PathInfo;
 
-        LogInfo(Format('Incoming request: %s %s', [Req.RawWebRequest.Method, LPath]), 'http_request');
+        uLogger.LogInfo(Format('Incoming request: %s %s', [Req.RawWebRequest.Method, LPath]), 'http_request');
         Next();
-        LogInfo(
+        uLogger.LogInfo(
           Format('Completed request: %s %s -> %d (%d ms)',
             [Req.RawWebRequest.Method, LPath, Res.RawWebResponse.StatusCode, TThread.GetTickCount64 - LStartTick]),
           'http_request'
@@ -154,7 +154,7 @@ begin
         LStatus: Integer;
         LMessage: string;
       begin
-        LogError(E, 'horse_exception');
+        uLogger.LogError(E, 'horse_exception');
         LStatus := Integer(THTTPStatus.InternalServerError);
         LMessage := 'Error interno del servidor';
 
@@ -204,7 +204,7 @@ end;
 procedure InitializeServerDependencies;
 begin
   THConfig.GetInstance;
-  LogInfo('Configuracion cargada correctamente.', 'startup');
+  uLogger.LogInfo('Configuracion cargada correctamente.', 'startup');
 
   try
     TLicenciaService.InicializarLicencia;
@@ -212,7 +212,7 @@ begin
   except
     on E: Exception do
     begin
-      LogError(E, 'startup');
+      uLogger.LogError(E, 'startup');
     end;
   end;
 end;
@@ -230,18 +230,18 @@ begin
       Exit;
 
     try
-      LogInfo(Format('Iniciando servidor Horse (intento %d/%d)...', [LAttempt, AMaxStartAttempts]), 'startup');
+      uLogger.LogInfo(Format('Iniciando servidor Horse (intento %d/%d)...', [LAttempt, AMaxStartAttempts]), 'startup');
       // Punto de inicio del servidor HTTP Horse.
       THorse.Listen(9000,
         procedure
         begin
-          LogInfo('Server is running on port ' + IntToStr(THorse.Port), 'startup');
+          uLogger.LogInfo('Server is running on port ' + IntToStr(THorse.Port), 'startup');
         end);
       Exit;
     except
       on E: Exception do
       begin
-        LogError(E, Format('startup attempt %d/%d', [LAttempt, AMaxStartAttempts]));
+        uLogger.LogError(E, Format('startup attempt %d/%d', [LAttempt, AMaxStartAttempts]));
 
         if (LAttempt < AMaxStartAttempts) and (not GStopRequested) then
           GStopEvent.WaitFor(ARetryDelayMs)
@@ -266,7 +266,7 @@ begin
     RunServer(GMaxStartAttempts, GRetryDelayMs);
   except
     on E: Exception do
-      LogError(E, 'startup');
+      uLogger.LogError(E, 'startup');
   end;
 end;
 
@@ -311,7 +311,7 @@ begin
     THorse.StopListen;
   except
     on E: Exception do
-      LogError(E, 'shutdown');
+      uLogger.LogError(E, 'shutdown');
   end;
 
   GServerLock.Acquire;
