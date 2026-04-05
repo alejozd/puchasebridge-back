@@ -1,9 +1,8 @@
-program PurchaseBridge;
-
-{$APPTYPE CONSOLE}
+program PurchaseBridgeService;
 
 uses
-  System.SysUtils,
+  Vcl.SvcMgr,
+  PurchaseBridge.Service in 'service\PurchaseBridge.Service.pas' {PurchaseBridgeService: TService},
   ServerMain in 'ServerMain.pas',
   HConfig in 'config\HConfig.pas',
   FirebirdConnection in 'database\FirebirdConnection.pas',
@@ -34,14 +33,11 @@ uses
   ErrorResponseUtils in 'utils\ErrorResponseUtils.pas',
   LicenseService in 'services\LicenseService.pas';
 
+{$R *.RES}
+
 begin
-  try
-    StartServer(False);
-  except
-    on E: Exception do
-    begin
-      Log('Fallo fatal en ejecucion de consola: ' + E.Message, llError);
-      Halt(1);
-    end;
-  end;
+  if not Application.DelayInitialize or Application.Installing then
+    Application.Initialize;
+  Application.CreateForm(TPurchaseBridgeService, PurchaseBridgeService);
+  Application.Run;
 end.

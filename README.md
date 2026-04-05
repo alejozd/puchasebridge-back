@@ -55,3 +55,25 @@ Path=F:\Proyectos\delphi_backend\purchasebridge\backend\database\purchasebridge.
 ## Prueba
 
 Esta es una línea de prueba.
+
+## Ejecución como Windows Service
+
+Además del ejecutable de consola (`PurchaseBridge.dpr`), ahora existe un proyecto de servicio nativo (`PurchaseBridgeService.dpr`) que reutiliza la misma lógica de arranque/parada en `ServerMain.pas`.
+
+### Flujo de arranque/parada
+
+- `StartServer(...)` inicializa configuración, licencia, middleware, rutas y arranca Horse.
+- `StopServer` detiene Horse de forma segura con `THorse.StopListen`.
+- En el servicio (`service/PurchaseBridge.Service.pas`):
+  - `ServiceStart` llama `StartServer(True, 3, 5000)` para iniciar en hilo separado.
+  - `ServiceStop` llama `StopServer` para detenerlo limpiamente.
+
+### Instalación rápida con sc.exe
+
+```bat
+sc create PurchaseBridgeService binPath= "C:\PurchaseBridge\PurchaseBridgeService.exe"
+sc start PurchaseBridgeService
+sc stop PurchaseBridgeService
+```
+
+> Ejecuta la consola de Windows como Administrador para crear/iniciar/detener servicios.
