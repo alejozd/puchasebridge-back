@@ -21,7 +21,8 @@ uses
   System.DateUtils,
   System.StrUtils,
   System.IOUtils,
-  System.SyncObjs;
+  System.SyncObjs,
+  uPaths;
 
 var
   LogLock: TCriticalSection;
@@ -33,7 +34,7 @@ var
 begin
   LogLock.Acquire;
   try
-    LogsDir := TPath.Combine(ExtractFilePath(ParamStr(0)), 'logs');
+    LogsDir := GetLogsPath;
     if not TDirectory.Exists(LogsDir) then
       TDirectory.CreateDirectory(LogsDir);
 

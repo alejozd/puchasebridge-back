@@ -1,4 +1,4 @@
-unit ServerBootstrap;
+﻿unit ServerBootstrap;
 
 interface
 
@@ -44,7 +44,8 @@ uses
   LicenseMiddleware,
   uLogger,
   ErrorResponseUtils,
-  LicenseService;
+  LicenseService,
+  uPaths;
 
 var
   GConfigured: Boolean;
@@ -197,8 +198,19 @@ begin
   GConfigured := True;
 end;
 
+procedure LogResolvedPaths;
+begin
+  uLogger.LogInfo('BasePath: ' + GetBasePath, 'startup_paths');
+  uLogger.LogInfo('InputPath: ' + GetInputPath, 'startup_paths');
+  uLogger.LogInfo('ProcessedPath: ' + GetProcessedPath, 'startup_paths');
+  uLogger.LogInfo('LogsPath: ' + GetLogsPath, 'startup_paths');
+end;
+
 procedure InitializeServerDependencies;
 begin
+  EnsureServiceDirectories;
+  LogResolvedPaths;
+
   THConfig.GetInstance;
   uLogger.LogInfo('Configuracion cargada correctamente.', 'startup');
 

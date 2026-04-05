@@ -1,4 +1,4 @@
-unit XmlValidationController;
+﻿unit XmlValidationController;
 
 interface
 
@@ -15,7 +15,8 @@ uses
   System.Generics.Collections,
   XmlParserService,
   XmlPersistenceService,
-  ValidationService;
+  ValidationService,
+  uPaths;
 
 function ParsedInvoiceToJSONObject(const AParsedInvoice: TParsedInvoice): TJSONObject;
 var
@@ -77,7 +78,7 @@ var
   LVal: TJSONValue;
 begin
   try
-    LPath := TPath.Combine('PurchaseBridge', 'Input');
+    LPath := GetInputPath;
     LFullFile := TPath.Combine(LPath, AFileName);
 
     if not TFile.Exists(LFullFile) then
@@ -273,7 +274,7 @@ begin
     if LFiles.Count = 0 then
     begin
       // Take all XML files from Input folder
-      LPath := TPath.Combine('PurchaseBridge', 'Input');
+      LPath := GetInputPath;
       if TDirectory.Exists(LPath) then
       begin
         for LFileName in TDirectory.GetFiles(LPath, '*.xml') do

@@ -18,7 +18,8 @@ uses
   EquivalenciaService,
   AuthService,
   AuthMiddleware,
-  FireDAC.Comp.Client;
+  FireDAC.Comp.Client,
+  uPaths;
 
 function ParsedInvoiceToJSONObject(const AParsedInvoice: TParsedInvoice): TJSONObject;
 var
@@ -105,8 +106,8 @@ begin
         for I := 0 to LFilesArr.Count - 1 do
         begin
           LFileName := TPath.GetFileName(LFilesArr.Items[I].Value);
-          LPath := TPath.Combine('PurchaseBridge', 'Input');
-          LProcessedPath := TPath.Combine('PurchaseBridge', 'Processed');
+          LPath := GetInputPath;
+          LProcessedPath := GetProcessedPath;
 
           if not TDirectory.Exists(LProcessedPath) then
             TDirectory.CreateDirectory(LProcessedPath);
