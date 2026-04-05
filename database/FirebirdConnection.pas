@@ -1,4 +1,4 @@
-unit FirebirdConnection;
+﻿unit FirebirdConnection;
 
 interface
 
@@ -19,7 +19,7 @@ function TestBridgeConnection: Boolean;
 implementation
 
 uses
-  System.SysUtils, System.IniFiles, System.IOUtils, HConfig;
+  System.SysUtils, System.IniFiles, System.IOUtils, HConfig, uPaths;
 
 type
   TDBConfig = record
@@ -31,10 +31,8 @@ type
 function LoadDBConfig(const Section: string): TDBConfig;
 var
   Ini: TIniFile;
-  AppPath: string;
 begin
-  AppPath := TPath.GetDirectoryName(GetModuleName(HInstance));
-  Ini := TIniFile.Create(TPath.Combine(AppPath, 'config.ini'));
+  Ini := TIniFile.Create(GetConfigPath);
   try
     if Section = 'HELISA' then
     begin
@@ -54,7 +52,9 @@ begin
       Result.Pass := DecodeIfEncoded(
         Ini.ReadString('BRIDGE', 'Pass', ''), CONFIG_SECRET
       );
-      Result.Path := Ini.ReadString('BRIDGE', 'Path', 'F:\Proyectos\delphi_backend\purchasebridge\backend\database\purchasebridge.fdb');
+      Result.Path := ResolvePathFromBase(
+        Ini.ReadString('BRIDGE', 'Path', TPath.Combine('database', 'purchasebridge.fdb'))
+      );
     end;
   finally
     Ini.Free;

@@ -31,6 +31,7 @@ uses
   AuthMiddleware in 'middleware\AuthMiddleware.pas',
   LicenseMiddleware in 'middleware\LicenseMiddleware.pas',
   uLogger in 'utils\uLogger.pas',
+  uPaths in 'utils\uPaths.pas',
   ErrorResponseUtils in 'utils\ErrorResponseUtils.pas',
   LicenseService in 'services\LicenseService.pas';
 

@@ -24,7 +24,8 @@ uses
   EquivalenciaService,
   HelisaService,
   DianUnits,
-  uLogger;
+  uLogger,
+  uPaths;
 
 type
   TCombinedFileInfo = record
@@ -63,9 +64,9 @@ var
 begin
   Result := '';
   LSearchPaths := [
-    TPath.Combine('PurchaseBridge', 'Input'),
-    TPath.Combine('PurchaseBridge', 'Processed'),
-    TPath.Combine('PurchaseBridge', 'Output')
+    GetInputPath,
+    GetProcessedPath,
+    GetOutputPath
   ];
 
   for LPath in LSearchPaths do
@@ -81,8 +82,8 @@ var
   LInputPath, LProcessedPath: string;
 begin
   Result := '';
-  LInputPath := TPath.Combine('PurchaseBridge', 'Input');
-  LProcessedPath := TPath.Combine('PurchaseBridge', 'Processed');
+  LInputPath := GetInputPath;
+  LProcessedPath := GetProcessedPath;
 
   if TFile.Exists(TPath.Combine(LInputPath, AFileName)) then
     Exit(TPath.Combine(LInputPath, AFileName));
@@ -135,7 +136,7 @@ begin
       Exit;
     end;
 
-    LPath := TPath.Combine('PurchaseBridge', 'Input');
+    LPath := GetInputPath;
     if not TDirectory.Exists(LPath) then
       TDirectory.CreateDirectory(LPath);
 
@@ -670,9 +671,9 @@ begin
 
       // 3. Escanear archivos físicos en Input/Processed/Output y agregar faltantes.
       LSearchPaths := [
-        TPath.Combine('PurchaseBridge', 'Input'),
-        TPath.Combine('PurchaseBridge', 'Processed'),
-        TPath.Combine('PurchaseBridge', 'Output')
+        GetInputPath,
+        GetProcessedPath,
+        GetOutputPath
       ];
 
       for LPath in LSearchPaths do

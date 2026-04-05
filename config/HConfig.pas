@@ -1,4 +1,4 @@
-unit HConfig;
+﻿unit HConfig;
 
 interface
 
@@ -56,7 +56,8 @@ uses
   System.IniFiles,
   System.IOUtils,
   System.NetEncoding,
-  System.StrUtils;
+  System.StrUtils,
+  uPaths;
 
 const
   ENCODED_PREFIX = 'ENC:';
@@ -127,11 +128,8 @@ begin
 end;
 
 function THConfig.GetConfigPath: string;
-var
-  AppPath: string;
 begin
-  AppPath := TPath.GetDirectoryName(GetModuleName(HInstance));
-  Result := TPath.Combine(AppPath, 'config.ini');
+  Result := uPaths.GetConfigPath;
 end;
 
 procedure THConfig.Load;

@@ -1,4 +1,4 @@
-unit LicenseService;
+﻿unit LicenseService;
 
 interface
 
@@ -12,7 +12,8 @@ uses
   System.IOUtils,
   System.Classes,
   HConfig,
-  uLogger;
+  uLogger,
+  uPaths;
 
 type
   TValidationResult = (vrValid, vrInvalid, vrConnectionError);
@@ -149,7 +150,7 @@ end;
 
 class function TLicenciaService.GetLicenseFilePath: string;
 begin
-  Result := TPath.Combine(TPath.GetDirectoryName(GetModuleName(HInstance)), 'licencia.json');
+  Result := TPath.Combine(GetBasePath, 'licencia.json');
 end;
 
 class function TLicenciaService.GuardarLicenciaLocal(const AJSON: TJSONObject): Boolean;

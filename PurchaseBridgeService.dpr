@@ -32,7 +32,8 @@ uses
   XmlPersistenceService in 'services\XmlPersistenceService.pas',
   ErrorResponseUtils in 'utils\ErrorResponseUtils.pas',
   HelisaUtils in 'utils\HelisaUtils.pas',
-  uLogger in 'utils\uLogger.pas';
+  uLogger in 'utils\uLogger.pas',
+  uPaths in 'utils\uPaths.pas';
 
 {$R *.RES}
 
