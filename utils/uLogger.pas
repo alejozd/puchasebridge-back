@@ -1,4 +1,4 @@
-unit uLogger;
+﻿unit uLogger;
 
 interface
 
@@ -24,7 +24,7 @@ var
 begin
   LogLock.Acquire;
   try
-    LogsDir := 'logs';
+    LogsDir := TPath.Combine(ExtractFilePath(ParamStr(0)), 'logs');
     if not TDirectory.Exists(LogsDir) then
       TDirectory.CreateDirectory(LogsDir);
 

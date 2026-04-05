@@ -81,11 +81,6 @@ class procedure TLicenciaService.BloquearSistema(const AMsg: string);
 begin
   FSistemaBloqueado := True;
   Log('SISTEMA BLOQUEADO: ' + AMsg, llError);
-  Writeln('---------------------------------------------------------');
-  Writeln('ADVERTENCIA DE LICENCIA: ' + AMsg);
-  Writeln('El sistema ha iniciado en modo restringido.');
-  Writeln('Solo los endpoints de licencia estan disponibles.');
-  Writeln('---------------------------------------------------------');
 end;
 
 class procedure TLicenciaService.LimpiarLicenciaLocal;
