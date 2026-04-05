@@ -8,7 +8,7 @@ uses
 type
   TLogLevel = (llInfo, llWarn, llError, llDebug);
 
-procedure Log(const Msg: string; Level: TLogLevel = llInfo);
+procedure Log(const Msg: string; Level: TLogLevel = llInfo); overload;
 procedure Log(const Msg: string; Level: TLogLevel; const Context: string); overload;
 procedure LogInfo(const Msg: string; const Context: string = '');
 procedure LogError(const Msg: string; const Context: string = ''); overload;
