@@ -7,12 +7,14 @@ procedure StartServer;
 implementation
 
 uses
+  Winapi.Windows,
   Horse,
   Horse.Jhonson,
   Horse.OctetStream,
   Horse.Exception,
   Horse.HandleException,
   System.SysUtils,
+  System.Classes,
   System.DateUtils,
   System.JSON,
   System.StrUtils,
@@ -61,7 +63,7 @@ end;
 
 function GetUptimeSeconds: Int64;
 begin
-  Result := (TThread.GetTickCount64 - GApplicationStartTicks) div 1000;
+  Result := (GetTickCount64 - GApplicationStartTicks) div 1000;
 end;
 
 function BuildPingResponse: TJSONObject;
@@ -105,7 +107,7 @@ begin
         LStartTick: UInt64;
         LPath: string;
       begin
-        LStartTick := TThread.GetTickCount64;
+        LStartTick := GetTickCount64;
         LPath := Req.RawWebRequest.PathInfo;
         if LPath.IsEmpty then
           LPath := Req.PathInfo;
@@ -114,7 +116,7 @@ begin
         Next();
         uLogger.LogInfo(
           Format('Completed request: %s %s -> %d (%d ms)',
-            [Req.RawWebRequest.Method, LPath, Res.RawWebResponse.StatusCode, TThread.GetTickCount64 - LStartTick]),
+            [Req.RawWebRequest.Method, LPath, Res.RawWebResponse.StatusCode, GetTickCount64 - LStartTick]),
           'http_request'
         );
       end)
@@ -228,6 +230,6 @@ end;
 
 initialization
   GConfigured := False;
-  GApplicationStartTicks := TThread.GetTickCount64;
+  GApplicationStartTicks := GetTickCount64;
 
 end.
