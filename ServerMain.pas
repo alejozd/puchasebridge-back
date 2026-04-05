@@ -118,6 +118,25 @@ begin
   THorse
     .Use(
       procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
+      var
+        LStartTick: UInt64;
+        LPath: string;
+      begin
+        LStartTick := TThread.GetTickCount64;
+        LPath := Req.RawWebRequest.PathInfo;
+        if LPath.IsEmpty then
+          LPath := Req.PathInfo;
+
+        LogInfo(Format('Incoming request: %s %s', [Req.RawWebRequest.Method, LPath]), 'http_request');
+        Next();
+        LogInfo(
+          Format('Completed request: %s %s -> %d (%d ms)',
+            [Req.RawWebRequest.Method, LPath, Res.RawWebResponse.StatusCode, TThread.GetTickCount64 - LStartTick]),
+          'http_request'
+        );
+      end)
+    .Use(
+      procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
       begin
         ApplyCORSHeaders(Req, Res);
 
@@ -135,7 +154,7 @@ begin
         LStatus: Integer;
         LMessage: string;
       begin
-        LogError(E.Message);
+        LogError(E, 'horse_exception');
         LStatus := Integer(THTTPStatus.InternalServerError);
         LMessage := 'Error interno del servidor';
 
@@ -185,7 +204,7 @@ end;
 procedure InitializeServerDependencies;
 begin
   THConfig.GetInstance;
-  Log('Configuracion cargada correctamente.', llInfo);
+  LogInfo('Configuracion cargada correctamente.', 'startup');
 
   try
     TLicenciaService.InicializarLicencia;
@@ -193,7 +212,7 @@ begin
   except
     on E: Exception do
     begin
-      Log('Error en validacion de licencia: ' + E.Message, llError);
+      LogError(E, 'startup');
     end;
   end;
 end;
@@ -211,18 +230,18 @@ begin
       Exit;
 
     try
-      Log(Format('Iniciando servidor Horse (intento %d/%d)...', [LAttempt, AMaxStartAttempts]), llInfo);
+      LogInfo(Format('Iniciando servidor Horse (intento %d/%d)...', [LAttempt, AMaxStartAttempts]), 'startup');
       // Punto de inicio del servidor HTTP Horse.
       THorse.Listen(9000,
         procedure
         begin
-          Log('Server is running on port ' + IntToStr(THorse.Port), llInfo);
+          LogInfo('Server is running on port ' + IntToStr(THorse.Port), 'startup');
         end);
       Exit;
     except
       on E: Exception do
       begin
-        Log(Format('Error iniciando servidor (intento %d/%d): %s', [LAttempt, AMaxStartAttempts, E.Message]), llError);
+        LogError(E, Format('startup attempt %d/%d', [LAttempt, AMaxStartAttempts]));
 
         if (LAttempt < AMaxStartAttempts) and (not GStopRequested) then
           GStopEvent.WaitFor(ARetryDelayMs)
@@ -247,7 +266,7 @@ begin
     RunServer(GMaxStartAttempts, GRetryDelayMs);
   except
     on E: Exception do
-      Log('Fallo fatal iniciando el servidor Horse: ' + E.Message, llError);
+      LogError(E, 'startup');
   end;
 end;
 
@@ -292,7 +311,7 @@ begin
     THorse.StopListen;
   except
     on E: Exception do
-      Log('Error deteniendo servidor Horse: ' + E.Message, llError);
+      LogError(E, 'shutdown');
   end;
 
   GServerLock.Acquire;

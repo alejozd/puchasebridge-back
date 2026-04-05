@@ -15,7 +15,7 @@ implementation
 
 procedure LogError(const AMessage: string);
 begin
-  Log(AMessage, llError);
+  uLogger.LogError(AMessage, 'error_response');
 end;
 
 procedure SendErrorResponse(const Res: THorseResponse; const AStatus: Integer; const AMessage: string; const ADetail: string = '');
