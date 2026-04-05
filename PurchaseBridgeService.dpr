@@ -2,6 +2,7 @@ program PurchaseBridgeSvcHost;
 
 uses
   Vcl.SvcMgr,
+  ServerBootstrap in 'ServerBootstrap.pas',
   ServerMain in 'ServerMain.pas',
   HConfig in 'config\HConfig.pas',
   AuthController in 'controllers\AuthController.pas',
