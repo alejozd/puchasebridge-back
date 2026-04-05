@@ -17,6 +17,7 @@ uses
   Horse.HandleException,
   System.SysUtils,
   System.StrUtils,
+  System.Classes,
   System.SyncObjs,
   HConfig,
   ProveedorRepository,
@@ -46,13 +47,23 @@ uses
   ErrorResponseUtils,
   LicenseService;
 
+type
+  TServerRunner = class(TThread)
+  protected
+    procedure Execute; override;
+  public
+    constructor Create;
+  end;
+
 var
-  GServerThread: TThread;
-  GServerLock: TObject;
+  GServerThread: TServerRunner;
+  GServerLock: TCriticalSection;
   GStopEvent: TEvent;
   GConfigured: Boolean;
   GRunningInBackground: Boolean;
   GStopRequested: Boolean;
+  GMaxStartAttempts: Integer;
+  GRetryDelayMs: Cardinal;
 
 function IsAllowedOrigin(const AOrigin: string): Boolean;
 begin
@@ -142,7 +153,6 @@ end;
 
 procedure InitializeServerDependencies;
 begin
-  // Inicio de configuración (config.ini) y licencia antes de arrancar Horse.
   THConfig.GetInstance;
   Log('Configuracion cargada correctamente.', llInfo);
 
@@ -153,7 +163,6 @@ begin
     on E: Exception do
     begin
       Log('Error en validacion de licencia: ' + E.Message, llError);
-      // El sistema continua cargando pero quedara restringido por middleware.
     end;
   end;
 end;
@@ -177,10 +186,6 @@ begin
         procedure
         begin
           Log('Server is running on port ' + IntToStr(THorse.Port), llInfo);
-        end,
-        procedure
-        begin
-          Log('Server stopped on port ' + IntToStr(THorse.Port), llInfo);
         end);
       Exit;
     except
@@ -197,51 +202,58 @@ begin
   end;
 end;
 
+{ TServerRunner }
+
+constructor TServerRunner.Create;
+begin
+  inherited Create(True);
+  FreeOnTerminate := False;
+end;
+
+procedure TServerRunner.Execute;
+begin
+  try
+    RunServer(GMaxStartAttempts, GRetryDelayMs);
+  except
+    on E: Exception do
+      Log('Fallo fatal iniciando el servidor Horse: ' + E.Message, llError);
+  end;
+end;
+
 procedure StartServer(const ARunInBackground: Boolean; const AMaxStartAttempts: Integer; const ARetryDelayMs: Cardinal);
 begin
-  TMonitor.Enter(GServerLock);
+  GServerLock.Acquire;
   try
     GStopRequested := False;
     GStopEvent.ResetEvent;
     GRunningInBackground := ARunInBackground;
+    GMaxStartAttempts := AMaxStartAttempts;
+    GRetryDelayMs := ARetryDelayMs;
 
     if ARunInBackground then
     begin
       if Assigned(GServerThread) then
         Exit;
 
-      GServerThread := TThread.CreateAnonymousThread(
-        procedure
-        begin
-          try
-            RunServer(AMaxStartAttempts, ARetryDelayMs);
-          except
-            on E: Exception do
-              Log('Fallo fatal iniciando el servidor Horse: ' + E.Message, llError);
-          end;
-        end);
-      GServerThread.FreeOnTerminate := False;
+      GServerThread := TServerRunner.Create;
       GServerThread.Start;
       Exit;
     end;
   finally
-    TMonitor.Exit(GServerLock);
+    GServerLock.Release;
   end;
 
   RunServer(AMaxStartAttempts, ARetryDelayMs);
 end;
 
 procedure StopServer;
-var
-  LThread: TThread;
 begin
-  TMonitor.Enter(GServerLock);
+  GServerLock.Acquire;
   try
     GStopRequested := True;
     GStopEvent.SetEvent;
-    LThread := GServerThread;
   finally
-    TMonitor.Exit(GServerLock);
+    GServerLock.Release;
   end;
 
   try
@@ -252,15 +264,15 @@ begin
       Log('Error deteniendo servidor Horse: ' + E.Message, llError);
   end;
 
-  if Assigned(LThread) then
-  begin
-    LThread.WaitFor;
-    TMonitor.Enter(GServerLock);
-    try
+  GServerLock.Acquire;
+  try
+    if Assigned(GServerThread) then
+    begin
+      GServerThread.WaitFor;
       FreeAndNil(GServerThread);
-    finally
-      TMonitor.Exit(GServerLock);
     end;
+  finally
+    GServerLock.Release;
   end;
 end;
 
@@ -270,10 +282,12 @@ begin
 end;
 
 initialization
-  GServerLock := TObject.Create;
+  GServerLock := TCriticalSection.Create;
   GStopEvent := TEvent.Create(nil, True, False, '');
   GConfigured := False;
   GStopRequested := False;
+  GMaxStartAttempts := 3;
+  GRetryDelayMs := 5000;
 
 finalization
   if GRunningInBackground and Assigned(GServerThread) then
