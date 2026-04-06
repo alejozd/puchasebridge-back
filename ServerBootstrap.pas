@@ -9,6 +9,7 @@ implementation
 uses
   Winapi.Windows,
   Horse,
+  Horse.CORS,
   Horse.Jhonson,
   Horse.OctetStream,
   Horse.Exception,
@@ -78,7 +79,14 @@ end;
 
 function IsAllowedOrigin(const AOrigin: string): Boolean;
 begin
-  Result := MatchText(AOrigin, ['http://localhost:5173', 'http://127.0.0.1:5173']);
+//  Result := MatchText(AOrigin, ['http://localhost:5173', 'http://127.0.0.1:5173']);
+  Result := MatchText(AOrigin, [
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+    'http://localhost:8080',
+    'http://127.0.0.1:8080',
+    'http://192.168.1.7:8080'
+  ]);
 end;
 
 procedure ApplyCORSHeaders(const Req: THorseRequest; const Res: THorseResponse);
@@ -86,10 +94,15 @@ var
   LOrigin: string;
 begin
   LOrigin := Req.Headers['Origin'];
+
+  // Si el origen está en nuestra lista permitida, lo devolvemos tal cual.
   if IsAllowedOrigin(LOrigin) then
     Res.RawWebResponse.SetCustomHeader('Access-Control-Allow-Origin', LOrigin)
   else
-    Res.RawWebResponse.SetCustomHeader('Access-Control-Allow-Origin', 'http://localhost:5173');
+    // IMPORTANTE: Si no es un origen conocido, NO devuelvas el 5173 por defecto.
+    // Es mejor no enviar la cabecera o enviarla vacía para que el error de CORS sea real
+    // y no un desajuste de "esperaba A y recibí B".
+    Res.RawWebResponse.SetCustomHeader('Access-Control-Allow-Origin', '');
 
   Res.RawWebResponse.SetCustomHeader('Vary', 'Origin');
   Res.RawWebResponse.SetCustomHeader('Access-Control-Allow-Credentials', 'true');
@@ -241,6 +254,7 @@ begin
 end;
 
 initialization
+  THorse.Use(CORS);
   GConfigured := False;
   GApplicationStartTicks := GetTickCount64;
 
