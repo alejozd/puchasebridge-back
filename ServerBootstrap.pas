@@ -9,7 +9,6 @@ implementation
 uses
   Winapi.Windows,
   Horse,
-  Horse.CORS,
   Horse.Jhonson,
   Horse.OctetStream,
   Horse.Exception,
@@ -18,7 +17,6 @@ uses
   System.Classes,
   System.DateUtils,
   System.JSON,
-  System.StrUtils,
   HConfig,
   ProveedorRepository,
   ProductoRepository,
@@ -42,6 +40,7 @@ uses
   AuthController,
   LicenciaController,
   AuthMiddleware,
+  CORSMiddleware,
   LicenseMiddleware,
   uLogger,
   ErrorResponseUtils,
@@ -77,41 +76,6 @@ begin
   Result.AddPair('uptime_seconds', TJSONNumber.Create(GetUptimeSeconds));
 end;
 
-function IsAllowedOrigin(const AOrigin: string): Boolean;
-begin
-//  Result := MatchText(AOrigin, ['http://localhost:5173', 'http://127.0.0.1:5173']);
-  Result := MatchText(AOrigin, [
-    'http://localhost:5173',
-    'http://127.0.0.1:5173',
-    'http://localhost:8080',
-    'http://127.0.0.1:8080',
-    'http://192.168.1.7:8080'
-  ]);
-end;
-
-procedure ApplyCORSHeaders(const Req: THorseRequest; const Res: THorseResponse);
-var
-  LOrigin: string;
-begin
-  LOrigin := Req.Headers['Origin'];
-
-  // Si el origen está en nuestra lista permitida, lo devolvemos tal cual.
-  if IsAllowedOrigin(LOrigin) then
-    Res.RawWebResponse.SetCustomHeader('Access-Control-Allow-Origin', LOrigin)
-  else
-    // IMPORTANTE: Si no es un origen conocido, NO devuelvas el 5173 por defecto.
-    // Es mejor no enviar la cabecera o enviarla vacía para que el error de CORS sea real
-    // y no un desajuste de "esperaba A y recibí B".
-    Res.RawWebResponse.SetCustomHeader('Access-Control-Allow-Origin', '');
-
-  Res.RawWebResponse.SetCustomHeader('Vary', 'Origin');
-  Res.RawWebResponse.SetCustomHeader('Access-Control-Allow-Credentials', 'true');
-  Res.RawWebResponse.SetCustomHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
-  Res.RawWebResponse.SetCustomHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-  Res.RawWebResponse.SetCustomHeader('Access-Control-Max-Age', '86400');
-  Res.RawWebResponse.SetCustomHeader('Access-Control-Expose-Headers', 'Content-Disposition, Content-Type');
-end;
-
 procedure RegisterMiddleware;
 begin
   THorse
@@ -137,15 +101,7 @@ begin
     .Use(
       procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
       begin
-        ApplyCORSHeaders(Req, Res);
-
-        if SameText(Req.RawWebRequest.Method, 'OPTIONS') then
-        begin
-          Res.Status(THTTPStatus.OK).Send('');
-          raise EHorseCallbackInterrupted.Create;
-        end;
-
-        Next();
+        ApplyDynamicCORS(Req, Res, Next);
       end)
     .Use(HandleException(
       procedure(const E: Exception; const Req: THorseRequest; const Res: THorseResponse; var ASendException: Boolean)
@@ -254,7 +210,6 @@ begin
 end;
 
 initialization
-  THorse.Use(CORS);
   GConfigured := False;
   GApplicationStartTicks := GetTickCount64;
 
