@@ -165,7 +165,7 @@ begin
     begin
       if (SameText(Req.RawWebRequest.Method, 'GET') or SameText(Req.RawWebRequest.Method, 'HEAD')) and
          TryServeStaticRequest('/', Req, Res) then
-        Exit;
+        raise EHorseCallbackInterrupted.Create;
 
       Res.Status(THTTPStatus.NotFound).Send('Not Found');
     end);
@@ -175,7 +175,7 @@ begin
     begin
       if (SameText(Req.RawWebRequest.Method, 'GET') or SameText(Req.RawWebRequest.Method, 'HEAD')) and
          TryServeStaticRequest(Req.RawWebRequest.PathInfo, Req, Res) then
-        Exit;
+        raise EHorseCallbackInterrupted.Create;
 
       if SameText(Req.RawWebRequest.Method, 'HEAD') then
         Res.Status(THTTPStatus.NotFound).Send('')

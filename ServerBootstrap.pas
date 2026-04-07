@@ -110,6 +110,12 @@ begin
         LStatus: Integer;
         LMessage: string;
       begin
+        if E is EHorseCallbackInterrupted then
+        begin
+          ASendException := False;
+          Exit;
+        end;
+
         uLogger.LogError(E, 'horse_exception');
         LStatus := Integer(THTTPStatus.InternalServerError);
         LMessage := 'Error interno del servidor';
