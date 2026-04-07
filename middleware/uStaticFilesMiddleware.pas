@@ -13,9 +13,6 @@ uses
   SysUtils,
   Classes,
   uPaths
-{$IF CompilerVersion >= 35.0}
-  , System.Mime
-{$IFEND}
   ;
 
 var
@@ -72,11 +69,6 @@ var
 begin
   LExt := LowerCase(AExtension);
 
-{$IF CompilerVersion >= 35.0}
-  Result := TMimeTypes.Default.GetFileInfo(LExt).MediaType;
-  if Result <> '' then
-    Exit;
-{$IFEND}
 
   if LExt = '.html' then Result := 'text/html'
   else if LExt = '.htm' then Result := 'text/html'
