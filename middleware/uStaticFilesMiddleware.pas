@@ -160,31 +160,27 @@ begin
 
   uLogger.LogInfo('Static files middleware path: ' + GStaticBasePath, 'startup');
 
-  THorse.Get('/',
+  THorse.All('/',
     procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
     begin
-      if TryServeStaticRequest('/', Req, Res) then
-        raise EHorseCallbackInterrupted.Create;
+      if (SameText(Req.RawWebRequest.Method, 'GET') or SameText(Req.RawWebRequest.Method, 'HEAD')) and
+         TryServeStaticRequest('/', Req, Res) then
+        Exit;
 
       Res.Status(THTTPStatus.NotFound).Send('Not Found');
     end);
 
-  THorse.Get('/*',
+  THorse.All('/*',
     procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
     begin
-      if TryServeStaticRequest(Req.RawWebRequest.PathInfo, Req, Res) then
-        raise EHorseCallbackInterrupted.Create;
+      if (SameText(Req.RawWebRequest.Method, 'GET') or SameText(Req.RawWebRequest.Method, 'HEAD')) and
+         TryServeStaticRequest(Req.RawWebRequest.PathInfo, Req, Res) then
+        Exit;
 
-      Res.Status(THTTPStatus.NotFound).Send('Not Found');
-    end);
-
-  THorse.Head('/*',
-    procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
-    begin
-      if TryServeStaticRequest(Req.RawWebRequest.PathInfo, Req, Res) then
-        raise EHorseCallbackInterrupted.Create;
-
-      Res.Status(THTTPStatus.NotFound).Send('');
+      if SameText(Req.RawWebRequest.Method, 'HEAD') then
+        Res.Status(THTTPStatus.NotFound).Send('')
+      else
+        Res.Status(THTTPStatus.NotFound).Send('Not Found');
     end);
 end;
 
