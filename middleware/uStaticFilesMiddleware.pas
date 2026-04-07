@@ -122,6 +122,7 @@ var
   LIndexPath: string;
 begin
   LRequestPath := NormalizeRequestPath(Req.RawWebRequest.PathInfo);
+  uLogger.LogInfo('Static request candidate: ' + Req.RawWebRequest.Method + ' ' + LRequestPath, 'static_files');
 
   if IsApiOrHealthPath(LRequestPath) then
   begin
@@ -137,6 +138,7 @@ begin
 
   if TFile.Exists(LTargetFile) then
   begin
+    uLogger.LogInfo('Serving static file: ' + LTargetFile, 'static_files');
     Res.Status(THTTPStatus.OK)
       .SendFile(LTargetFile, GetMimeTypeFromExtension(LTargetFile));
     Exit;
@@ -147,6 +149,7 @@ begin
     LIndexPath := TPath.Combine(GStaticBasePath, 'index.html');
     if TFile.Exists(LIndexPath) then
     begin
+      uLogger.LogInfo('Serving SPA fallback index: ' + LIndexPath + ' for route ' + LRequestPath, 'static_files');
       Res.Status(THTTPStatus.OK)
         .SendFile(LIndexPath, GetMimeTypeFromExtension(LIndexPath));
       Exit;
@@ -167,9 +170,16 @@ begin
 
   uLogger.LogInfo('Static files middleware path: ' + GStaticBasePath, 'startup');
 
-  THorse.Get('/*',
+  THorse.All('/*',
     procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
     begin
+      if not SameText(Req.RawWebRequest.Method, 'GET') and
+         not SameText(Req.RawWebRequest.Method, 'HEAD') then
+      begin
+        SendNotFound(Res);
+        Exit;
+      end;
+
       try
         HandleStaticRequest(Req, Res);
       except
@@ -178,20 +188,6 @@ begin
           uLogger.LogError(E, 'static_files');
           Res.Status(THTTPStatus.InternalServerError)
              .Send('Error interno al servir archivo estático');
-        end;
-      end;
-    end);
-
-  THorse.Head('/*',
-    procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
-    begin
-      try
-        HandleStaticRequest(Req, Res);
-      except
-        on E: Exception do
-        begin
-          uLogger.LogError(E, 'static_files');
-          Res.Status(THTTPStatus.InternalServerError).Send('');
         end;
       end;
     end);
