@@ -125,13 +125,15 @@ begin
         ASendException := False;
       end))
     .Use(Jhonson())
-    .Use(OctetStream)
-    .Use(LicenseGuard);
+    .Use(OctetStream);
 
-  // [FIX-STATIC] Middleware ordenado para servir frontend React antes de auth.
+  // [FIX-STATIC] Middleware para servir frontend React ANTES de auth y license.
   RegisterStaticFilesMiddleware('www');
 
-  // [FIX-STATIC] Auth solo aplica sobre /api para no interceptar / ni /assets/*.
+  // License solo aplica sobre rutas API, no debe bloquear el frontend
+  THorse.Use(LicenseGuard);
+
+  // Auth solo aplica sobre /api para no interceptar / ni /assets/*.
   THorse.Use('/api', Auth);
 end;
 

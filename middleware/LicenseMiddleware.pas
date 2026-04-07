@@ -30,6 +30,13 @@ begin
         Exit;
       end;
 
+      // [FIX] LicenseGuard SOLO aplica a rutas /api, no debe bloquear el frontend estatico
+      if not LPath.StartsWith('/api') then
+      begin
+        Next();
+        Exit;
+      end;
+
       if not TLicenciaService.SistemaBloqueado then
       begin
         Next();
