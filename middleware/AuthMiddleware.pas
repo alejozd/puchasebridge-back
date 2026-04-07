@@ -21,7 +21,6 @@ end;
 
 function IsPublicFrontendPath(const APath: string): Boolean;
 begin
-  // Mantener autenticación únicamente en API y endpoints explícitos de auth/licencia.
   Result := not APath.StartsWith('/api') and
             not APath.StartsWith('/auth') and
             not APath.StartsWith('/licencia') and
@@ -34,9 +33,11 @@ var
   LSession: TSessionInfo;
   LPath: string;
 begin
-  // CRITICO: nunca bloquear preflight en autenticacion
   if SameText(Req.RawWebRequest.Method, 'OPTIONS') then
+  begin
+    Next();
     Exit;
+  end;
 
   LPath := NormalizePath(Req.RawWebRequest.PathInfo);
   if (LPath = '/auth/login') or
@@ -44,6 +45,7 @@ begin
      (LPath = '/ping') or
      IsPublicFrontendPath(LPath) then
   begin
+    Next();
     Exit;
   end;
 
@@ -52,13 +54,13 @@ begin
   if LToken.IsEmpty then
   begin
     SendErrorResponse(Res, Integer(THTTPStatus.Unauthorized), 'Sesión expirada');
-    raise EHorseCallbackInterrupted.Create;
+    Exit;
   end;
 
   if not LToken.StartsWith('Bearer ', True) then
   begin
     SendErrorResponse(Res, Integer(THTTPStatus.Unauthorized), 'Sesión expirada');
-    raise EHorseCallbackInterrupted.Create;
+    Exit;
   end;
 
   LToken := LToken.Replace('Bearer ', '', [rfReplaceAll, rfIgnoreCase]).Trim;
@@ -70,14 +72,13 @@ begin
     begin
       LogError(E.Message);
       SendErrorResponse(Res, Integer(THTTPStatus.Unauthorized), 'Sesión expirada', E.Message);
-      raise EHorseCallbackInterrupted.Create;
+      Exit;
     end;
   end;
 
-  // Inyectar usuario en el contexto
   Req.Session(TSessionInfoObj.Create(LSession));
   try
-    // El framework continúa al siguiente callback automáticamente.
+    Next();
   finally
     if Req.Session<TObject> <> nil then
       Req.Session<TObject>.Free;

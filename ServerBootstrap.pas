@@ -92,6 +92,12 @@ begin
           LPath := Req.PathInfo;
 
         uLogger.LogInfo(Format('Incoming request: %s %s', [Req.RawWebRequest.Method, LPath]), 'http_request');
+        Next();
+        uLogger.LogInfo(
+          Format('Completed request: %s %s -> %d (%d ms)',
+            [Req.RawWebRequest.Method, LPath, Res.RawWebResponse.StatusCode, GetTickCount64 - LStartTick]),
+          'http_request'
+        );
       end)
     .Use(
       procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
