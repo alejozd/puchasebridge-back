@@ -17,6 +17,7 @@ uses
   System.Classes,
   System.DateUtils,
   System.JSON,
+  System.IOUtils,
   HConfig,
   ProveedorRepository,
   ProductoRepository,
@@ -78,6 +79,8 @@ begin
 end;
 
 procedure RegisterMiddleware;
+var
+  ExeDir, WWWPath: string;
 begin
   THorse
     .Use(
@@ -128,10 +131,22 @@ begin
     .Use(OctetStream)
     .Use(LicenseGuard);
 
-  // [FIX-STATIC] Middleware ordenado para servir frontend React antes de auth.
-  RegisterStaticFilesMiddleware('www');
+  // [FIX-STATIC] Calcular ruta absoluta de la carpeta www basada en la ubicación del ejecutable
+  // Esto es crítico cuando la aplicación corre como servicio de Windows, ya que el working
+  // directory es C:\Windows\System32\ y NO la carpeta del .exe
+  ExeDir := TPath.GetDirectoryName(ParamStr(0));
+  WWWPath := TPath.Combine(ExeDir, 'www');
+  
+  // Logging para diagnóstico
+  if TDirectory.Exists(WWWPath) then
+    uLogger.LogInfo('[StaticFiles] Carpeta www encontrada: ' + WWWPath, 'startup')
+  else
+    uLogger.LogError('[StaticFiles] ERROR: Carpeta www no encontrada en: ' + WWWPath, 'startup');
+  
+  // Registrar middleware con ruta absoluta
+  RegisterStaticFilesMiddleware(WWWPath);
 
-  // [FIX-STATIC] Auth solo aplica sobre /api para no interceptar / ni /assets/*.
+  // [FIX-STATIC] Auth solo aplica sobre /api para no interceptar / ni /assets/*
   THorse.Use('/api', Auth);
 end;
 

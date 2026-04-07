@@ -1,47 +1,26 @@
-# Archivos binarios de Delphi
-*.dcu
+```
+# Compiled files
+*.ppu
+*.o
+*.obj
+*.compiled
+# Build artifacts  
 *.exe
 *.dll
-*.bpl
-*.dcp
-*.ocx
-*.rsm
-
-# Archivos de compilación
-__history/
-__recovery/
-*.identcache
-*.local
+*.so
+*.a
+*.lib
+*.pdb
 *.map
-*.dsk
-*.cfg
-*.bak
-*.tvsconfig
-*.stat
+# Dependencies
+*.compiled
+# Logs and temp files
 *.log
-
-# Archivos generados
-*.res
+*.tmp
 *.~*
-*.groupproj.local
-*.tvsconfig
-*.obj
-*.pch
-*.tds
-*.dsv
-
-# Configuración de usuario en proyectos
+# IDE files
 *.identcache
 *.local
-*.dproj.local
-*.bdsproj.local
-
-# Carpeta de salida
-Win32/
-Win64/
-
-# Configuración sensible local
-config.ini
-
-# Base de datos
-*.fdb
+.DS_Store
+Thumbs.db
+```

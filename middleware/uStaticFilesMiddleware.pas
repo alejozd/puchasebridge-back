@@ -12,8 +12,9 @@ implementation
 uses
   SysUtils,
   Classes,
-  uPaths
-  ;
+  System.IOUtils,
+  uPaths,
+  uLogger;
 
 var
   GStaticRoot: string;
@@ -135,8 +136,16 @@ begin
 end;
 
 procedure RegisterStaticFilesMiddleware(const WWWPath: string);
+var
+  FullWWWPath: string;
 begin
-  GStaticRoot := ResolvePathFromBase(WWWPath);
+  // Normalizar y obtener ruta absoluta para prevenir problemas con servicios de Windows
+  FullWWWPath := TPath.GetFullPath(WWWPath);
+  
+  // Logging de depuración para diagnóstico
+  uLogger.LogDebug('[StaticFiles] Registrando middleware con ruta: ' + FullWWWPath, 'static_files');
+  
+  GStaticRoot := FullWWWPath;
 
   THorse.Use(
     procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
