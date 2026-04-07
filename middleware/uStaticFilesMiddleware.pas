@@ -163,22 +163,28 @@ begin
   THorse.Get('/',
     procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
     begin
-      if not TryServeStaticRequest('/', Req, Res) then
-        Res.Status(THTTPStatus.NotFound).Send('Not Found');
+      if TryServeStaticRequest('/', Req, Res) then
+        raise EHorseCallbackInterrupted.Create;
+
+      Res.Status(THTTPStatus.NotFound).Send('Not Found');
     end);
 
   THorse.Get('/*',
     procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
     begin
-      if not TryServeStaticRequest(Req.RawWebRequest.PathInfo, Req, Res) then
-        Res.Status(THTTPStatus.NotFound).Send('Not Found');
+      if TryServeStaticRequest(Req.RawWebRequest.PathInfo, Req, Res) then
+        raise EHorseCallbackInterrupted.Create;
+
+      Res.Status(THTTPStatus.NotFound).Send('Not Found');
     end);
 
   THorse.Head('/*',
     procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
     begin
-      if not TryServeStaticRequest(Req.RawWebRequest.PathInfo, Req, Res) then
-        Res.Status(THTTPStatus.NotFound).Send('');
+      if TryServeStaticRequest(Req.RawWebRequest.PathInfo, Req, Res) then
+        raise EHorseCallbackInterrupted.Create;
+
+      Res.Status(THTTPStatus.NotFound).Send('');
     end);
 end;
 
