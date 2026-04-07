@@ -13,6 +13,7 @@ uses
   System.SysUtils,
   System.IOUtils,
   System.StrUtils,
+  System.Classes,
   uLogger,
   uPaths;
 
@@ -24,10 +25,11 @@ var
   LPath: string;
 begin
   LPath := APath.ToLower;
+  if (not LPath.IsEmpty) and (not LPath.StartsWith('/')) then LPath := '/' + LPath;
   // Rutas que no deben ser manejadas por el middleware de archivos estáticos
-  Result := LPath.StartsWith('/api/') or (LPath = '/api') or
-            LPath.StartsWith('/auth/') or (LPath = '/auth') or
-            LPath.StartsWith('/licencia/') or (LPath = '/licencia') or
+  Result := LPath.StartsWith('/api') or
+            LPath.StartsWith('/auth') or
+            LPath.StartsWith('/licencia') or
             (LPath = '/ping');
 end;
 
@@ -52,7 +54,6 @@ begin
   else if LExt = '.webp' then Result := 'image/webp'
   else Result := 'application/octet-stream';
 
-  // Add charset for text types
   if (Result.StartsWith('text/')) or (Result.Contains('javascript')) or (Result.Contains('json')) then
     Result := Result + '; charset=utf-8';
 end;
@@ -78,65 +79,15 @@ begin
   if LRelativePath.Contains('..') then
     Exit;
 
-  LRootPath := TPath.GetFullPath(GStaticBasePath);
+  LRootPath := IncludeTrailingPathDelimiter(TPath.GetFullPath(GStaticBasePath));
   LFullPath := TPath.GetFullPath(TPath.Combine(LRootPath, LRelativePath));
 
-  // Security check: resolved path must be within root path
-  if not StartsText(IncludeTrailingPathDelimiter(LRootPath), LFullPath) then
-  begin
-     // Fallback for files directly in the root
-     if not StartsText(IncludeTrailingPathDelimiter(LRootPath), IncludeTrailingPathDelimiter(TPath.GetDirectoryName(LFullPath))) then
-       Exit;
-  end;
+  // Verificación de seguridad: el archivo resuelto debe estar dentro del directorio base
+  if not StartsText(LRootPath, LFullPath) then
+    Exit;
 
   AResolvedPath := LFullPath;
   Result := True;
-end;
-
-function TryServeStaticRequest(const APath: string; const Req: THorseRequest; Res: THorseResponse): Boolean;
-var
-  LRequestPath: string;
-  LTargetFile: string;
-  LIndexPath: string;
-begin
-  Result := False;
-
-  LRequestPath := APath;
-  if not LRequestPath.StartsWith('/') then
-    LRequestPath := '/' + LRequestPath;
-
-  // 1. Excluir rutas de API y autenticación
-  if IsExcludedPath(LRequestPath) then
-    Exit;
-
-  // 2. Intentar servir archivo físico directamente
-  if TryBuildSafePath(LRequestPath, LTargetFile) then
-  begin
-    if TFile.Exists(LTargetFile) then
-    begin
-      uLogger.LogInfo('Serving static file: ' + LTargetFile, 'static_files');
-      Res.Status(THTTPStatus.OK)
-        .SendFile(LTargetFile, GetMimeTypeFromExtension(LTargetFile));
-      Result := True;
-      Exit;
-    end;
-  end;
-
-  // 3. SPA Fallback: servir index.html para rutas que no tienen extensión (rutas de React Router)
-  // No aplicar si la ruta es /assets/ o tiene extensión
-  if (not LRequestPath.ToLower.StartsWith('/assets/')) and
-     ExtractFileExt(LRequestPath).IsEmpty then
-  begin
-    LIndexPath := TPath.Combine(GStaticBasePath, 'index.html');
-    if TFile.Exists(LIndexPath) then
-    begin
-      uLogger.LogInfo('Serving SPA fallback index: ' + LIndexPath + ' for route ' + LRequestPath, 'static_files');
-      Res.Status(THTTPStatus.OK)
-        .SendFile(LIndexPath, GetMimeTypeFromExtension(LIndexPath));
-      Result := True;
-      Exit;
-    end;
-  end;
 end;
 
 procedure RegisterStaticFilesMiddleware(const WWWPath: string);
@@ -147,18 +98,57 @@ begin
 
   uLogger.LogInfo('Static files middleware path: ' + GStaticBasePath, 'startup');
 
-  // Usamos una ruta catch-all registrada al final de las rutas de Horse
-  THorse.Get('/*',
+  // Usamos THorse.Use para asegurar que capturamos todas las rutas que no fueron manejadas previamente,
+  // incluyendo la raíz "/" y las rutas de SPA.
+  THorse.Use(
     procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
     var
       LPath: string;
+      LTargetFile: string;
+      LIndexPath: string;
     begin
-      LPath := Req.RawWebRequest.PathInfo;
-      if LPath.IsEmpty then
-        LPath := Req.PathInfo;
+      // Solo manejamos GET y HEAD para archivos estáticos y SPA
+      if not (SameText(Req.RawWebRequest.Method, 'GET') or SameText(Req.RawWebRequest.Method, 'HEAD')) then
+      begin
+        Next();
+        Exit;
+      end;
 
-      if TryServeStaticRequest(LPath, Req, Res) then
+      // Obtener el path de la petición
+      LPath := Req.PathInfo;
+      if LPath.IsEmpty then
+        LPath := Req.RawWebRequest.PathInfo;
+      if LPath.IsEmpty then
+        LPath := '/';
+
+      // Si es una ruta excluida (API, Auth, Licencia), pasamos al siguiente handler
+      if IsExcludedPath(LPath) then
+      begin
+        Next();
+        Exit;
+      end;
+
+      // 1. Intentar servir archivo físico directamente
+      if TryBuildSafePath(LPath, LTargetFile) and TFile.Exists(LTargetFile) then
+      begin
+        uLogger.LogInfo('Serving static file: ' + LTargetFile, 'static_files');
+        Res.Status(THTTPStatus.OK).SendFile(LTargetFile, GetMimeTypeFromExtension(LTargetFile));
+        // IMPORTANTE: raise EHorseCallbackInterrupted para detener la cadena y evitar 404
         raise EHorseCallbackInterrupted.Create;
+      end;
+
+      // 2. Fallback para SPA: servir index.html para rutas que no tienen extensión (rutas de React Router)
+      // No aplicar si la ruta es /assets/ o tiene extensión
+      if (not LPath.ToLower.StartsWith('/assets/')) and ExtractFileExt(LPath).IsEmpty then
+      begin
+        LIndexPath := TPath.Combine(GStaticBasePath, 'index.html');
+        if TFile.Exists(LIndexPath) then
+        begin
+          uLogger.LogInfo('Serving SPA fallback index: ' + LIndexPath + ' for route ' + LPath, 'static_files');
+          Res.Status(THTTPStatus.OK).SendFile(LIndexPath, GetMimeTypeFromExtension(LIndexPath));
+          raise EHorseCallbackInterrupted.Create;
+        end;
+      end;
 
       Next();
     end);
