@@ -137,75 +137,71 @@ end;
 procedure RegisterStaticFilesMiddleware(const WWWPath: string);
 begin
   GStaticRoot := ResolvePathFromBase(WWWPath);
-  // Logging removido temporalmente para evitar error de compilacion
-
-  THorse.Use(
+  
+  // Registrar rutas explicitas para servir archivos estaticos
+  // Esto debe hacerse ANTES de cualquier otro middleware que pueda interceptar
+  
+  // Ruta raiz y SPA fallback
+  THorse.Get(['/', '/index.html'],
     procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
     var
-      LMethod: string;
-      LPath: string;
-      LResolvedPath: string;
       LIndexPath: string;
     begin
-      LMethod := UpperCase(Req.RawWebRequest.Method);
-      if (LMethod <> 'GET') and (LMethod <> 'HEAD') then
+      LIndexPath := SanitizeAndResolve('/index.html');
+      if (LIndexPath <> '') and FileExists(LIndexPath) then
       begin
-        Next();
-        Exit;
-      end;
-
-      LPath := NormalizeWebPath(Req.RawWebRequest.PathInfo);
-      // uLogger.LogDebug removido temporalmente
-
-      if IsApiOrHealthRoute(LPath) then
+        SendStaticFile(LIndexPath, Res);
+      end
+      else
       begin
-        // uLogger.LogDebug removido temporalmente
-        Next();
-        Exit;
-      end;
-
-      try
-        if LPath = '/' then
-          LPath := '/index.html';
-
-        LResolvedPath := SanitizeAndResolve(LPath);
-        // uLogger.LogDebug removido temporalmente
-        
-        if (LResolvedPath <> '') and FileExists(LResolvedPath) then
-        begin
-          // uLogger.LogInfo removido temporalmente
-          SendStaticFile(LResolvedPath, Res);
-          Exit;
-        end;
-
-        if IsFileRequest(LPath) then
-        begin
-          // uLogger.LogDebug removido temporalmente
-          Res.Status(404).ContentType('application/json; charset=utf-8')
-            .Send('{"error":"Archivo no encontrado"}');
-          Exit;
-        end;
-
-        LIndexPath := SanitizeAndResolve('/index.html');
-        // uLogger.LogDebug removido temporalmente
-        
-        if (LIndexPath <> '') and FileExists(LIndexPath) then
-        begin
-          // uLogger.LogInfo removido temporalmente
-          SendStaticFile(LIndexPath, Res);
-          Exit;
-        end;
-
-        // uLogger.LogError removido temporalmente
         Res.Status(404).ContentType('application/json; charset=utf-8')
           .Send('{"error":"index.html no encontrado"}');
-      except
-        on E: Exception do
-        begin
-          // uLogger.LogError removido temporalmente
-          Res.Status(500).ContentType('application/json; charset=utf-8')
-            .Send('{"error":"Error al leer archivo estatico"}');
-        end;
+      end;
+    end);
+  
+  // Assets y otros archivos estaticos
+  THorse.Get('/assets/:filename',
+    procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
+    var
+      LFileName: string;
+      LResolvedPath: string;
+    begin
+      LFileName := Req.Params['filename'];
+      LResolvedPath := SanitizeAndResolve('/assets/' + LFileName);
+      if (LResolvedPath <> '') and FileExists(LResolvedPath) then
+      begin
+        SendStaticFile(LResolvedPath, Res);
+      end
+      else
+      begin
+        Res.Status(404).ContentType('application/json; charset=utf-8')
+          .Send('{"error":"Archivo no encontrado"}');
+      end;
+    end);
+    
+  // Favicon y otros archivos en la raiz
+  THorse.Get('/:filename',
+    procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
+    var
+      LFileName: string;
+      LResolvedPath: string;
+    begin
+      LFileName := Req.Params['filename'];
+      // Ignorar rutas que son APIs
+      if (LFileName = 'api') or (LFileName = 'ping') or (LFileName = 'licencia') then
+      begin
+        Next();
+        Exit;
+      end;
+      
+      LResolvedPath := SanitizeAndResolve('/' + LFileName);
+      if (LResolvedPath <> '') and FileExists(LResolvedPath) then
+      begin
+        SendStaticFile(LResolvedPath, Res);
+      end
+      else
+      begin
+        Next();
       end;
     end);
 end;

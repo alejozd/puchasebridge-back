@@ -79,6 +79,9 @@ end;
 
 procedure RegisterMiddleware;
 begin
+  // [FIX-STATIC] Middleware para servir frontend React DEBE ser el PRIMERO
+  RegisterStaticFilesMiddleware('www');
+
   THorse
     .Use(
       procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
@@ -121,9 +124,6 @@ begin
       end))
     .Use(Jhonson())
     .Use(OctetStream);
-
-  // [FIX-STATIC] Middleware para servir frontend React ANTES de auth y license.
-  RegisterStaticFilesMiddleware('www');
 
   // CORS debe aplicarse DESPUES de static files pero ANTES de auth/license
   THorse.Use(
