@@ -29,12 +29,17 @@ begin
     Result := '/' + Result;
 end;
 
-function IsApiOrHealthPath(const APath: string): Boolean;
+function IsExcludedPath(const APath: string): Boolean;
 var
   LPath: string;
 begin
   LPath := APath.ToLower;
-  Result := LPath.StartsWith('/api/') or (LPath = '/api') or (LPath = '/ping');
+  // Rutas que no deben ser manejadas por el fallback de SPA
+  Result := LPath.StartsWith('/api/') or (LPath = '/api') or
+            LPath.StartsWith('/auth/') or (LPath = '/auth') or
+            LPath.StartsWith('/licencia/') or (LPath = '/licencia') or
+            LPath.StartsWith('/assets/') or (LPath = '/assets') or
+            (LPath = '/ping');
 end;
 
 function IsTextMime(const AMime: string): Boolean;
@@ -120,9 +125,11 @@ begin
 
   LRequestPath := NormalizeRequestPath(APath);
 
-  if IsApiOrHealthPath(LRequestPath) then
+  // 1. Si es una ruta de API/Auth conocida, no intentamos servir archivos estáticos (excepto assets)
+  if IsExcludedPath(LRequestPath) and (not LRequestPath.StartsWith('/assets/')) then
     Exit;
 
+  // 2. Intentar encontrar el archivo físico
   if not TryBuildSafePath(LRequestPath, LTargetFile) then
     Exit;
 
@@ -135,7 +142,11 @@ begin
     Exit;
   end;
 
-  if ExtractFileExt(LRequestPath).IsEmpty then
+  // 3. Fallback para SPA:
+  // Solo si es GET/HEAD, no tiene extensión, no es una ruta excluida (incluyendo assets), y existe index.html
+  if (SameText(Req.RawWebRequest.Method, 'GET') or SameText(Req.RawWebRequest.Method, 'HEAD')) and
+     (not IsExcludedPath(LRequestPath)) and
+     ExtractFileExt(LRequestPath).IsEmpty then
   begin
     LIndexPath := TPath.Combine(GStaticBasePath, 'index.html');
     if TFile.Exists(LIndexPath) then
@@ -160,50 +171,7 @@ begin
 
   uLogger.LogInfo('Static files middleware path: ' + GStaticBasePath, 'startup');
 
-  THorse.All('/',
-    procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
-    begin
-      if (SameText(Req.RawWebRequest.Method, 'GET') or SameText(Req.RawWebRequest.Method, 'HEAD')) and
-         TryServeStaticRequest('/', Req, Res) then
-        raise EHorseCallbackInterrupted.Create;
-
-      Res.Status(THTTPStatus.NotFound).Send('Not Found');
-    end);
-
-
-  THorse.All('/assets/:file',
-    procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
-    var
-      LAssetPath: string;
-    begin
-      LAssetPath := '/assets/' + Req.Params['file'];
-      if (SameText(Req.RawWebRequest.Method, 'GET') or SameText(Req.RawWebRequest.Method, 'HEAD')) and
-         TryServeStaticRequest(LAssetPath, Req, Res) then
-        raise EHorseCallbackInterrupted.Create;
-
-      if SameText(Req.RawWebRequest.Method, 'HEAD') then
-        Res.Status(THTTPStatus.NotFound).Send('')
-      else
-        Res.Status(THTTPStatus.NotFound).Send('Not Found');
-    end);
-
-  THorse.All('/:file',
-    procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
-    var
-      LFilePath: string;
-    begin
-      LFilePath := '/' + Req.Params['file'];
-      if (SameText(Req.RawWebRequest.Method, 'GET') or SameText(Req.RawWebRequest.Method, 'HEAD')) and
-         (not ExtractFileExt(LFilePath).IsEmpty) and
-         TryServeStaticRequest(LFilePath, Req, Res) then
-        raise EHorseCallbackInterrupted.Create;
-
-      if SameText(Req.RawWebRequest.Method, 'HEAD') then
-        Res.Status(THTTPStatus.NotFound).Send('')
-      else
-        Res.Status(THTTPStatus.NotFound).Send('Not Found');
-    end);
-
+  // Catch-all route for static files and SPA fallback
   THorse.All('/*',
     procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
     begin
@@ -211,10 +179,7 @@ begin
          TryServeStaticRequest(Req.RawWebRequest.PathInfo, Req, Res) then
         raise EHorseCallbackInterrupted.Create;
 
-      if SameText(Req.RawWebRequest.Method, 'HEAD') then
-        Res.Status(THTTPStatus.NotFound).Send('')
-      else
-        Res.Status(THTTPStatus.NotFound).Send('Not Found');
+      Next();
     end);
 end;
 
