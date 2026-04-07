@@ -17,6 +17,7 @@ uses
   System.Classes,
   System.DateUtils,
   System.JSON,
+  System.IOUtils,
   HConfig,
   ProveedorRepository,
   ProductoRepository,
@@ -132,8 +133,8 @@ begin
       end))
     .Use(Jhonson())
     .Use(OctetStream)
-    .Use(LicenseGuard)
-    .Use(Auth);
+    .Use('/api', LicenseGuard)
+    .Use('/api', Auth);
 end;
 
 procedure RegisterRoutes;
@@ -165,13 +166,20 @@ begin
 end;
 
 procedure ConfigureHorse;
+var
+  ExeDir, WWWPath: string;
 begin
   if GConfigured then
     Exit;
 
+  // [STATIC-FILES] Registrar estáticos PRIMERO (antes de auth)
+  ExeDir := TPath.GetDirectoryName(ParamStr(0));
+  WWWPath := TPath.Combine(ExeDir, 'www');
+  RegisterStaticFilesMiddleware(WWWPath);
+
+  // Luego el resto
   RegisterMiddleware;
   RegisterRoutes;
-  RegisterStaticFilesMiddleware('www');
   GConfigured := True;
 end;
 
