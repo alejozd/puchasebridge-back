@@ -24,11 +24,10 @@ var
   LPath: string;
 begin
   LPath := APath.ToLower;
-  if not LPath.StartsWith('/') then LPath := '/' + LPath;
-  // Rutas que no deben ser manejadas por el fallback de SPA.
-  Result := LPath.StartsWith('/api') or
-            LPath.StartsWith('/auth') or
-            LPath.StartsWith('/licencia') or
+  // Rutas que no deben ser manejadas por el middleware de archivos estáticos
+  Result := LPath.StartsWith('/api/') or (LPath = '/api') or
+            LPath.StartsWith('/auth/') or (LPath = '/auth') or
+            LPath.StartsWith('/licencia/') or (LPath = '/licencia') or
             (LPath = '/ping');
 end;
 
@@ -103,13 +102,14 @@ begin
   Result := False;
 
   LRequestPath := APath;
-  if not LRequestPath.StartsWith('/') then LRequestPath := '/' + LRequestPath;
+  if not LRequestPath.StartsWith('/') then
+    LRequestPath := '/' + LRequestPath;
 
-  // 1. Exclude API/Auth/Licencia/Ping
+  // 1. Excluir rutas de API y autenticación
   if IsExcludedPath(LRequestPath) then
     Exit;
 
-  // 2. Try physical file
+  // 2. Intentar servir archivo físico directamente
   if TryBuildSafePath(LRequestPath, LTargetFile) then
   begin
     if TFile.Exists(LTargetFile) then
@@ -122,9 +122,8 @@ begin
     end;
   end;
 
-  // 3. SPA Fallback
-  // Only if no extension, not in /assets/, and index.html exists.
-  // Note: Method check (GET/HEAD) is already done by the caller.
+  // 3. SPA Fallback: servir index.html para rutas que no tienen extensión (rutas de React Router)
+  // No aplicar si la ruta es /assets/ o tiene extensión
   if (not LRequestPath.ToLower.StartsWith('/assets/')) and
      ExtractFileExt(LRequestPath).IsEmpty then
   begin
@@ -148,23 +147,18 @@ begin
 
   uLogger.LogInfo('Static files middleware path: ' + GStaticBasePath, 'startup');
 
-  THorse.Use(
+  // Usamos una ruta catch-all registrada al final de las rutas de Horse
+  THorse.Get('/*',
     procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
     var
       LPath: string;
     begin
-      // Only handle GET and HEAD
-      if not (SameText(Req.RawWebRequest.Method, 'GET') or SameText(Req.RawWebRequest.Method, 'HEAD')) then
-      begin
-        Next();
-        Exit;
-      end;
-
-      LPath := Req.PathInfo;
-      if LPath.IsEmpty then LPath := '/';
+      LPath := Req.RawWebRequest.PathInfo;
+      if LPath.IsEmpty then
+        LPath := Req.PathInfo;
 
       if TryServeStaticRequest(LPath, Req, Res) then
-        Exit;
+        raise EHorseCallbackInterrupted.Create;
 
       Next();
     end);
