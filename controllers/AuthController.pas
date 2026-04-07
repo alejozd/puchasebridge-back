@@ -46,6 +46,7 @@ end;
 procedure Registry;
 begin
   THorse.Post('/auth/login', Login);
+  THorse.Post('/api/auth/login', Login);
 end;
 
 end.

@@ -43,6 +43,7 @@ begin
 
   LPath := NormalizePath(Req.RawWebRequest.PathInfo);
   if (LPath = '/auth/login') or
+     (LPath = '/api/auth/login') or
      (LPath = '/ping') or
      IsPublicFrontendPath(LPath) then
   begin

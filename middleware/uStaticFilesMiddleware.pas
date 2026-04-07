@@ -110,7 +110,7 @@ begin
   Result := True;
 end;
 
-function TryServeStaticRequest(Req: THorseRequest; Res: THorseResponse): Boolean;
+function TryServeStaticRequest(const APath: string; const Req: THorseRequest; Res: THorseResponse): Boolean;
 var
   LRequestPath: string;
   LTargetFile: string;
@@ -118,7 +118,7 @@ var
 begin
   Result := False;
 
-  LRequestPath := NormalizeRequestPath(Req.RawWebRequest.PathInfo);
+  LRequestPath := NormalizeRequestPath(APath);
 
   if IsApiOrHealthPath(LRequestPath) then
     Exit;
@@ -160,30 +160,25 @@ begin
 
   uLogger.LogInfo('Static files middleware path: ' + GStaticBasePath, 'startup');
 
-  THorse.Use(
+  THorse.Get('/',
     procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
     begin
-      if not SameText(Req.RawWebRequest.Method, 'GET') and
-         not SameText(Req.RawWebRequest.Method, 'HEAD') then
-      begin
-        Next();
-        Exit;
-      end;
+      if not TryServeStaticRequest('/', Req, Res) then
+        Res.Status(THTTPStatus.NotFound).Send('Not Found');
+    end);
 
-      try
-        if TryServeStaticRequest(Req, Res) then
-          Exit;
-      except
-        on E: Exception do
-        begin
-          uLogger.LogError(E, 'static_files');
-          Res.Status(THTTPStatus.InternalServerError)
-             .Send('Error interno al servir archivo estático');
-          Exit;
-        end;
-      end;
+  THorse.Get('/*',
+    procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
+    begin
+      if not TryServeStaticRequest(Req.RawWebRequest.PathInfo, Req, Res) then
+        Res.Status(THTTPStatus.NotFound).Send('Not Found');
+    end);
 
-      Next();
+  THorse.Head('/*',
+    procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
+    begin
+      if not TryServeStaticRequest(Req.RawWebRequest.PathInfo, Req, Res) then
+        Res.Status(THTTPStatus.NotFound).Send('');
     end);
 end;
 
