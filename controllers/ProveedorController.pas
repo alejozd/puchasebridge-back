@@ -33,7 +33,7 @@ end;
 
 procedure Registry;
 begin
-  THorse.Get('/proveedor/:nit', GetProveedor);
+  THorse.Get('/api/proveedor/:nit', GetProveedor);
 end;
 
 end.

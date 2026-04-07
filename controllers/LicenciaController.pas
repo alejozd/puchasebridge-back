@@ -172,10 +172,10 @@ end;
 
 class procedure TLicenciaController.Registry;
 begin
-  THorse.Get('/licencia/estado', GetEstado);
-  THorse.Post('/licencia/registrar', Registrar);
-  THorse.Post('/licencia/activar', Registrar);
-  THorse.Post('/licencia/activar-online', ActivarOnline);
+  THorse.Get('/api/licencia/estado', GetEstado);
+  THorse.Post('/api/licencia/registrar', Registrar);
+  THorse.Post('/api/licencia/activar', Registrar);
+  THorse.Post('/api/licencia/activar-online', ActivarOnline);
 end;
 
 end.

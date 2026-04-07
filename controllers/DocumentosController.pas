@@ -276,7 +276,7 @@ end;
 
 procedure Registry;
 begin
-  THorse.Post('/documentos/procesar', Procesar);
+  THorse.Post('/api/documentos/procesar', Procesar);
 end;
 
 end.
