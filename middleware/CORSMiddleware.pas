@@ -29,10 +29,8 @@ begin
   if SameText(Req.RawWebRequest.Method, 'OPTIONS') then
   begin
     Res.Status(THTTPStatus.OK).Send('');
-    Exit;
+    raise EHorseCallbackInterrupted.Create;
   end;
-
-  Next();
 end;
 
 end.

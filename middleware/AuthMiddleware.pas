@@ -36,10 +36,7 @@ var
 begin
   // CRITICO: nunca bloquear preflight en autenticacion
   if SameText(Req.RawWebRequest.Method, 'OPTIONS') then
-  begin
-    Next();
     Exit;
-  end;
 
   LPath := NormalizePath(Req.RawWebRequest.PathInfo);
   if (LPath = '/auth/login') or
@@ -47,7 +44,6 @@ begin
      (LPath = '/ping') or
      IsPublicFrontendPath(LPath) then
   begin
-    Next();
     Exit;
   end;
 
@@ -56,13 +52,13 @@ begin
   if LToken.IsEmpty then
   begin
     SendErrorResponse(Res, Integer(THTTPStatus.Unauthorized), 'Sesión expirada');
-    Exit;
+    raise EHorseCallbackInterrupted.Create;
   end;
 
   if not LToken.StartsWith('Bearer ', True) then
   begin
     SendErrorResponse(Res, Integer(THTTPStatus.Unauthorized), 'Sesión expirada');
-    Exit;
+    raise EHorseCallbackInterrupted.Create;
   end;
 
   LToken := LToken.Replace('Bearer ', '', [rfReplaceAll, rfIgnoreCase]).Trim;
@@ -74,14 +70,14 @@ begin
     begin
       LogError(E.Message);
       SendErrorResponse(Res, Integer(THTTPStatus.Unauthorized), 'Sesión expirada', E.Message);
-      Exit;
+      raise EHorseCallbackInterrupted.Create;
     end;
   end;
 
   // Inyectar usuario en el contexto
   Req.Session(TSessionInfoObj.Create(LSession));
   try
-    Next();
+    // El framework continúa al siguiente callback automáticamente.
   finally
     if Req.Session<TObject> <> nil then
       Req.Session<TObject>.Free;
