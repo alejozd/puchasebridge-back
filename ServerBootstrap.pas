@@ -126,8 +126,13 @@ begin
       end))
     .Use(Jhonson())
     .Use(OctetStream)
-    .Use(LicenseGuard)
-    .Use(Auth);
+    .Use(LicenseGuard);
+
+  // [FIX-STATIC] Middleware ordenado para servir frontend React antes de auth.
+  RegisterStaticFilesMiddleware('www');
+
+  // [FIX-STATIC] Auth solo aplica sobre /api para no interceptar / ni /assets/*.
+  THorse.Use('/api', Auth);
 end;
 
 procedure RegisterRoutes;
@@ -156,8 +161,6 @@ begin
   DocumentosController.Registry;
   AuthController.Registry;
   TLicenciaController.Registry;
-
-  RegisterStaticFilesMiddleware('www');
 end;
 
 procedure ConfigureHorse;
