@@ -1,1 +1,51 @@
-<!DOCTYPE html><html><head><title>Test SPA</title></head><body><h1>SPA Fallback Test</h1></body></html>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PurchaseBridge - SPA Test</title>
+    <link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+    <div id="app">
+        <header>
+            <h1>PurchaseBridge</h1>
+            <nav id="navigation">
+                <a href="/">Inicio</a>
+                <a href="/dashboard">Dashboard</a>
+                <a href="/configuracion">Configuración</a>
+                <span id="auth-links">
+                    <a href="/login" id="login-link">Login</a>
+                </span>
+            </nav>
+        </header>
+        
+        <main id="main-content">
+            <section id="home">
+                <h2>Bienvenido a PurchaseBridge</h2>
+                <p>Esta es una aplicación de prueba para validar el funcionamiento del SPA.</p>
+                <button id="test-api-btn">Probar API Ping</button>
+                <div id="api-response"></div>
+            </section>
+            
+            <section id="login" style="display:none;">
+                <h2>Iniciar Sesión</h2>
+                <form id="login-form">
+                    <input type="text" id="usuario" placeholder="Usuario" required>
+                    <input type="password" id="clave" placeholder="Clave" required>
+                    <button type="submit">Ingresar</button>
+                </form>
+                <div id="login-error"></div>
+            </section>
+            
+            <section id="dashboard" style="display:none;">
+                <h2>Dashboard</h2>
+                <p>Contenido protegido - requiere autenticación</p>
+                <button id="logout-btn">Cerrar Sesión</button>
+            </section>
+        </main>
+    </div>
+    
+    <script src="/assets/app.js"></script>
+</body>
+</html>

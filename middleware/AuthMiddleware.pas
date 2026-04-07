@@ -12,6 +12,9 @@ procedure Auth(Req: THorseRequest; Res: THorseResponse; Next: TProc);
 
 implementation
 
+uses
+  System.StrUtils;
+
 function NormalizePath(const APath: string): string;
 begin
   Result := APath.Trim.ToLower;
@@ -19,12 +22,34 @@ begin
     Result := Result.Substring(0, Result.Length - 1);
 end;
 
-function IsPublicFrontendPath(const APath: string): Boolean;
+function HasFileExtension(const APath: string): Boolean;
+var
+  LExt: string;
 begin
-  Result := not APath.StartsWith('/api') and
-            not APath.StartsWith('/auth') and
-            not APath.StartsWith('/licencia') and
-            (APath <> '/ping');
+  LExt := ExtractFileExt(APath);
+  Result := not LExt.IsEmpty;
+end;
+
+function IsPublicPath(const APath: string): Boolean;
+var
+  LPath: string;
+begin
+  LPath := APath.ToLower;
+  
+  // Rutas públicas explícitas
+  Result := (LPath = '/auth/login') or
+            (LPath = '/api/auth/login') or
+            (LPath = '/ping') or
+            (LPath = '/') or
+            (LPath = '');
+  
+  if Result then
+    Exit;
+  
+  // Archivos estáticos con extensión son públicos (JS, CSS, imágenes, etc.)
+  // Esto permite que el SPA cargue sus recursos sin autenticación
+  if HasFileExtension(LPath) then
+    Exit(True);
 end;
 
 procedure Auth(Req: THorseRequest; Res: THorseResponse; Next: TProc);
@@ -40,10 +65,9 @@ begin
   end;
 
   LPath := NormalizePath(Req.RawWebRequest.PathInfo);
-  if (LPath = '/auth/login') or
-     (LPath = '/api/auth/login') or
-     (LPath = '/ping') or
-     IsPublicFrontendPath(LPath) then
+  
+  // Verificar si es una ruta pública (login, ping, archivos estáticos)
+  if IsPublicPath(LPath) then
   begin
     Next();
     Exit;

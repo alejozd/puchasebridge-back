@@ -132,13 +132,15 @@ begin
         ASendException := False;
       end))
     .Use(Jhonson())
-    .Use(OctetStream)
-    .Use('/api', LicenseGuard)
-    .Use('/api', Auth);
+    .Use(OctetStream);
 end;
 
 procedure RegisterRoutes;
 begin
+  // Registrar middlewares de protección para rutas API
+  THorse.Use('/api', LicenseGuard);
+  THorse.Use('/api', Auth);
+
   THorse.Get('/ping',
     procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
     var
@@ -175,13 +177,15 @@ begin
   // 1. Primero middlewares globales (logging, CORS, exception handler, Jhonson, OctetStream)
   RegisterMiddleware;
   
-  // 2. Luego rutas API (/api/*, /auth/*, /ping) - deben registrarse ANTES del estático
-  RegisterRoutes;
-  
-  // 3. Finalmente estáticos con fallback SPA (catch-all /*)
+  // 2. Registrar estáticos ANTES de los middlewares de autenticación y rutas API
+  // Esto permite que archivos estáticos (JS, CSS, imágenes) se sirvan sin autenticación
+  // Y que las rutas SPA funcionen correctamente con fallback a index.html
   ExeDir := TPath.GetDirectoryName(ParamStr(0));
   WWWPath := TPath.Combine(ExeDir, 'www');
   RegisterStaticFilesMiddleware(WWWPath);
+  
+  // 3. Luego rutas API (/api/*, /auth/*, /ping) con sus middlewares de protección
+  RegisterRoutes;
   
   GConfigured := True;
 end;
