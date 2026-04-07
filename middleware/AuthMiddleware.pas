@@ -19,6 +19,15 @@ begin
     Result := Result.Substring(0, Result.Length - 1);
 end;
 
+function IsPublicFrontendPath(const APath: string): Boolean;
+begin
+  // Mantener autenticación únicamente en API y endpoints explícitos de auth/licencia.
+  Result := not APath.StartsWith('/api') and
+            not APath.StartsWith('/auth') and
+            not APath.StartsWith('/licencia') and
+            (APath <> '/ping');
+end;
+
 procedure Auth(Req: THorseRequest; Res: THorseResponse; Next: TProc);
 var
   LToken: string;
@@ -34,7 +43,8 @@ begin
 
   LPath := NormalizePath(Req.RawWebRequest.PathInfo);
   if (LPath = '/auth/login') or
-     (LPath = '/ping') then
+     (LPath = '/ping') or
+     IsPublicFrontendPath(LPath) then
   begin
     Next();
     Exit;
