@@ -45,7 +45,8 @@ uses
   uLogger,
   ErrorResponseUtils,
   LicenseService,
-  uPaths;
+  uPaths,
+  uStaticFilesMiddleware;
 
 var
   GConfigured: Boolean;
@@ -155,6 +156,8 @@ begin
   DocumentosController.Registry;
   AuthController.Registry;
   TLicenciaController.Registry;
+
+  RegisterStaticFilesMiddleware('www');
 end;
 
 procedure ConfigureHorse;
