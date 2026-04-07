@@ -170,6 +170,40 @@ begin
       Res.Status(THTTPStatus.NotFound).Send('Not Found');
     end);
 
+
+  THorse.All('/assets/:file',
+    procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
+    var
+      LAssetPath: string;
+    begin
+      LAssetPath := '/assets/' + Req.Params['file'];
+      if (SameText(Req.RawWebRequest.Method, 'GET') or SameText(Req.RawWebRequest.Method, 'HEAD')) and
+         TryServeStaticRequest(LAssetPath, Req, Res) then
+        raise EHorseCallbackInterrupted.Create;
+
+      if SameText(Req.RawWebRequest.Method, 'HEAD') then
+        Res.Status(THTTPStatus.NotFound).Send('')
+      else
+        Res.Status(THTTPStatus.NotFound).Send('Not Found');
+    end);
+
+  THorse.All('/:file',
+    procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
+    var
+      LFilePath: string;
+    begin
+      LFilePath := '/' + Req.Params['file'];
+      if (SameText(Req.RawWebRequest.Method, 'GET') or SameText(Req.RawWebRequest.Method, 'HEAD')) and
+         (not ExtractFileExt(LFilePath).IsEmpty) and
+         TryServeStaticRequest(LFilePath, Req, Res) then
+        raise EHorseCallbackInterrupted.Create;
+
+      if SameText(Req.RawWebRequest.Method, 'HEAD') then
+        Res.Status(THTTPStatus.NotFound).Send('')
+      else
+        Res.Status(THTTPStatus.NotFound).Send('Not Found');
+    end);
+
   THorse.All('/*',
     procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
     begin
