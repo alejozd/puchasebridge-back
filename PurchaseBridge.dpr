@@ -1,4 +1,4 @@
-program PurchaseBridge;
+﻿program PurchaseBridge;
 
 {$APPTYPE CONSOLE}
 
@@ -29,7 +29,9 @@ uses
   AuthController in 'controllers\AuthController.pas',
   LicenciaController in 'controllers\LicenciaController.pas',
   AuthMiddleware in 'middleware\AuthMiddleware.pas',
+  CORSMiddleware in 'middleware\CORSMiddleware.pas',
   LicenseMiddleware in 'middleware\LicenseMiddleware.pas',
+  uStaticFilesMiddleware in 'middleware\uStaticFilesMiddleware.pas',
   uLogger in 'utils\uLogger.pas',
   uPaths in 'utils\uPaths.pas',
   ErrorResponseUtils in 'utils\ErrorResponseUtils.pas',

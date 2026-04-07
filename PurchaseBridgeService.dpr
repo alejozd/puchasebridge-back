@@ -1,4 +1,4 @@
-program PurchaseBridgeSvcHost;
+﻿program PurchaseBridgeSvcHost;
 
 uses
   Vcl.SvcMgr,
@@ -16,7 +16,9 @@ uses
   XmlValidationController in 'controllers\XmlValidationController.pas',
   FirebirdConnection in 'database\FirebirdConnection.pas',
   AuthMiddleware in 'middleware\AuthMiddleware.pas',
+  CORSMiddleware in 'middleware\CORSMiddleware.pas',
   LicenseMiddleware in 'middleware\LicenseMiddleware.pas',
+  uStaticFilesMiddleware in 'middleware\uStaticFilesMiddleware.pas',
   ProductoRepository in 'repositories\ProductoRepository.pas',
   ProveedorRepository in 'repositories\ProveedorRepository.pas',
   PurchaseBridge.Service in 'service\PurchaseBridge.Service.pas' {PurchaseBridgeService: TService},
