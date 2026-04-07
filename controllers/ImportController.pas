@@ -72,8 +72,7 @@ end;
 
 procedure Registry;
 begin
-  THorse
-    .Post('/factura/xml', PostFacturaXML);
+  THorse.Post('/api/factura/xml', PostFacturaXML);
 end;
 
 end.

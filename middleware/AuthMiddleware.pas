@@ -33,7 +33,7 @@ begin
   end;
 
   LPath := NormalizePath(Req.RawWebRequest.PathInfo);
-  if (LPath = '/auth/login') or
+  if (LPath = '/api/auth/login') or
      (LPath = '/ping') then
   begin
     Next();

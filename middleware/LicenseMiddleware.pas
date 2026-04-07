@@ -24,7 +24,7 @@ begin
       LPath := Req.RawWebRequest.PathInfo;
 
       // Permitir siempre el acceso a los endpoints de licencia para poder activar/ver estado
-      if LPath.Contains('/licencia') or LPath.StartsWith('/ping') then
+      if LPath.Contains('/api/licencia') or LPath.StartsWith('/ping') then
       begin
         Next();
         Exit;

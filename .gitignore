@@ -1,47 +1,46 @@
-# Archivos binarios de Delphi
-*.dcu
+```
+# Compiled files
+*.o
+*.obj
 *.exe
 *.dll
-*.bpl
-*.dcp
-*.ocx
-*.rsm
+*.so
+*.a
+*.out
 
-# Archivos de compilación
-__history/
-__recovery/
-*.identcache
-*.local
-*.map
-*.dsk
-*.cfg
-*.bak
-*.tvsconfig
-*.stat
+# Dependencies
+node_modules/
+venv/
+.venv/
+__pycache__/
+.mypy_cache/
+.pytest_cache/
+target/
+.gradle/
+
+# Build directories
+dist/
+build/
+
+# Editor/IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*.tmp
+
+# System files
+.DS_Store
+Thumbs.db
+.env
+.env.local
+*.env.*
+
+# Logs
 *.log
 
-# Archivos generados
-*.res
-*.~*
-*.groupproj.local
-*.tvsconfig
-*.obj
-*.pch
-*.tds
-*.dsv
-
-# Configuración de usuario en proyectos
-*.identcache
-*.local
-*.dproj.local
-*.bdsproj.local
-
-# Carpeta de salida
-Win32/
-Win64/
-
-# Configuración sensible local
-config.ini
-
-# Base de datos
-*.fdb
+# Coverage
+coverage/
+htmlcov/
+.coverage
+```
