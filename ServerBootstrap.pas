@@ -174,15 +174,15 @@ begin
   if GConfigured then
     Exit;
 
-  // 1. Primero middlewares globales (logging, CORS, exception handler, Jhonson, OctetStream)
-  RegisterMiddleware;
-  
-  // 2. Registrar estáticos ANTES de los middlewares de autenticación y rutas API
-  // Esto permite que archivos estáticos (JS, CSS, imágenes) se sirvan sin autenticación
+  // 1. Registrar estáticos PRIMERO - antes de cualquier otro middleware
+  // Esto permite que archivos estáticos (JS, CSS, imágenes) se sirvan sin pasar por otros middlewares
   // Y que las rutas SPA funcionen correctamente con fallback a index.html
   ExeDir := TPath.GetDirectoryName(ParamStr(0));
   WWWPath := TPath.Combine(ExeDir, 'www');
   RegisterStaticFilesMiddleware(WWWPath);
+  
+  // 2. Luego middlewares globales (logging, CORS, exception handler, Jhonson, OctetStream)
+  RegisterMiddleware;
   
   // 3. Luego rutas API (/api/*, /auth/*, /ping) con sus middlewares de protección
   RegisterRoutes;

@@ -68,28 +68,7 @@ begin
 
   uLogger.LogInfo('Static files middleware path: ' + GStaticBasePath, 'startup');
 
-  // Ruta explícita para la raíz "/" - sirve index.html directamente
-  THorse.Get('/',
-    procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
-    var
-      LIndexPath: string;
-    begin
-      LIndexPath := TPath.Combine(GStaticBasePath, 'index.html');
-      if TFile.Exists(LIndexPath) then
-      begin
-        uLogger.LogInfo('Serving index.html for root path /', 'static_files');
-        Res.Status(THTTPStatus.OK)
-          .ContentType(GetMimeTypeFromExtension(LIndexPath))
-          .SendFile(LIndexPath);
-      end
-      else
-      begin
-        uLogger.LogError('index.html not found at: ' + LIndexPath, 'static_files');
-        Res.Status(THTTPStatus.NotFound).Send('Not Found');
-      end;
-    end);
-
-  // Ruta catch-all para todo lo demás (incluyendo /assets/* y rutas SPA)
+  // Ruta catch-all para todo lo demás (incluyendo /assets/* y rutas SPA) - REGISTRAR PRIMERO
   THorse.Get('/*',
     procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
     var
@@ -161,6 +140,27 @@ begin
       // Archivo no encontrado y tiene extensión -> 404 real
       uLogger.LogDebug('File not found: ' + LFullPath, 'static_files');
       Res.Status(THTTPStatus.NotFound).Send('Not Found');
+    end);
+
+  // Ruta explícita para la raíz "/" - sirve index.html directamente - REGISTRAR DESPUÉS
+  THorse.Get('/',
+    procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
+    var
+      LIndexPath: string;
+    begin
+      LIndexPath := TPath.Combine(GStaticBasePath, 'index.html');
+      if TFile.Exists(LIndexPath) then
+      begin
+        uLogger.LogInfo('Serving index.html for root path /', 'static_files');
+        Res.Status(THTTPStatus.OK)
+          .ContentType(GetMimeTypeFromExtension(LIndexPath))
+          .SendFile(LIndexPath);
+      end
+      else
+      begin
+        uLogger.LogError('index.html not found at: ' + LIndexPath, 'static_files');
+        Res.Status(THTTPStatus.NotFound).Send('Not Found');
+      end;
     end);
 end;
 
