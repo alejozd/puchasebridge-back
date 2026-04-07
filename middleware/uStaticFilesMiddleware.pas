@@ -170,7 +170,7 @@ begin
          not SameText(Req.RawWebRequest.Method, 'HEAD') then
         Exit;
 
-      if Res.RawWebResponse.StatusCode <> THTTPStatus.NotFound.ToInteger then
+      if Res.RawWebResponse.StatusCode <> Integer(THTTPStatus.NotFound) then
         Exit;
 
       try
