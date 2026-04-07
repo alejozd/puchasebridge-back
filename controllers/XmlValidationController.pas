@@ -1,4 +1,4 @@
-﻿unit XmlValidationController;
+unit XmlValidationController;
 
 interface
 
@@ -321,7 +321,9 @@ end;
 procedure Registry;
 begin
   THorse.Post('/xml/validate', Validate);
+  THorse.Post('/api/xml/validate', Validate);
   THorse.Post('/xml/validate/batch', ValidateBatch);
+  THorse.Post('/api/xml/validate/batch', ValidateBatch);
 end;
 
 end.

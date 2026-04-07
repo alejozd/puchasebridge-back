@@ -138,7 +138,9 @@ end;
 procedure Registry;
 begin
   THorse.Get('/erp/productos', GetProductos);
+  THorse.Get('/api/erp/productos', GetProductos);
   THorse.Get('/erp/unidades', GetUnidades);
+  THorse.Get('/api/erp/unidades', GetUnidades);
 end;
 
 end.

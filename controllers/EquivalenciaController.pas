@@ -215,8 +215,11 @@ end;
 procedure Registry;
 begin
   THorse.Get('/equivalencias', List);
+  THorse.Get('/api/equivalencias', List);
   THorse.Post('/equivalencia', Create);
+  THorse.Post('/api/equivalencia', Create);
   THorse.Delete('/equivalencia', Delete);
+  THorse.Delete('/api/equivalencia', Delete);
 end;
 
 end.

@@ -1,4 +1,4 @@
-﻿unit XmlController;
+unit XmlController;
 
 interface
 
@@ -1152,15 +1152,25 @@ procedure Registry;
 begin
   // /xml/list is deprecated, use /xml/files
   THorse.Get('/xml/list', GetFiles);
+  THorse.Get('/api/xml/list', GetFiles);
   THorse.Post('/xml/upload', Upload);
+  THorse.Post('/api/xml/upload', Upload);
   THorse.Post('/xml/parse', Parse);
+  THorse.Post('/api/xml/parse', Parse);
   THorse.Get('/xml/files', GetFiles);
+  THorse.Get('/api/xml/files', GetFiles);
   THorse.Get('/xml/files/:id', GetFileById);
+  THorse.Get('/api/xml/files/:id', GetFileById);
   THorse.Post('/xml/procesar', ProcesarBatch);
+  THorse.Post('/api/xml/procesar', ProcesarBatch);
   THorse.Get('/xml/productos/pendientes', GetProductosPendientes);
+  THorse.Get('/api/xml/productos/pendientes', GetProductosPendientes);
   THorse.Get('/xml/productos/documento', GetProductosDocumento);
+  THorse.Get('/api/xml/productos/documento', GetProductosDocumento);
   THorse.Post('/xml/homologar', Homologar);
+  THorse.Post('/api/xml/homologar', Homologar);
   THorse.Get('/dashboard/metrics', GetDashboardMetrics);
+  THorse.Get('/api/dashboard/metrics', GetDashboardMetrics);
 end;
 
 end.
