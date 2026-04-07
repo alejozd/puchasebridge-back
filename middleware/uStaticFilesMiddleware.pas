@@ -138,16 +138,13 @@ procedure RegisterStaticFilesMiddleware(const WWWPath: string);
 begin
   GStaticRoot := ResolvePathFromBase(WWWPath);
   
-  // Registrar rutas explicitas para servir archivos estaticos
-  // Esto debe hacerse ANTES de cualquier otro middleware que pueda interceptar
-  
-  // Ruta raiz y SPA fallback
-  THorse.Get(['/', '/index.html'],
+  // Registrar ruta para servir index.html en la raiz
+  THorse.Get('/',
     procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
     var
       LIndexPath: string;
     begin
-      LIndexPath := SanitizeAndResolve('/index.html');
+      LIndexPath := SanitizeAndResolve('index.html');
       if (LIndexPath <> '') and FileExists(LIndexPath) then
       begin
         SendStaticFile(LIndexPath, Res);
@@ -167,7 +164,7 @@ begin
       LResolvedPath: string;
     begin
       LFileName := Req.Params['filename'];
-      LResolvedPath := SanitizeAndResolve('/assets/' + LFileName);
+      LResolvedPath := SanitizeAndResolve('assets/' + LFileName);
       if (LResolvedPath <> '') and FileExists(LResolvedPath) then
       begin
         SendStaticFile(LResolvedPath, Res);
@@ -194,7 +191,7 @@ begin
         Exit;
       end;
       
-      LResolvedPath := SanitizeAndResolve('/' + LFileName);
+      LResolvedPath := SanitizeAndResolve(LFileName);
       if (LResolvedPath <> '') and FileExists(LResolvedPath) then
       begin
         SendStaticFile(LResolvedPath, Res);
