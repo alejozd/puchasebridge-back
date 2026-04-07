@@ -80,13 +80,16 @@ end;
 procedure TNextCaller.Next;
 var
   LCallback: TList<THorseCallback>;
+  LIndexBefore: Integer;
+  LIndexCallbackBefore: Integer;
 begin
   Inc(FIndex);
   if (FMiddleware.Count > FIndex) then
   begin
     FFound^ := True;
+    LIndexBefore := FIndex;
     Self.FMiddleware.Items[FIndex](FRequest, FResponse, Next);
-    if (FMiddleware.Count > FIndex) then
+    if (FIndex = LIndexBefore) and (FMiddleware.Count > FIndex) then
       Next;
   end
   else if (FPath.Count = 0) and Assigned(FCallBack) then
@@ -98,6 +101,7 @@ begin
       begin
         try
           FFound^ := True;
+          LIndexCallbackBefore := FIndexCallback;
           LCallback.Items[FIndexCallback](FRequest, FResponse, Next);
         except
           on E: Exception do
@@ -110,7 +114,8 @@ begin
             raise;
           end;
         end;
-        Next;
+        if FIndexCallback = LIndexCallbackBefore then
+          Next;
       end;
     end
     else
