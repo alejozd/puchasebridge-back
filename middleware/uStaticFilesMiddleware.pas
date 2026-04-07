@@ -170,6 +170,21 @@ begin
 
   uLogger.LogInfo('Static files middleware path: ' + GStaticBasePath, 'startup');
 
+  THorse.Get('/',
+    procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
+    begin
+      try
+        HandleStaticRequest(Req, Res);
+      except
+        on E: Exception do
+        begin
+          uLogger.LogError(E, 'static_files');
+          Res.Status(THTTPStatus.InternalServerError)
+             .Send('Error interno al servir archivo estático');
+        end;
+      end;
+    end);
+
   THorse.All('/*',
     procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
     begin
