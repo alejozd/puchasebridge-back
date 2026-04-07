@@ -15,11 +15,7 @@ uses
   System.StrUtils,
   System.Classes,
   uLogger,
-  uPaths
-{$IF CompilerVersion >= 35.0}
-  ,System.MimeTypes
-{$IFEND}
-  ;
+  uPaths;
 
 var
   GStaticBasePath: string;
@@ -58,9 +54,6 @@ function GetMimeTypeFromExtension(const AFileName: string): string;
 var
   LExt: string;
 begin
-{$IF CompilerVersion >= 35.0}
-  Result := TMimeTypes.Default.GetFileInfo(AFileName).MediaType;
-{$ELSE}
   LExt := LowerCase(ExtractFileExt(AFileName));
   if LExt = '.html' then Result := 'text/html'
   else if LExt = '.htm' then Result := 'text/html'
@@ -78,8 +71,9 @@ begin
   else if LExt = '.map' then Result := 'application/json'
   else if LExt = '.txt' then Result := 'text/plain'
   else if LExt = '.xml' then Result := 'application/xml'
+  else if LExt = '.pdf' then Result := 'application/pdf'
+  else if LExt = '.webp' then Result := 'image/webp'
   else Result := 'application/octet-stream';
-{$IFEND}
 
   if Result.IsEmpty then
     Result := 'application/octet-stream';
