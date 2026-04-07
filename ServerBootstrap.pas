@@ -99,11 +99,6 @@ begin
           'http_request'
         );
       end)
-    .Use(
-      procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
-      begin
-        ApplyDynamicCORS(Req, Res, Next);
-      end)
     .Use(HandleException(
       procedure(const E: Exception; const Req: THorseRequest; const Res: THorseResponse; var ASendException: Boolean)
       var
@@ -130,10 +125,17 @@ begin
   // [FIX-STATIC] Middleware para servir frontend React ANTES de auth y license.
   RegisterStaticFilesMiddleware('www');
 
+  // CORS debe aplicarse DESPUES de static files pero ANTES de auth/license
+  THorse.Use(
+    procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
+    begin
+      ApplyDynamicCORS(Req, Res, Next);
+    end);
+
   // License solo aplica sobre rutas API, no debe bloquear el frontend
   THorse.Use(LicenseGuard);
 
-  // Auth solo aplica sobre /api para no interceptar / ni /assets/*.
+  // Auth solo aplica sobre /api para no interceptar / ni /assets/*
   THorse.Use('/api', Auth);
 end;
 

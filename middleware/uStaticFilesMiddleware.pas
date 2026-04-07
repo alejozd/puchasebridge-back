@@ -137,6 +137,7 @@ end;
 procedure RegisterStaticFilesMiddleware(const WWWPath: string);
 begin
   GStaticRoot := ResolvePathFromBase(WWWPath);
+  uLogger.LogInfo('StaticFilesMiddleware: GStaticRoot=' + GStaticRoot, 'static_files');
 
   THorse.Use(
     procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
@@ -154,9 +155,11 @@ begin
       end;
 
       LPath := NormalizeWebPath(Req.RawWebRequest.PathInfo);
+      uLogger.LogDebug('StaticFilesMiddleware: Path=' + LPath, 'static_files');
 
       if IsApiOrHealthRoute(LPath) then
       begin
+        uLogger.LogDebug('StaticFilesMiddleware: Skipping API/health route', 'static_files');
         Next();
         Exit;
       end;
@@ -166,32 +169,43 @@ begin
           LPath := '/index.html';
 
         LResolvedPath := SanitizeAndResolve(LPath);
+        uLogger.LogDebug('StaticFilesMiddleware: ResolvedPath=' + LResolvedPath + ', Exists=' + BoolToStr(FileExists(LResolvedPath), True), 'static_files');
+        
         if (LResolvedPath <> '') and FileExists(LResolvedPath) then
         begin
+          uLogger.LogInfo('StaticFilesMiddleware: Serving file=' + LResolvedPath, 'static_files');
           SendStaticFile(LResolvedPath, Res);
           Exit;
         end;
 
         if IsFileRequest(LPath) then
         begin
+          uLogger.LogDebug('StaticFilesMiddleware: File not found=' + LPath, 'static_files');
           Res.Status(404).ContentType('application/json; charset=utf-8')
             .Send('{"error":"Archivo no encontrado"}');
           Exit;
         end;
 
         LIndexPath := SanitizeAndResolve('/index.html');
+        uLogger.LogDebug('StaticFilesMiddleware: Index fallback path=' + LIndexPath + ', Exists=' + BoolToStr(FileExists(LIndexPath), True), 'static_files');
+        
         if (LIndexPath <> '') and FileExists(LIndexPath) then
         begin
+          uLogger.LogInfo('StaticFilesMiddleware: Serving index fallback=' + LIndexPath, 'static_files');
           SendStaticFile(LIndexPath, Res);
           Exit;
         end;
 
+        uLogger.LogError('StaticFilesMiddleware: index.html not found at ' + LIndexPath, 'static_files');
         Res.Status(404).ContentType('application/json; charset=utf-8')
           .Send('{"error":"index.html no encontrado"}');
       except
         on E: Exception do
+        begin
+          uLogger.LogError(E, 'static_files_exception');
           Res.Status(500).ContentType('application/json; charset=utf-8')
             .Send('{"error":"Error al leer archivo estatico"}');
+        end;
       end;
     end);
 end;
