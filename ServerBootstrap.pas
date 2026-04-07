@@ -1,4 +1,4 @@
-﻿unit ServerBootstrap;
+unit ServerBootstrap;
 
 interface
 
@@ -42,6 +42,7 @@ uses
   AuthMiddleware,
   CORSMiddleware,
   LicenseMiddleware,
+  uStaticFilesMiddleware,
   uLogger,
   ErrorResponseUtils,
   LicenseService,
@@ -164,6 +165,7 @@ begin
 
   RegisterMiddleware;
   RegisterRoutes;
+  RegisterStaticFilesMiddleware('www');
   GConfigured := True;
 end;
 
