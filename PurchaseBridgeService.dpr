@@ -37,8 +37,6 @@ uses
   uLogger in 'utils\uLogger.pas',
   uPaths in 'utils\uPaths.pas';
 
-{$R *.RES}
-
 begin
   if not Application.DelayInitialize or Application.Installing then
     Application.Initialize;
