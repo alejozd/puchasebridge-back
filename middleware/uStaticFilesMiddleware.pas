@@ -68,28 +68,7 @@ begin
 
   uLogger.LogInfo('Static files middleware path: ' + GStaticBasePath, 'startup');
 
-  // Ruta específica para "/" (raíz) - servir index.html directamente
-  THorse.Get('/',
-    procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
-    var
-      LIndexPath: string;
-    begin
-      LIndexPath := TPath.Combine(GStaticBasePath, 'index.html');
-      if TFile.Exists(LIndexPath) then
-      begin
-        uLogger.LogInfo('Serving index.html for root path /', 'static_files');
-        Res.Status(THTTPStatus.OK)
-          .ContentType(GetMimeTypeFromExtension(LIndexPath))
-          .SendFile(LIndexPath);
-      end
-      else
-      begin
-        uLogger.LogError('index.html not found at: ' + LIndexPath, 'static_files');
-        Res.Status(THTTPStatus.InternalServerError).Send('Server configuration error: index.html not found');
-      end;
-    end);
-
-  // Catch-all para todas las demás rutas
+  // Única ruta catch-all que maneja TODO (incluyendo /)
   THorse.Get('/*',
     procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
     var
@@ -102,6 +81,7 @@ begin
     begin
       // Excluir rutas de API y health check - dejar que otros middlewares las manejen
       LRequestPath := Req.RawWebRequest.PathInfo;
+      
       if IsApiOrHealthPath(LRequestPath) then
       begin
         Next();
@@ -113,9 +93,11 @@ begin
       if LRelativePath.StartsWith('/') then
         LRelativePath := LRelativePath.Substring(1);
 
+      // Si es raíz vacía, usar index.html
       if LRelativePath.IsEmpty then
         LRelativePath := 'index.html';
 
+      // Reemplazar slashes por separador de path del sistema
       LRelativePath := StringReplace(LRelativePath, '/', PathDelim, [rfReplaceAll]);
 
       // Bloquear directory traversal
@@ -138,7 +120,7 @@ begin
       // Verificar si el archivo existe físicamente
       if TFile.Exists(LFullPath) then
       begin
-        uLogger.LogInfo('Serving static file: ' + LFullPath, 'static_files');
+        uLogger.LogDebug('Serving static file: ' + LFullPath, 'static_files');
         Res.Status(THTTPStatus.OK)
           .ContentType(GetMimeTypeFromExtension(LFullPath))
           .SendFile(LFullPath);
