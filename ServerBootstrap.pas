@@ -172,14 +172,17 @@ begin
   if GConfigured then
     Exit;
 
-  // [STATIC-FILES] Registrar estáticos PRIMERO (antes de auth)
+  // [STATIC-FILES] Registrar estáticos PRIMERO (antes de middlewares globales)
   ExeDir := TPath.GetDirectoryName(ParamStr(0));
   WWWPath := TPath.Combine(ExeDir, 'www');
   RegisterStaticFilesMiddleware(WWWPath);
 
-  // Luego el resto
-  RegisterMiddleware;
+  // Luego routes API
   RegisterRoutes;
+  
+  // Finalmente middlewares globales (logging, CORS, exception handler, auth, license)
+  RegisterMiddleware;
+  
   GConfigured := True;
 end;
 
