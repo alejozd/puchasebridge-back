@@ -13,7 +13,6 @@ uses
   System.SysUtils,
   System.IOUtils,
   System.StrUtils,
-  System.Classes,
   uLogger,
   uPaths;
 
@@ -35,7 +34,7 @@ var
   LPath: string;
 begin
   LPath := APath.ToLower;
-  Result := LPath.StartsWith('/api') or LPath.StartsWith('/ping');
+  Result := LPath.StartsWith('/api/') or (LPath = '/api') or (LPath = '/ping');
 end;
 
 function IsTextMime(const AMime: string): Boolean;
@@ -75,9 +74,6 @@ begin
   else if LExt = '.webp' then Result := 'image/webp'
   else Result := 'application/octet-stream';
 
-  if Result.IsEmpty then
-    Result := 'application/octet-stream';
-
   if IsTextMime(Result) and (not ContainsText(Result, 'charset=')) then
     Result := Result + '; charset=utf-8';
 end;
@@ -114,7 +110,12 @@ begin
   Result := True;
 end;
 
-procedure TryServeStaticOrSpaFallback(Req: THorseRequest; Res: THorseResponse);
+procedure SendNotFound(Res: THorseResponse);
+begin
+  Res.Status(THTTPStatus.NotFound).Send('Not Found');
+end;
+
+procedure HandleStaticRequest(Req: THorseRequest; Res: THorseResponse);
 var
   LRequestPath: string;
   LTargetFile: string;
@@ -123,11 +124,14 @@ begin
   LRequestPath := NormalizeRequestPath(Req.RawWebRequest.PathInfo);
 
   if IsApiOrHealthPath(LRequestPath) then
+  begin
+    SendNotFound(Res);
     Exit;
+  end;
 
   if not TryBuildSafePath(LRequestPath, LTargetFile) then
   begin
-    Res.Status(THTTPStatus.NotFound);
+    SendNotFound(Res);
     Exit;
   end;
 
@@ -148,6 +152,8 @@ begin
       Exit;
     end;
   end;
+
+  SendNotFound(Res);
 end;
 
 procedure RegisterStaticFilesMiddleware(const WWWPath: string);
@@ -161,26 +167,31 @@ begin
 
   uLogger.LogInfo('Static files middleware path: ' + GStaticBasePath, 'startup');
 
-  THorse.Use(
+  THorse.Get('/*',
     procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
     begin
-      Next();
-
-      if not SameText(Req.RawWebRequest.Method, 'GET') and
-         not SameText(Req.RawWebRequest.Method, 'HEAD') then
-        Exit;
-
-      if Res.RawWebResponse.StatusCode <> Integer(THTTPStatus.NotFound) then
-        Exit;
-
       try
-        TryServeStaticOrSpaFallback(Req, Res);
+        HandleStaticRequest(Req, Res);
       except
         on E: Exception do
         begin
           uLogger.LogError(E, 'static_files');
           Res.Status(THTTPStatus.InternalServerError)
              .Send('Error interno al servir archivo estático');
+        end;
+      end;
+    end);
+
+  THorse.Head('/*',
+    procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
+    begin
+      try
+        HandleStaticRequest(Req, Res);
+      except
+        on E: Exception do
+        begin
+          uLogger.LogError(E, 'static_files');
+          Res.Status(THTTPStatus.InternalServerError).Send('');
         end;
       end;
     end);
