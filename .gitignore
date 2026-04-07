@@ -1,17 +1,11 @@
 ```
-# Compiled files
-*.pas~
-
-# Logs and temp files
-*.log
-*.tmp
-*.swp
+# Dependencies
+node_modules/
 
 # Editors
 .vscode/
-.idea/
 
-# System files
-.DS_Store
-Thumbs.db
+# Build artifacts
+dist/
+build/
 ```
