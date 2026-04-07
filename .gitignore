@@ -1,1 +1,17 @@
-Nothing should be ignored based on the provided file changes. The only modified file is a Pascal source file (`middleware/uStaticFilesMiddleware.pas`), which is source code and should not be ignored.
+```
+# Compiled files
+*.pas~
+
+# Logs and temp files
+*.log
+*.tmp
+*.swp
+
+# Editors
+.vscode/
+.idea/
+
+# System files
+.DS_Store
+Thumbs.db
+```

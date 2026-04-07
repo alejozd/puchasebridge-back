@@ -172,16 +172,16 @@ begin
   if GConfigured then
     Exit;
 
-  // [STATIC-FILES] Registrar estáticos PRIMERO (antes de middlewares globales)
+  // 1. Primero middlewares globales (logging, CORS, exception handler, Jhonson, OctetStream)
+  RegisterMiddleware;
+  
+  // 2. Luego rutas API (/api/*, /auth/*, /ping) - deben registrarse ANTES del estático
+  RegisterRoutes;
+  
+  // 3. Finalmente estáticos con fallback SPA (catch-all /*)
   ExeDir := TPath.GetDirectoryName(ParamStr(0));
   WWWPath := TPath.Combine(ExeDir, 'www');
   RegisterStaticFilesMiddleware(WWWPath);
-
-  // Luego routes API
-  RegisterRoutes;
-  
-  // Finalmente middlewares globales (logging, CORS, exception handler, auth, license)
-  RegisterMiddleware;
   
   GConfigured := True;
 end;

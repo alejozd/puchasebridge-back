@@ -68,7 +68,28 @@ begin
 
   uLogger.LogInfo('Static files middleware path: ' + GStaticBasePath, 'startup');
 
-  // Única ruta catch-all que maneja TODO (incluyendo /)
+  // Ruta explícita para la raíz "/" - sirve index.html directamente
+  THorse.Get('/',
+    procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
+    var
+      LIndexPath: string;
+    begin
+      LIndexPath := TPath.Combine(GStaticBasePath, 'index.html');
+      if TFile.Exists(LIndexPath) then
+      begin
+        uLogger.LogInfo('Serving index.html for root path /', 'static_files');
+        Res.Status(THTTPStatus.OK)
+          .ContentType(GetMimeTypeFromExtension(LIndexPath))
+          .SendFile(LIndexPath);
+      end
+      else
+      begin
+        uLogger.LogError('index.html not found at: ' + LIndexPath, 'static_files');
+        Res.Status(THTTPStatus.NotFound).Send('Not Found');
+      end;
+    end);
+
+  // Ruta catch-all para todo lo demás (incluyendo /assets/* y rutas SPA)
   THorse.Get('/*',
     procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
     var
@@ -92,10 +113,6 @@ begin
       LRelativePath := LRequestPath;
       if LRelativePath.StartsWith('/') then
         LRelativePath := LRelativePath.Substring(1);
-
-      // Si es raíz vacía, usar index.html
-      if LRelativePath.IsEmpty then
-        LRelativePath := 'index.html';
 
       // Reemplazar slashes por separador de path del sistema
       LRelativePath := StringReplace(LRelativePath, '/', PathDelim, [rfReplaceAll]);
