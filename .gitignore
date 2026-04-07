@@ -1,11 +1,4 @@
 ```
-# Dependencies
-node_modules/
-
-# Editors
-.vscode/
-
 # Build artifacts
-dist/
-build/
+www/assets/
 ```
