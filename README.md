@@ -1,79 +1,72 @@
 # PurchaseBridge - Integración ERP & DIAN XML
 
-Backend REST desarrollado en Delphi utilizando el framework **Horse** y **FireDAC** para la conexión con bases de datos Firebird del sistema contable **ERP**.
+![Delphi 12](https://img.shields.io/badge/Delphi-12-blue.svg)
+![Horse Framework](https://img.shields.io/badge/Framework-Horse-red.svg)
+![React](https://img.shields.io/badge/Frontend-React-blue.svg)
+![License](https://img.shields.io/badge/License-Proprietary-yellow.svg)
 
-El objetivo principal es procesar facturas electrónicas de la DIAN (Colombia) en formato XML, extrayendo información de proveedores y productos para validar su existencia en el sistema contable.
+Backend REST de alto rendimiento desarrollado en **Delphi** utilizando el framework **Horse** y **FireDAC** para la integración con sistemas contables **Helisa** (Firebird).
 
-## Características
+El sistema automatiza el procesamiento de facturas electrónicas de la DIAN (Colombia) en formato XML (UBL 2.1), extrayendo metadatos de proveedores y productos para su validación y homologación en el ERP.
 
-- **Singleton de Configuración**: Lectura eficiente del registro de Windows una sola vez al inicio.
-- **Thread-Safe**: Implementación segura para entornos multihilo.
-- **Parsing XML**: Extracción inteligente de datos desde facturas UBL/DIAN.
-- **Seguridad**: Protección contra SQL Injection mediante validación de parámetros y consultas parametrizadas.
+## 🏗️ Arquitectura y Stack Tecnológico
 
-## Requisitos
+-   **Backend:** Delphi 12 (Modern Object Pascal).
+-   **Framework Web:** [Horse](https://github.com/HashLoad/horse) (Minimalist web framework).
+-   **Base de Datos:** Firebird 3.0+ / FireDAC.
+-   **Frontend:** React + Vite (Desplegado como SPA en `/www`).
+-   **Middleware:** Jhonson (JSON), CORS, HandleException, Auth (JWT), LicenseGuard.
+-   **Logging:** Sistema de logs estructurados en JSON (uLogger).
 
-- **Delphi 11+** (o versión compatible con Horse).
-- **Boss** (Dependency Manager para Delphi).
-- **Firebird 3.0+**.
+## 📂 Estructura del Repositorio
 
-## Configuración del Sistema
+-   `config/`: Gestión de configuración (Singleton con acceso a Registro y archivos INI).
+-   `controllers/`: Endpoints REST organizados por dominio (XML, Proveedores, Licencia, etc.).
+-   `database/`: Gestión de conexiones a Firebird.
+-   `middleware/`: Capas de interceptación de peticiones (Seguridad, Logs, SPA Fallback).
+-   `repositories/`: Capa de persistencia y consultas SQL.
+-   `services/`: Lógica de negocio, parsing de XML UBL y servicios de validación.
+-   `utils/`: Utilidades comunes (Logging, Gestión de Rutas, Respuestas de Error).
+-   `service/`: Implementación del servicio nativo de Windows.
+-   `www/`: Directorio para el build de producción del frontend.
 
-Para evitar la exposición de credenciales sensibles, el sistema utiliza un archivo de configuración `config.ini` que debe ubicarse en la misma carpeta que el ejecutable.
+## ⚙️ Configuración del Entorno de Desarrollo
 
-### Archivo config.ini
+### Backend (Delphi)
+1.  Abrir el proyecto `PurchaseBridge.dproj` (Consola) o `PurchaseBridgeService.dproj` (Servicio) en Delphi 12.
+2.  Instalar dependencias mediante **Boss**:
+    ```bash
+    boss install
+    ```
+3.  Configurar el archivo `config.ini` en la carpeta raíz (ver `README_CLIENTE.md` para detalles).
+4.  Ejecutar en modo Debug (F9).
 
-Crea un archivo llamado `config.ini` con la siguiente estructura:
+### Frontend (React)
+1.  Navegar a la carpeta del proyecto frontend.
+2.  Instalar dependencias:
+    ```bash
+    npm install
+    ```
+3.  Ejecutar en modo desarrollo con proxy al backend (puerto 9000):
+    ```bash
+    npm run dev
+    ```
 
-```ini
-[ERP]
-User=USUARIO-ERP
-Pass=tu_password_ERP
+## 🏗️ Build de Producción
 
-[BRIDGE]
-User=SYSDBA
-Pass=tu_password_bridge
-Path=F:\Proyectos\delphi_backend\purchasebridge\backend\database\purchasebridge.fdb
-```
+### Generación del Frontend
+1.  Ejecutar `npm run build` en el proyecto React.
+2.  Copiar el contenido de la carpeta `dist/` resultante al directorio `www/` del backend.
 
-> **Nota:** El archivo `config.ini` está incluido en el `.gitignore` para prevenir que tus contraseñas se suban al repositorio.
+### Compilación del Backend
+1.  En Delphi IDE, cambiar el Build Configuration a **Release**.
+2.  Compilar el proyecto (`Shift + F9`).
+3.  El ejecutable se generará en `Win32\Release` (o `Win64\Release`).
 
-## Estructura del Proyecto
+### Despliegue
+Para instrucciones detalladas de instalación en el cliente final, consulte la [Guía del Administrador](README_CLIENTE.md).
 
-- `config/`: Gestión de configuración (Singleton).
-- `controllers/`: Definición de rutas y manejo de peticiones HTTP.
-- `database/`: Gestión de conexiones FireDAC.
-- `repositories/`: Capa de persistencia y consultas a Firebird.
-- `services/`: Lógica de negocio (Parsing XML).
+## 📄 Licencia y Copyright
 
-## Pruebas con Postman
-
-1. Importa el archivo `PurchaseBridge.postman_collection.json` en Postman.
-2. Asegúrate de que el servidor está corriendo en el puerto 9000.
-3. Ejecuta las peticiones de prueba incluidas.
-
-## Prueba
-
-Esta es una línea de prueba.
-
-## Ejecución como Windows Service
-
-Además del ejecutable de consola (`PurchaseBridge.dpr`), ahora existe un proyecto de servicio nativo (`PurchaseBridgeService.dpr`) que reutiliza la misma lógica de arranque/parada en `ServerMain.pas`.
-
-### Flujo de arranque/parada
-
-- `StartServer(...)` inicializa configuración, licencia, middleware, rutas y arranca Horse.
-- `StopServer` detiene Horse de forma segura con `THorse.StopListen`.
-- En el servicio (`service/PurchaseBridge.Service.pas`):
-  - `ServiceStart` llama `StartServer(True, 3, 5000)` para iniciar en hilo separado.
-  - `ServiceStop` llama `StopServer` para detenerlo limpiamente.
-
-### Instalación rápida con sc.exe
-
-```bat
-sc create PurchaseBridgeService binPath= "C:\PurchaseBridge\PurchaseBridgeService.exe"
-sc start PurchaseBridgeService
-sc stop PurchaseBridgeService
-```
-
-> Ejecuta la consola de Windows como Administrador para crear/iniciar/detener servicios.
+Copyright © 2024 - Todos los derechos reservados.
+Este software es de código cerrado y propiedad exclusiva.
