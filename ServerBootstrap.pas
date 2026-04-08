@@ -43,6 +43,7 @@ uses
   CORSMiddleware,
   LicenseMiddleware,
   uStaticFilesMiddleware,
+  uHttpLoggerMiddleware,
   uLogger,
   ErrorResponseUtils,
   LicenseService,
@@ -80,25 +81,7 @@ end;
 procedure RegisterMiddleware;
 begin
   THorse
-    .Use(
-      procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
-      var
-        LStartTick: UInt64;
-        LPath: string;
-      begin
-        LStartTick := GetTickCount64;
-        LPath := Req.RawWebRequest.PathInfo;
-        if LPath.IsEmpty then
-          LPath := Req.PathInfo;
-
-        uLogger.LogInfo(Format('Incoming request: %s %s', [Req.RawWebRequest.Method, LPath]), 'http_request');
-        Next();
-        uLogger.LogInfo(
-          Format('Completed request: %s %s -> %d (%d ms)',
-            [Req.RawWebRequest.Method, LPath, Res.RawWebResponse.StatusCode, GetTickCount64 - LStartTick]),
-          'http_request'
-        );
-      end)
+    .Use(HttpLogger)
     .Use(
       procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
       begin
@@ -116,7 +99,7 @@ begin
           Exit;
         end;
 
-        uLogger.LogError(E, 'horse_exception');
+        uLogger.LogError(E, 'http', Req.PathInfo);
         LStatus := Integer(THTTPStatus.InternalServerError);
         LMessage := 'Error interno del servidor';
 

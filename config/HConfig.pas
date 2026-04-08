@@ -20,6 +20,7 @@ type
     Servidor: string;
     Tipo: string;
     Empresa: string;
+    LogLevel: string;
   end;
 
   TLicensingConfig = record
@@ -158,6 +159,7 @@ begin
   Ini := TIniFile.Create(GetConfigPath);
   try
     FConfig.Empresa := Ini.ReadString('HELISA', 'Empresa', '0');
+    FConfig.LogLevel := Ini.ReadString('LOGGING', 'LogLevel', 'INFO').ToUpper;
 
     FLicense.URLServidor := DecodeIfEncoded(
       Ini.ReadString('LICENCIA', 'URLServidor', ''), CONFIG_SECRET
