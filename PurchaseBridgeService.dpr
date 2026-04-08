@@ -1,4 +1,6 @@
-program PurchaseBridgeSvcHost;
+program PurchaseBridgeService;
+
+{$R *.res}
 
 uses
   Vcl.SvcMgr,

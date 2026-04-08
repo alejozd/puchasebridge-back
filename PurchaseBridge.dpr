@@ -1,6 +1,8 @@
 program PurchaseBridge;
 
 {$APPTYPE CONSOLE}
+{$R *.res}
+{$R assets/PurchaseICO44.ico}
 
 uses
   System.SysUtils,

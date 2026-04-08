@@ -1,50 +1,38 @@
 ```
-# Delphi/Pascal build artifacts
-*.dcu
-*.dcp
-*.dpl
-*.bpl
-*.lib
-*.obj
-*.res
-*.tds
+# Compiled/Binary files
+*.dproj
+*.drc
 *.map
+*.obj
+*.tds
 *.local
-*.identcache
-*.stat
-*.pas.bak
-*.dfm.bak
-*.xfm.bak
 
-# Delphi/Pascal IDE files
+# Build artifacts
+Win32/
+Win64/
 __history/
-*.groupproj
-*.groupproj.local
-*.proj
-*.proj.local
-*.dsk
-*.dof
-*.cfg
-*.ddp
+dcc32.cfg
+dcc64.cfg
 
-# Generic build artifacts
-*.exe
-*.dll
-*.so
-*.a
-*.out
+# Dependencies
+*.bpl
+*.dcp
+*.lib
 
 # Logs and temp files
 *.log
 *.tmp
+*.~*
 *.bak
-
-# Editors
-.vscode/
-.idea/
 
 # Environment
 .env
 .env.local
-.env.*
+*.env.*
+
+# Editors
+.vscode/
+.idea/
+*.identcache
+*.tvsconfig
 ```
