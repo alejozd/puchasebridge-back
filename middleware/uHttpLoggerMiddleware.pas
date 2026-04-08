@@ -12,6 +12,9 @@ procedure HttpLogger(Req: THorseRequest; Res: THorseResponse; Next: TProc);
 
 implementation
 
+uses
+  Winapi.Windows;
+
 function ShouldLogRequest(const APath: string; AStatus: Integer): Boolean;
 begin
   // Always log errors
