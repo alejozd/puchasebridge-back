@@ -33,6 +33,7 @@ uses
   CORSMiddleware in 'middleware\CORSMiddleware.pas',
   LicenseMiddleware in 'middleware\LicenseMiddleware.pas',
   uStaticFilesMiddleware in 'middleware\uStaticFilesMiddleware.pas',
+  uHttpLoggerMiddleware in 'middleware\uHttpLoggerMiddleware.pas',
   uLogger in 'utils\uLogger.pas',
   uPaths in 'utils\uPaths.pas',
   ErrorResponseUtils in 'utils\ErrorResponseUtils.pas',

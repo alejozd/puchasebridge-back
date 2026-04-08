@@ -63,7 +63,7 @@
         <DCC_Define>HORSE_CONSOLE;$(DCC_Define)</DCC_Define>
         <Icns_MainIcns>$(BDS)\bin\delphi_PROJECTICNS.icns</Icns_MainIcns>
         <SanitizedProjectName>PurchaseBridge</SanitizedProjectName>
-        <DCC_UnitSearchPath>modules\.dcp;..\modules\.dcp;modules\.dcu;..\modules\.dcu;modules;..\modules;modules\handle-exception\src;..\modules\handle-exception\src;modules\horse\src;..\modules\horse\src;modules\horse-cors\src;..\modules\horse-cors\src;modules\horse-logger\src;..\modules\horse-logger\src;modules\horse-octet-stream\src;..\modules\horse-octet-stream\src;modules\horse-utils-clientip\src;..\modules\horse-utils-clientip\src;modules\jhonson\src;..\modules\jhonson\src;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
+        <DCC_UnitSearchPath>middleware;utils;modules\.dcp;..\modules\.dcp;modules\.dcu;..\modules\.dcu;modules;..\modules;modules\handle-exception\src;..\modules\handle-exception\src;modules\horse\src;..\modules\horse\src;modules\horse-cors\src;..\modules\horse-cors\src;modules\horse-logger\src;..\modules\horse-logger\src;modules\horse-octet-stream\src;..\modules\horse-octet-stream\src;modules\horse-utils-clientip\src;..\modules\horse-utils-clientip\src;modules\jhonson\src;..\modules\jhonson\src;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base_Android)'!=''">
         <VerInfo_Keys>package=com.embarcadero.$(MSBuildProjectName);label=$(MSBuildProjectName);versionCode=1;versionName=1.0.0;persistent=False;restoreAnyVersion=False;installLocation=auto;largeHeap=False;theme=TitleBar;hardwareAccelerated=true;apiKey=;minSdkVersion=23;targetSdkVersion=34</VerInfo_Keys>
@@ -147,6 +147,7 @@
         <DCCReference Include="middleware\CORSMiddleware.pas"/>
         <DCCReference Include="middleware\LicenseMiddleware.pas"/>
         <DCCReference Include="middleware\uStaticFilesMiddleware.pas"/>
+        <DCCReference Include="middleware\uHttpLoggerMiddleware.pas"/>
         <DCCReference Include="utils\uLogger.pas"/>
         <DCCReference Include="utils\uPaths.pas"/>
         <DCCReference Include="utils\ErrorResponseUtils.pas"/>

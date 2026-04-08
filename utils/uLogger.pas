@@ -1,31 +1,64 @@
-﻿unit uLogger;
+unit uLogger;
 
 interface
 
 uses
-  System.SysUtils;
+  System.SysUtils, System.JSON;
 
 type
-  TLogLevel = (llInfo, llWarn, llError, llDebug);
+  TLogLevel = (llDebug, llInfo, llWarn, llError);
 
-procedure Log(const Msg: string; Level: TLogLevel = llInfo); overload;
-procedure Log(const Msg: string; Level: TLogLevel; const Context: string); overload;
-procedure LogInfo(const Msg: string; const Context: string = '');
-procedure LogError(const Msg: string; const Context: string = ''); overload;
-procedure LogError(const E: Exception; const Context: string = ''); overload;
-procedure LogDebug(const Msg: string; const Context: string = '');
+procedure Log(const Msg: string; Level: TLogLevel = llInfo; const AType: string = 'system'); overload;
+procedure Log(const Msg: string; Level: TLogLevel; const AType, AMethod, APath: string; AStatus: Integer; ADuration: Int64); overload;
+procedure LogInfo(const Msg: string; const AType: string = 'system');
+procedure LogWarn(const Msg: string; const AType: string = 'system');
+procedure LogError(const Msg: string; const AType: string = 'error'); overload;
+procedure LogError(const E: Exception; const AType: string = 'error'; const APath: string = ''); overload;
+procedure LogDebug(const Msg: string; const AType: string = 'debug');
 
 implementation
 
 uses
   System.DateUtils,
-  System.StrUtils,
   System.IOUtils,
   System.SyncObjs,
-  uPaths;
+  uPaths,
+  HConfig;
 
 var
   LogLock: TCriticalSection;
+
+function LevelToString(Level: TLogLevel): string;
+begin
+  case Level of
+    llDebug: Result := 'DEBUG';
+    llInfo: Result := 'INFO';
+    llWarn: Result := 'WARN';
+    llError: Result := 'ERROR';
+  else
+    Result := 'INFO';
+  end;
+end;
+
+function StringToLevel(const S: string): TLogLevel;
+begin
+  if S = 'DEBUG' then Exit(llDebug);
+  if S = 'WARN' then Exit(llWarn);
+  if S = 'ERROR' then Exit(llError);
+  Result := llInfo;
+end;
+
+function ShouldLog(Level: TLogLevel): Boolean;
+var
+  ConfigLevel: TLogLevel;
+begin
+  try
+    ConfigLevel := StringToLevel(THConfig.GetInstance.Config.LogLevel);
+    Result := Ord(Level) >= Ord(ConfigLevel);
+  except
+    Result := Ord(Level) >= Ord(llInfo);
+  end;
+end;
 
 procedure WriteToFile(const Text: string);
 var
@@ -41,7 +74,6 @@ begin
     FileName := TPath.Combine(LogsDir, 'app.log');
 
     AssignFile(LogFile, FileName);
-
     if FileExists(FileName) then
       Append(LogFile)
     else
@@ -54,89 +86,91 @@ begin
   end;
 end;
 
-function LevelToString(Level: TLogLevel): string;
-begin
-  case Level of
-    llInfo: Result := 'INFO';
-    llWarn: Result := 'WARN';
-    llError: Result := 'ERROR';
-    llDebug: Result := 'DEBUG';
-  end;
-end;
-
 function GetIsoTimestamp: string;
 begin
   Result := DateToISO8601(TTimeZone.Local.ToUniversalTime(Now), True);
 end;
 
-function SanitizeInlineText(const Value: string): string;
-begin
-  Result := Value.Replace(sLineBreak, ' ').Replace(#10, ' ').Replace(#13, ' ').Trim;
-end;
-
-function BuildLogLine(const Msg: string; Level: TLogLevel; const Context: string): string;
+procedure InternalLog(Level: TLogLevel; const Msg, AType, AMethod, APath: string; AStatus: Integer; ADuration: Int64; E: Exception = nil);
 var
-  LContext: string;
+  LJSON: TJSONObject;
 begin
-  LContext := Context.Trim;
-  if LContext.IsEmpty then
-    Exit(Format('[%s] [%s] %s', [GetIsoTimestamp, LevelToString(Level), Msg]));
-
-  Result := Format('[%s] [%s] [%s] %s', [GetIsoTimestamp, LevelToString(Level), LContext, Msg]);
-end;
-
-procedure Log(const Msg: string; Level: TLogLevel; const Context: string);
-var
-  Line: string;
-begin
-  {$IFDEF RELEASE}
-  // En producción ignorar DEBUG
-  if Level = llDebug then Exit;
-  {$ENDIF}
-
-  Line := BuildLogLine(Msg, Level, Context);
-
-  WriteToFile(Line);
-end;
-
-procedure Log(const Msg: string; Level: TLogLevel);
-begin
-  Log(Msg, Level, '');
-end;
-
-procedure LogInfo(const Msg: string; const Context: string);
-begin
-  Log(Msg, llInfo, Context);
-end;
-
-procedure LogError(const Msg: string; const Context: string);
-begin
-  Log(Msg, llError, Context);
-end;
-
-procedure LogError(const E: Exception; const Context: string);
-var
-  LMessage: string;
-  LStack: string;
-begin
-  if E = nil then
-  begin
-    Log('Unknown exception', llError, Context);
+  if not ShouldLog(Level) then
     Exit;
+
+  LJSON := TJSONObject.Create;
+  try
+    LJSON.AddPair('timestamp', GetIsoTimestamp);
+    LJSON.AddPair('level', LevelToString(Level));
+    LJSON.AddPair('type', AType);
+
+    if not AMethod.IsEmpty then
+      LJSON.AddPair('method', AMethod);
+
+    if not APath.IsEmpty then
+      LJSON.AddPair('path', APath);
+
+    if AStatus <> 0 then
+      LJSON.AddPair('status', TJSONNumber.Create(AStatus));
+
+    if ADuration >= 0 then
+      LJSON.AddPair('duration_ms', TJSONNumber.Create(ADuration));
+
+    LJSON.AddPair('message', Msg);
+
+    if E <> nil then
+    begin
+      LJSON.AddPair('exception', E.ClassName);
+      if not E.StackTrace.IsEmpty then
+        LJSON.AddPair('stack', E.StackTrace.Replace(sLineBreak, ' | '));
+    end;
+
+    WriteToFile(LJSON.ToJSON);
+  finally
+    LJSON.Free;
   end;
-
-  LMessage := Format('Exception [%s]: %s', [E.ClassName, E.Message]);
-
-  LStack := SanitizeInlineText(E.StackTrace);
-  if not LStack.IsEmpty then
-    LMessage := LMessage + ' | stack: ' + LStack;
-
-  Log(LMessage, llError, Context);
 end;
 
-procedure LogDebug(const Msg: string; const Context: string);
+procedure Log(const Msg: string; Level: TLogLevel; const AType: string);
 begin
-  Log(Msg, llDebug, Context);
+  InternalLog(Level, Msg, AType, '', '', 0, -1);
+end;
+
+procedure Log(const Msg: string; Level: TLogLevel; const AType, AMethod, APath: string; AStatus: Integer; ADuration: Int64);
+begin
+  InternalLog(Level, Msg, AType, AMethod, APath, AStatus, ADuration);
+end;
+
+procedure LogInfo(const Msg: string; const AType: string);
+begin
+  Log(Msg, llInfo, AType);
+end;
+
+procedure LogWarn(const Msg: string; const AType: string);
+begin
+  Log(Msg, llWarn, AType);
+end;
+
+procedure LogError(const Msg: string; const AType: string);
+begin
+  Log(Msg, llError, AType);
+end;
+
+procedure LogError(const E: Exception; const AType: string; const APath: string);
+var
+  LMsg: string;
+begin
+  if E <> nil then
+    LMsg := E.Message
+  else
+    LMsg := 'Unknown error';
+
+  InternalLog(llError, LMsg, AType, '', APath, 0, -1, E);
+end;
+
+procedure LogDebug(const Msg: string; const AType: string);
+begin
+  Log(Msg, llDebug, AType);
 end;
 
 initialization
