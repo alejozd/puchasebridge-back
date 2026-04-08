@@ -25,15 +25,27 @@ VersionInfoProductName=PurchaseBridge
 VersionInfoProductVersion=1.0
 
 [Files]
-Source: PurchaseBridgeService.exe; DestDir: {app}; Flags: ignoreversion
+; === BACKEND ===
+Source: PurchaseBridgeService.exe; DestDir: {app}; Flags: ignoreversion restartreplace
 Source: config.ini; DestDir: {app}; Flags: ignoreversion
 Source: PURCHASEBRIDGE.FDB; DestDir: {app}; Flags: ignoreversion
 
+; === FRONTEND (NUEVO) ===
+; Carpeta www completa con todos los archivos estáticos de React
+Source: www\*; DestDir: {app}\www; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: www\assets\*.*; DestDir: {app}\www\assets; Flags: ignoreversion recursesubdirs
+
+; === SCRIPTS DE MANTENIMIENTO (OPCIONAL PERO RECOMENDADO) ===
+; Source: Scripts\Rotate-Logs.ps1; DestDir: {app}\Scripts; Flags: ignoreversion
+; Source: Scripts\Health-Check.ps1; DestDir: {app}\Scripts; Flags: ignoreversion
 [Run]
+; Instalar servicio de Windows
 Filename: {sys}\sc.exe; Parameters: "create PurchaseBridgeService binPath= ""{app}\PurchaseBridgeService.exe"" start= auto"; Flags: runhidden waituntilterminated
-Filename: {sys}\sc.exe; Parameters: "description PurchaseBridgeService ""Servicio PurchaseBridge"""; Flags: runhidden waituntilterminated
+Filename: {sys}\sc.exe; Parameters: "description PurchaseBridgeService ""Servicio PurchaseBridge - Parser de facturas XML"""; Flags: runhidden waituntilterminated
 Filename: {sys}\sc.exe; Parameters: failure PurchaseBridgeService reset= 0 actions= restart/60000/restart/60000/restart/60000; Flags: runhidden waituntilterminated
 
+; Abrir frontend en navegador tras instalación (opcional)
+; Filename: "http://localhost:9000"; Flags: postinstall nowait skipifsilent
 
 [UninstallRun]
 Filename: {sys}\sc.exe; Parameters: stop PurchaseBridgeService; Flags: runhidden waituntilterminated skipifdoesntexist
@@ -101,6 +113,29 @@ begin
   end;
 end;
 
+// ? VALIDACIÓN: Verificar que la carpeta www existe ANTES de instalar
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  WwwPath: string;
+begin
+  Result := '';
+  WwwPath := ExpandConstant('{src}\www');
+
+  if not DirExists(WwwPath) then
+  begin
+    Result := 'Error: La carpeta "www" con el frontend no fue encontrada en el origen de instalación.' + #13#10 +
+              'Por favor, compile el frontend con "npm run build" y copie la carpeta "dist" como "www" junto al instalador.';
+    Exit;
+  end;
+
+  // Verificar que index.html existe (validación básica)
+  if not FileExists(WwwPath + '\index.html') then
+  begin
+    Result := 'Error: El archivo "www\index.html" no fue encontrado. El frontend parece incompleto.';
+    Exit;
+  end;
+end;
+
 procedure UpdateConfigFile();
 var
   FilePath: string;
@@ -110,6 +145,8 @@ var
 begin
   FilePath := ExpandConstant('{app}\config.ini');
   InstallPath := ExpandConstant('{app}') + '\PURCHASEBRIDGE.FDB';
+
+  if not FileExists(FilePath) then Exit;
 
   Lines := TStringList.Create;
   try
@@ -157,6 +194,7 @@ procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep = ssPostInstall then
   begin
+    CreateRequiredFolders();
     UpdateConfigFile();
     StartService();
   end;
