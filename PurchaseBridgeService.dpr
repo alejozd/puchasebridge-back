@@ -1,5 +1,7 @@
 program PurchaseBridgeSvcHost;
 
+{$R *.res}
+
 uses
   Vcl.SvcMgr,
   ServerBootstrap in 'ServerBootstrap.pas',

@@ -102,6 +102,12 @@
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_1_Win32)'!=''">
         <DCC_RemoteDebug>false</DCC_RemoteDebug>
+        <VerInfo_Locale>1033</VerInfo_Locale>
+        <Icon_MainIcon>..\branch-backend\assets\PurchaseICO44.ico</Icon_MainIcon>
+        <UWP_DelphiLogo44>..\branch-backend\assets\PurchaseICO.png</UWP_DelphiLogo44>
+        <UWP_DelphiLogo150>..\branch-backend\assets\PurchaseICO.png</UWP_DelphiLogo150>
+        <Manifest_File>(None)</Manifest_File>
+        <AppDPIAwarenessMode>none</AppDPIAwarenessMode>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2)'!=''">
         <DCC_LocalDebugSymbols>false</DCC_LocalDebugSymbols>
@@ -113,6 +119,7 @@
         <DelphiCompile Include="$(MainSource)">
             <MainSource>MainSource</MainSource>
         </DelphiCompile>
+        <DCCReference Include="ServerBootstrap.pas"/>
         <DCCReference Include="config\HConfig.pas"/>
         <DCCReference Include="database\FirebirdConnection.pas"/>
         <DCCReference Include="repositories\ProveedorRepository.pas"/>
@@ -135,9 +142,15 @@
         <DCCReference Include="controllers\DocumentosController.pas"/>
         <DCCReference Include="services\AuthService.pas"/>
         <DCCReference Include="controllers\AuthController.pas"/>
+        <DCCReference Include="controllers\LicenciaController.pas"/>
         <DCCReference Include="middleware\AuthMiddleware.pas"/>
+        <DCCReference Include="middleware\CORSMiddleware.pas"/>
+        <DCCReference Include="middleware\LicenseMiddleware.pas"/>
+        <DCCReference Include="middleware\uStaticFilesMiddleware.pas"/>
         <DCCReference Include="utils\uLogger.pas"/>
+        <DCCReference Include="utils\uPaths.pas"/>
         <DCCReference Include="utils\ErrorResponseUtils.pas"/>
+        <DCCReference Include="services\LicenseService.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>
@@ -158,6 +171,10 @@
                 <Source>
                     <Source Name="MainSource">PurchaseBridge.dpr</Source>
                 </Source>
+                <Excluded_Packages>
+                    <Excluded_Packages Name="$(BDSBIN)\dcloffice2k290.bpl">Microsoft Office 2000 Sample Automation Server Wrapper Components</Excluded_Packages>
+                    <Excluded_Packages Name="$(BDSBIN)\dclofficexp290.bpl">Microsoft Office XP Sample Automation Server Wrapper Components</Excluded_Packages>
+                </Excluded_Packages>
             </Delphi.Personality>
             <Deployment Version="5">
                 <DeployFile LocalName="$(BDS)\Redist\iossimulator\libcgunwind.1.0.dylib" Class="DependencyModule">
@@ -172,6 +189,13 @@
                 </DeployFile>
                 <DeployFile LocalName="$(BDS)\Redist\osx32\libcgunwind.1.0.dylib" Class="DependencyModule">
                     <Platform Name="OSX32">
+                        <Overwrite>true</Overwrite>
+                    </Platform>
+                </DeployFile>
+                <DeployFile LocalName="..\branch-backend\assets\PurchaseICO.png" Configuration="Debug" Class="UWP_DelphiLogo44">
+                    <Platform Name="Win32">
+                        <RemoteDir>Assets\</RemoteDir>
+                        <RemoteName>Logo44x44.png</RemoteName>
                         <Overwrite>true</Overwrite>
                     </Platform>
                 </DeployFile>

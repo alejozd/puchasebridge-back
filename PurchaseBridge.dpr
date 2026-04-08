@@ -1,5 +1,6 @@
 program PurchaseBridge;
 
+{$R *.res}
 {$APPTYPE CONSOLE}
 
 uses
