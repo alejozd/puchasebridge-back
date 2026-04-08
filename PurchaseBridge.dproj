@@ -147,6 +147,7 @@
         <DCCReference Include="middleware\CORSMiddleware.pas"/>
         <DCCReference Include="middleware\LicenseMiddleware.pas"/>
         <DCCReference Include="middleware\uStaticFilesMiddleware.pas"/>
+        <DCCReference Include="middleware\uHttpLoggerMiddleware.pas"/>
         <DCCReference Include="utils\uLogger.pas"/>
         <DCCReference Include="utils\uPaths.pas"/>
         <DCCReference Include="utils\ErrorResponseUtils.pas"/>
