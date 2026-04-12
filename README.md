@@ -5,7 +5,7 @@
 ![React](https://img.shields.io/badge/Frontend-React-blue.svg)
 ![License](https://img.shields.io/badge/License-Proprietary-yellow.svg)
 
-Backend REST de alto rendimiento desarrollado en **Delphi** utilizando el framework **Horse** y **FireDAC** para la integración con sistemas contables **Helisa** (Firebird).
+Backend REST de alto rendimiento desarrollado en **Delphi** utilizando el framework **Horse** y **FireDAC** para la integración con sistemas contables (Firebird).
 
 El sistema automatiza el procesamiento de facturas electrónicas de la DIAN (Colombia) en formato XML (UBL 2.1), extrayendo metadatos de proveedores y productos para su validación y homologación en el ERP.
 
