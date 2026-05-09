@@ -75,6 +75,7 @@ uses
 
 const
   UNLEN = 256;
+  LICENSE_APP_NAME = 'PurchaseBridge';
 
 { TLicenciaService }
 
@@ -354,7 +355,7 @@ begin
   try
     LJSON.AddPair('nit', LConfig.Nit);
     LJSON.AddPair('instalacion_hash', LConfig.InstalacionHash);
-    LJSON.AddPair('app', LConfig.AppName);
+    LJSON.AddPair('app', LICENSE_APP_NAME);
 
     LBody := TStringStream.Create(LJSON.ToJSON, TEncoding.UTF8);
     try
@@ -505,6 +506,7 @@ begin
     LJSON.AddPair('nit', ANit);
     LJSON.AddPair('instalacion_hash', AInstalacionHash);
     LJSON.AddPair('codigo', ACodigo);
+    LJSON.AddPair('app', LICENSE_APP_NAME);
 
     LBody := TStringStream.Create(LJSON.ToJSON, TEncoding.UTF8);
     try
@@ -619,6 +621,7 @@ begin
   try
     LJSON.AddPair('nit', ANit);
     LJSON.AddPair('instalacion_hash', AInstalacionHash);
+    LJSON.AddPair('app', LICENSE_APP_NAME);
 
     LBody := TStringStream.Create(LJSON.ToJSON, TEncoding.UTF8);
     try
