@@ -165,7 +165,7 @@ begin
       Ini.ReadString('LICENCIA', 'URLServidor', ''), CONFIG_SECRET
     );
     FLicense.Nit := Ini.ReadString('LICENCIA', 'Nit', '');
-    FLicense.AppName := Ini.ReadString('LICENCIA', 'App', 'purchasebridge');
+    FLicense.AppName := Ini.ReadString('LICENCIA', 'App', 'PurchaseBridge');
     FLicense.InstalacionHash := Ini.ReadString('LICENCIA', 'InstalacionHash', '');
   finally
     Ini.Free;
