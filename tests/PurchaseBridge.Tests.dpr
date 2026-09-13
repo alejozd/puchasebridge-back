@@ -8,7 +8,9 @@ uses
   DUnitX.Loggers.Console,
   DUnitX.Loggers.Xml.NUnit,
   DUnitX.TestFramework,
-  SanityTests in 'Sample\SanityTests.pas';
+  SanityTests in 'Sample\SanityTests.pas',
+  DMVC.TestServerProcess in 'DMVC\DMVC.TestServerProcess.pas',
+  DMVC.PingControllerTests in 'DMVC\DMVC.PingControllerTests.pas';
 
 var
   runner: ITestRunner;
