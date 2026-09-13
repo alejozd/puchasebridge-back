@@ -44,11 +44,13 @@ unit search path a las fuentes).
 distinto (9091), compilable y con test automatizado, sin tocar ningún archivo
 de Horse ni el servicio de Windows.
 
-**Archivos nuevos:** `dmvc/DMVC.WebModule.pas/.dfm`, `dmvc/Controllers/PingController.pas`,
-`PurchaseBridgeDMVC.dpr`, `PurchaseBridgeDMVC.dproj`, `tests/PurchaseBridge.Tests.dpr`,
-`tests/PurchaseBridge.Tests.dproj`, `tests/DMVC/PingControllerTests.pas`.
+**Archivos nuevos:** `dmvc/DMVC.WebModule.Main.pas` (sin `.dfm`, WebModule 100% por código),
+`dmvc/Controllers/DMVC.Controllers.PingController.pas`, `PurchaseBridgeDMVC.dpr`,
+`tests/PurchaseBridge.Tests.dpr`, `tests/Sample/SanityTests.pas`,
+`tests/DMVC/DMVC.TestServerProcess.pas`, `tests/DMVC/DMVC.PingControllerTests.pas`
+(sin `.dproj` — verificación vía DCC32.EXE directo, ver Restricciones globales).
 
-**Plan detallado:** `2026-09-12-horse-to-dmvc-phase1-skeleton.md` (listo, siguiente paso).
+**Plan detallado:** `2026-09-12-horse-to-dmvc-phase1-skeleton.md` (completo, mergeado).
 
 ## Fase 2 — Controllers de bajo riesgo
 
@@ -56,6 +58,13 @@ de Horse ni el servicio de Windows.
 simples, sin upload de archivos) a clases `TMVCController` con DTOs propios,
 validando el patrón de error `EMVCException` y el DI por constructor con los
 `services`/`repositories` existentes.
+
+**Nota de serialización JSON:** `TPingController` (Fase 1) construye la respuesta a mano con
+`System.JSON.TJSONObject` — válido para un endpoint trivial sin DTO. Los controllers de esta
+fase SÍ tienen DTOs (`EquivalenciaDTOs.pas`, `ProveedorDTOs.pas`): decidir explícitamente si
+se renderizan vía el serializador nativo de DMVC (RTTI + atributos `[MVCNameCase]`, ver el
+patrón de NexoPago) en vez de construir `TJSONObject` a mano, para no mezclar dos convenciones
+de JSON en la misma capa de controllers.
 
 **Archivos:** `dmvc/Controllers/EquivalenciaController.pas`,
 `dmvc/Controllers/ProveedorController.pas`, `dmvc/DTOs/EquivalenciaDTOs.pas`,
@@ -101,7 +110,7 @@ con `PurchaseBridge.postman_collection.json` contra el servidor DMVC.
 
 ## Progreso
 
-- [ ] Fase 1 — Esqueleto DMVC en paralelo
+- [x] Fase 1 — Esqueleto DMVC en paralelo
 - [ ] Fase 2 — Controllers de bajo riesgo
 - [ ] Fase 3 — Middlewares transversales
 - [ ] Fase 4 — Controllers de alto riesgo/volumen

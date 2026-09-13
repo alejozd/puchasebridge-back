@@ -21,11 +21,14 @@ implementation
 procedure TTestServerProcess.Start(const AExePath: string; APort: Integer);
 var
   LStartupInfo: TStartupInfo;
+  LCommandLine: string;
 begin
   FillChar(FProcessInfo, SizeOf(FProcessInfo), 0);
   FillChar(LStartupInfo, SizeOf(LStartupInfo), 0);
   LStartupInfo.cb := SizeOf(LStartupInfo);
-  if not CreateProcess(PChar(AExePath), nil, nil, nil, False,
+  LCommandLine := Format('"%s" %d', [AExePath, APort]);
+  UniqueString(LCommandLine);
+  if not CreateProcess(nil, PChar(LCommandLine), nil, nil, False,
     CREATE_NEW_CONSOLE, nil, PChar(ExtractFilePath(AExePath)), LStartupInfo, FProcessInfo) then
     RaiseLastOSError;
   FRunning := True;

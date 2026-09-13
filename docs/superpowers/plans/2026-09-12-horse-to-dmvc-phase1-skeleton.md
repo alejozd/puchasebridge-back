@@ -153,7 +153,7 @@ optó por el nombre de unidad plano porque el archivo ya estaba fijado como
 
 - [ ] **Step 1: Escribir el helper de proceso de prueba**
 
-Crear `tests/DMVC/TestServerProcess.pas`:
+Crear `tests/DMVC/DMVC.TestServerProcess.pas`:
 
 ```pascal
 unit DMVC.TestServerProcess;
@@ -231,7 +231,7 @@ end.
 
 - [ ] **Step 2: Escribir el test que falla**
 
-Crear `tests/DMVC/PingControllerTests.pas`:
+Crear `tests/DMVC/DMVC.PingControllerTests.pas`:
 
 ```pascal
 unit DMVC.PingControllerTests;
@@ -303,11 +303,11 @@ end;
 end.
 ```
 
-Modificar `tests/PurchaseBridge.Tests.dpr`, agregando al `uses` (después de `Sample.SanityTests in 'Sample\SanityTests.pas',`):
+Modificar `tests/PurchaseBridge.Tests.dpr`, agregando al `uses` (después de `SanityTests in 'Sample\SanityTests.pas',`):
 
 ```pascal
-  DMVC.TestServerProcess in 'DMVC\TestServerProcess.pas',
-  DMVC.PingControllerTests in 'DMVC\PingControllerTests.pas';
+  DMVC.TestServerProcess in 'DMVC\DMVC.TestServerProcess.pas',
+  DMVC.PingControllerTests in 'DMVC\DMVC.PingControllerTests.pas';
 ```//! el `;` final del `uses` se mueve a esta última línea
 
 - [ ] **Step 3: Compilar y correr el test — debe fallar (RED)**

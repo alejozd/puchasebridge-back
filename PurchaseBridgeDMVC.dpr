@@ -31,7 +31,7 @@ begin
     if WebRequestHandler <> nil then
       WebRequestHandler.WebModuleClass := WebModuleClass;
     WebRequestHandlerProc.MaxConnections := 1024;
-    RunServer(9091);
+    RunServer(StrToIntDef(ParamStr(1), 9091));
   except
     on E: Exception do
       Writeln(E.ClassName, ': ', E.Message);

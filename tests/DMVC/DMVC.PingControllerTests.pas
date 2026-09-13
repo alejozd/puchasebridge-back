@@ -23,16 +23,20 @@ type
 implementation
 
 uses
-  System.SysUtils, System.JSON, IdHTTP;
+  System.SysUtils, System.JSON, System.IOUtils, IdHTTP;
 
 const
   TEST_PORT = 9091;
-  SERVER_EXE = 'F:\Proyectos\delphi_backend\purchasebridge\backend\.claude\worktrees\horse-to-dmvc-phase1\bin\PurchaseBridgeDMVC.exe';
+
+function ServerExePath: string;
+begin
+  Result := TPath.GetFullPath(TPath.Combine(TPath.GetDirectoryName(ParamStr(0)), '..\..\bin\PurchaseBridgeDMVC.exe'));
+end;
 
 procedure TPingControllerTests.Setup;
 begin
   FServer := TTestServerProcess.Create;
-  FServer.Start(SERVER_EXE, TEST_PORT);
+  FServer.Start(ServerExePath, TEST_PORT);
   Assert.IsTrue(FServer.WaitForReady(TEST_PORT),
     'El servidor DMVC no respondió a tiempo en /ping');
 end;
