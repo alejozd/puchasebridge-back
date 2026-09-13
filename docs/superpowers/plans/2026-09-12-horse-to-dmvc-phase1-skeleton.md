@@ -132,12 +132,20 @@ git commit -m "test: add DUnitX harness for PurchaseBridge"
 ### Task 2: Servidor DMVC mínimo con endpoint /ping (TDD)
 
 **Files:**
-- Create: `tests/DMVC/TestServerProcess.pas`
-- Create: `tests/DMVC/PingControllerTests.pas`
+- Create: `tests/DMVC/DMVC.TestServerProcess.pas` (nombre de archivo con punto — ver nota de nombres más abajo)
+- Create: `tests/DMVC/DMVC.PingControllerTests.pas` (ídem)
 - Modify: `tests/PurchaseBridge.Tests.dpr` (agregar dos unidades al `uses`)
 - Create: `dmvc/DMVC.WebModule.Main.pas`
 - Create: `dmvc/Controllers/DMVC.Controllers.PingController.pas`
 - Create: `PurchaseBridgeDMVC.dpr`
+
+**Nota de nombres (misma regla de la Task 1):** DCC32 exige que el nombre de
+unidad coincida exactamente con el nombre físico del archivo, punto por
+punto. Como aquí SÍ queremos namespace (`DMVC.TestServerProcess`,
+`DMVC.PingControllerTests`), el archivo debe llamarse igual, con los puntos
+incluidos (`DMVC.TestServerProcess.pas`), a diferencia de la Task 1 donde se
+optó por el nombre de unidad plano porque el archivo ya estaba fijado como
+`SanityTests.pas`.
 
 **Interfaces:**
 - Consumes: nada de Horse. Nada de tareas previas salvo el arnés DUnitX de la Task 1.

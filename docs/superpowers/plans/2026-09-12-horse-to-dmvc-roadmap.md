@@ -27,6 +27,14 @@ unit search path a las fuentes).
 - Compilador: `C:\Program Files (x86)\Embarcadero\Studio\23.0\bin\DCC32.EXE`.
   DUnitX vendorizado en `C:\Program Files (x86)\Embarcadero\Studio\23.0\source\DunitX`.
   Fuentes de DMVCFramework en `C:\Users\Alejo\Downloads\delphimvcframework-master\sources`.
+  Compilar contra DMVCFramework requiere además estas rutas `-U` (dependencias
+  vendorizadas junto al framework, descubierto en la Fase 1 Task 2):
+  `C:\Users\Alejo\Downloads\delphimvcframework-master\lib\loggerpro` y
+  `C:\Users\Alejo\Downloads\delphimvcframework-master\lib\swagdoc\Source`.
+- Regla de nombres de unidad Delphi: DCC32 exige que el nombre de unidad
+  coincida EXACTO con el nombre físico del archivo, incluidos los puntos. Un
+  unit `A.B` debe vivir en un archivo `A.B.pas` (no `B.pas`), sin excepción —
+  ver [[feedback_delphi_unit_naming]] en memoria del proyecto.
 
 ---
 
