@@ -1,0 +1,35 @@
+program PurchaseBridge.Tests;
+
+{$APPTYPE CONSOLE}
+{$STRONGLINKTYPES ON}
+
+uses
+  System.SysUtils,
+  DUnitX.Loggers.Console,
+  DUnitX.Loggers.Xml.NUnit,
+  DUnitX.TestFramework,
+  SanityTests in 'Sample\SanityTests.pas';
+
+var
+  runner: ITestRunner;
+  results: IRunResults;
+  logger: ITestLogger;
+begin
+  try
+    runner := TDUnitX.CreateRunner;
+    runner.UseRTTI := True;
+    logger := TDUnitXConsoleLogger.Create(true);
+    runner.AddLogger(logger);
+    runner.FailsOnNoAsserts := False;
+
+    results := runner.Execute;
+    if not results.AllPassed then
+      System.ExitCode := EXIT_ERRORS;
+
+    System.Write('Done.. press <Enter> key to quit.');
+    System.Readln;
+  except
+    on E: Exception do
+      System.Writeln(E.ClassName, ': ', E.Message);
+  end;
+end.
