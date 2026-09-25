@@ -21,13 +21,15 @@ var
 implementation
 
 uses
-  DMVC.Controllers.PingController;
+  DMVC.Controllers.PingController,
+  DMVC.Controllers.EquivalenciaController;
 
 constructor TPurchaseBridgeDMVCWebModule.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
   FEngine := TMVCEngine.Create(Self);
   FEngine.AddController(TPingController);
+  FEngine.AddController(TEquivalenciaController);
 end;
 
 destructor TPurchaseBridgeDMVCWebModule.Destroy;

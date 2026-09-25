@@ -7,6 +7,8 @@ uses
   Web.WebReq,
   Web.WebBroker,
   IdHTTPWebBrokerBridge,
+  FireDAC.Phys.FB,
+  FireDAC.Phys.FBDef,
   DMVC.WebModule.Main in 'dmvc\DMVC.WebModule.Main.pas',
   DMVC.Controllers.PingController in 'dmvc\Controllers\DMVC.Controllers.PingController.pas';
 
