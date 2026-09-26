@@ -5,7 +5,8 @@ interface
 uses
   MVCFramework, MVCFramework.Commons,
   System.Generics.Collections,
-  DMVC.DTOs.Equivalencia;
+  DMVC.DTOs.Equivalencia,
+  DMVC.DTOs.EquivalenciaCreate;
 
 type
   [MVCPath('/')]
@@ -18,11 +19,24 @@ type
       const [MVCFromQueryString('referenciaP', '')] AReferenciaP: String;
       const [MVCFromQueryString('unidadP', '')] AUnidadP: String;
       const [MVCFromQueryString('limite', 50)] ALimite: Integer): TObjectList<TEquivalenciaDTO>;
+
+    [MVCPath('/equivalencia')]
+    [MVCPath('/api/equivalencia')]
+    [MVCHTTPMethod([httpPOST])]
+    function CreateEquivalencia(const [MVCFromBody] ADatos: TEquivalenciaCreateDTO): IMVCResponse;
+
+    [MVCPath('/equivalencia')]
+    [MVCPath('/api/equivalencia')]
+    [MVCHTTPMethod([httpDELETE])]
+    function DeleteEquivalencia(
+      const [MVCFromQueryString('referenciaP', '')] AReferenciaP: String;
+      const [MVCFromQueryString('unidadP', '')] AUnidadP: String): IMVCResponse;
   end;
 
 implementation
 
 uses
+  System.SysUtils,
   EquivalenciaService, FireDAC.Comp.Client;
 
 function TEquivalenciaController.GetEquivalencias(const AReferenciaP, AUnidadP: String;
@@ -60,6 +74,50 @@ begin
     Result.Free;
     raise;
   end;
+end;
+
+function TEquivalenciaController.CreateEquivalencia(const ADatos: TEquivalenciaCreateDTO): IMVCResponse;
+begin
+  if not ADatos.CodigoH.HasValue then
+    raise EMVCException.Create(HTTP_STATUS.BadRequest, 'codigoH is required');
+  if (not ADatos.ReferenciaP.HasValue) or (Trim(ADatos.ReferenciaP.Value) = '') then
+    raise EMVCException.Create(HTTP_STATUS.BadRequest, 'referenciaP cannot be empty');
+  if (not ADatos.UnidadP.HasValue) or (Trim(ADatos.UnidadP.Value) = '') then
+    raise EMVCException.Create(HTTP_STATUS.BadRequest, 'unidadP cannot be empty');
+  if (not ADatos.Factor.HasValue) or (ADatos.Factor.Value <= 0) then
+    raise EMVCException.Create(HTTP_STATUS.BadRequest, 'factor must be greater than 0');
+
+  // Ver nota de comportamiento preexistente en Global Constraints: los nombres
+  // de parametro de EquivalenciaService.CrearEquivalencia no corresponden 1:1
+  // con las columnas que terminan usandose; se pasan en el mismo orden que
+  // usaba el controller Horse original para no alterar el comportamiento.
+  EquivalenciaService.CrearEquivalencia(
+    ADatos.CodigoH.Value,
+    ADatos.SubCodigoH.ValueOrDefault,
+    ADatos.NombreH.ValueOrDefault,
+    ADatos.ReferenciaP.Value,
+    ADatos.UnidadP.Value,
+    ADatos.UnidadH.ValueOrDefault,
+    ADatos.ReferenciaH.ValueOrDefault,
+    ADatos.Factor.Value);
+
+  Result := OKResponse('Equivalencia creada correctamente');
+end;
+
+function TEquivalenciaController.DeleteEquivalencia(const AReferenciaP, AUnidadP: String): IMVCResponse;
+var
+  LSuccess: Boolean;
+begin
+  if Trim(AReferenciaP) = '' then
+    raise EMVCException.Create(HTTP_STATUS.BadRequest, 'El parámetro "referenciaP" es obligatorio');
+  if Trim(AUnidadP) = '' then
+    raise EMVCException.Create(HTTP_STATUS.BadRequest, 'El parámetro "unidadP" es obligatorio');
+
+  LSuccess := EquivalenciaService.EliminarEquivalencia(AReferenciaP, AUnidadP);
+  if LSuccess then
+    Result := OKResponse('Equivalencia eliminada correctamente')
+  else
+    raise EMVCException.Create(HTTP_STATUS.NotFound, 'No se encontró la equivalencia para eliminar');
 end;
 
 end.
