@@ -54,21 +54,30 @@ de Horse ni el servicio de Windows.
 
 ## Fase 2 — Controllers de bajo riesgo
 
-**Objetivo:** Migrar `EquivalenciaController` y `ProveedorController` (rutas
-simples, sin upload de archivos) a clases `TMVCController` con DTOs propios,
-validando el patrón de error `EMVCException` y el DI por constructor con los
-`services`/`repositories` existentes.
+**Objetivo:** Migrar `EquivalenciaController` (list/create/delete) y
+`ProveedorController` (get-by-nit) a clases `TMVCController` con DTOs propios,
+usando `EMVCException` con el shape de error estándar de DMVC (decisión del
+usuario, 2026-09-25 — Horse's `{success,message,detail}` no se replica).
 
-**Nota de serialización JSON:** `TPingController` (Fase 1) construye la respuesta a mano con
-`System.JSON.TJSONObject` — válido para un endpoint trivial sin DTO. Los controllers de esta
-fase SÍ tienen DTOs (`EquivalenciaDTOs.pas`, `ProveedorDTOs.pas`): decidir explícitamente si
-se renderizan vía el serializador nativo de DMVC (RTTI + atributos `[MVCNameCase]`, ver el
-patrón de NexoPago) en vez de construir `TJSONObject` a mano, para no mezclar dos convenciones
-de JSON en la misma capa de controllers.
+**Decisión de arquitectura (NO DI)**: a diferencia de NexoPago (que usa
+`TMVCRepository<T>`/DI), los controllers de esta fase llaman DIRECTAMENTE a
+las unidades procedurales existentes `EquivalenciaService.pas`/
+`ProveedorRepository.pas` — no hay entidades ActiveRecord que envolver en este
+repo, y la Restricción Global prohíbe reescribirlas. Serialización vía DTOs
+con `[MVCNameCase(ncCamelCase)]` (RTTI nativo de DMVC), sin `TJSONObject` a
+mano salvo en `TPingController` (Fase 1, endpoint trivial sin DTO).
 
-**Archivos:** `dmvc/Controllers/EquivalenciaController.pas`,
-`dmvc/Controllers/ProveedorController.pas`, `dmvc/DTOs/EquivalenciaDTOs.pas`,
-`dmvc/DTOs/ProveedorDTOs.pas`, tests correspondientes en `tests/DMVC/`.
+**Cambios de status HTTP vs. Horse (pendiente para el frontend en la Fase 5)**:
+`CreateEquivalencia` responde 200 donde Horse respondía 201; `DeleteEquivalencia`
+responde 404 en not-found donde Horse respondía 200 con `{success:false}`.
+
+**Archivos:** `dmvc/Controllers/DMVC.Controllers.EquivalenciaController.pas`,
+`dmvc/Controllers/DMVC.Controllers.ProveedorController.pas`,
+`dmvc/DTOs/DMVC.DTOs.Equivalencia.pas`, `dmvc/DTOs/DMVC.DTOs.EquivalenciaCreate.pas`,
+`dmvc/DTOs/DMVC.DTOs.Proveedor.pas`, tests en `tests/DMVC/` (6 tests DUnitX
+en total con las Fase 1: sanity, ping, 3 de Equivalencia, 1 de Proveedor).
+
+**Plan detallado:** `2026-09-25-horse-to-dmvc-phase2-controllers.md` (completo, mergeado).
 
 **Depende de:** Fase 1 (WebModule/engine ya creado).
 
@@ -80,9 +89,30 @@ de JSON en la misma capa de controllers.
 archivos estáticos (SPA) con `Handled := True` en vez de
 `EHorseCallbackInterrupted`.
 
-**Archivos:** `dmvc/Middleware/AuthMiddleware.pas`, `dmvc/Middleware/CORSMiddleware.pas`,
-`dmvc/Middleware/LicenseMiddleware.pas`, `dmvc/Middleware/HttpLoggerMiddleware.pas`,
-`dmvc/Middleware/StaticFilesMiddleware.pas`.
+**Nota de riesgo de auth heredado de Horse (decidir explícitamente antes de
+implementar)**: en Horse, `AuthMiddleware.IsPublicFrontendPath` trata como
+público todo lo que NO empiece por `/api` (`middleware/AuthMiddleware.pas`).
+La Fase 2 replicó fielmente ambas variantes de ruta de Horse (`/equivalencia`
+y `/api/equivalencia`, etc.) sin decidir aún cómo se protegerán con auth. Si
+esta fase porta ese mismo predicado de "público si no empieza por /api" sin
+cambios, el servidor DMVC heredaría un DELETE de Equivalencia y un GET de
+Proveedor SIN autenticación en sus variantes de ruta "bare". Además, como los
+controllers ya usan `[MVCPath('/')]` a nivel de clase (obligatorio, ver nota
+de la Fase 1/2), NO se puede proteger por prefijo de ruta a nivel de
+controller — hay que decidir la protección por ruta/acción individual, o
+eliminar las variantes "bare" y dejar solo `/api/...`. Los tests DUnitX de
+la Fase 2 no envían header `Authorization` — el arnés de tests necesitará
+soporte para tokens Bearer en la Fase 3 (y `/ping` debe seguir siendo público
+para que `WaitForReady` funcione).
+
+**Archivos:** `dmvc/Middleware/DMVC.Middleware.AuthMiddleware.pas`,
+`dmvc/Middleware/DMVC.Middleware.CORSMiddleware.pas`,
+`dmvc/Middleware/DMVC.Middleware.LicenseMiddleware.pas`,
+`dmvc/Middleware/DMVC.Middleware.HttpLoggerMiddleware.pas`,
+`dmvc/Middleware/DMVC.Middleware.StaticFilesMiddleware.pas` (nombres con
+namespace punteado consistente con el resto de `dmvc/`, ver regla de nombres
+de unidad en Restricciones globales — un archivo `AuthMiddleware.pas` sin
+puntos NO puede declarar `unit DMVC.Middleware.AuthMiddleware;`).
 
 **Depende de:** Fase 2 (necesita al menos un controller protegido para probar
 auth end-to-end).
@@ -111,7 +141,7 @@ con `PurchaseBridge.postman_collection.json` contra el servidor DMVC.
 ## Progreso
 
 - [x] Fase 1 — Esqueleto DMVC en paralelo
-- [ ] Fase 2 — Controllers de bajo riesgo
+- [x] Fase 2 — Controllers de bajo riesgo
 - [ ] Fase 3 — Middlewares transversales
 - [ ] Fase 4 — Controllers de alto riesgo/volumen
 - [ ] Fase 5 — Cutover

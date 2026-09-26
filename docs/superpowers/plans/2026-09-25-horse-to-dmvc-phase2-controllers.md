@@ -16,7 +16,8 @@
 - **Shape de respuesta de éxito**: se usa el idiomático de DMVC (DTOs serializados con `[MVCNameCase(ncCamelCase)]`, listados como array JSON plano) en vez de los wrappers ad-hoc de Horse (`{"equivalencias": [...]}`). También se normaliza la inconsistencia de casing preexistente en Horse (`subcodigoH` en el output de `List` vs `subCodigoH` en el input de `Create` — ver hallazgo de exploración) a `subCodigoH` consistente en ambos DTOs. Esto es intencional, no un descuido.
 - **Comportamiento de negocio interno preservado tal cual, incluyendo una inconsistencia preexistente**: `ListarEquivalencias`/`EliminarEquivalencia` reciben los query-params `referenciaP`/`unidadP` pero internamente filtran por las columnas `REFERENCIAH`/`UNIDADH` (no `REFERENCIAP`/`UNIDADP`) — esto viene del Horse original (`EquivalenciaService.pas` líneas ~ListarEquivalencias/EliminarEquivalencia) y NO se corrige en esta fase (es un cambio de comportamiento, no de framework — fuera de alcance). Cada Task de este plan que toque estas funciones debe dejar un comentario explícito en el código nuevo señalando esto.
 - Rutas: cada acción migrada expone AMBAS variantes (`/xxx` y `/api/xxx`) igual que Horse, usando dos atributos `[MVCPath]` apilados sobre el mismo método.
-- Tests contra datos reales: los tests de `Create`/`Delete` de Equivalencia usan valores de `referenciaP`/`unidadP` claramente marcados como de prueba (prefijo `__PHASE2TEST__`) y limpian lo que crean (create → verificar → delete → verificar). El test de Proveedor usa un NIT claramente inexistente (`'000000000-TEST'`) y solo verifica la rama `existe=false` — no depende de datos reales de Helisa.
+- Tests contra datos reales: los tests de `Create`/`Delete`/listado de Equivalencia usan valores de `referenciaP`/`unidadP` claramente marcados como de prueba y cortos (`UNIDADH` es `VARCHAR(5)` en el schema real, así que los tags deben caber ahí — p.ej. `P2T2`/`P2TU`, no un prefijo largo tipo `__PHASE2TEST__`) y limpian lo que crean de forma INCONDICIONAL (un `finally` con un `DELETE` SQL crudo vía `FirebirdConnection.GetBridgeQuery`, no solo el `DELETE` HTTP que el test está verificando — así el cleanup sobrevive incluso si una aserción falla a mitad de camino). El test de Proveedor usa un NIT claramente inexistente (`'000000000-TEST'`) y solo verifica la rama `existe=false` — no depende de datos reales de Helisa, y NO necesita cleanup (es de solo lectura). **Advertencia de seguridad de datos**: `ProveedorRepository` conecta a la base Helisa REAL del usuario (no una de pruebas descartable) — cualquier test contra Proveedor debe ser estrictamente de solo lectura y usar solo el NIT ficticio designado, nunca un valor que pudiera ser un proveedor real.
+- **Cambios de status HTTP respecto a Horse (documentar para el cutover de Fase 5)**: `CreateEquivalencia` responde 200 (`OKResponse`) donde Horse respondía 201; `DeleteEquivalencia` responde 404 cuando no encuentra la fila, donde Horse respondía 200 con `{success:false}`. Son normalizaciones intencionales al estilo idiomático de DMVC (mismo criterio que la decisión de formato de error), pero el frontend necesita conocer ambos cambios en la Fase 5.
 - Registro de controllers nuevos: se agregan a `dmvc/DMVC.WebModule.Main.pas` (mismo `TMVCEngine` de la Fase 1, mismo puerto 9091), nunca un WebModule/engine nuevo.
 - Compilador y rutas `-U`/`-I`: idénticas a la Fase 1 (ver `docs/superpowers/plans/2026-09-12-horse-to-dmvc-roadmap.md`, sección Restricciones globales) — DCC32 en `C:\Program Files (x86)\Embarcadero\Studio\23.0\bin\DCC32.EXE`, fuentes DMVC en `C:\Users\Alejo\Downloads\delphimvcframework-master\sources` + `lib\loggerpro` + `lib\swagdoc\Source`.
 - Regla de nombres de unidad Delphi (de la Fase 1): el nombre de unidad debe coincidir EXACTO con el nombre físico del archivo, incluidos los puntos. Todos los archivos nuevos de este plan ya están nombrados correctamente para esto (verificar antes de compilar si algo no cuadra).
@@ -72,6 +73,8 @@ type
     property Factor: Double read fFactor write fFactor;
   end;
 
+implementation
+
 end.
 ```
 
@@ -90,6 +93,9 @@ uses
   DMVC.DTOs.Equivalencia;
 
 type
+  [MVCPath('/')] // OBLIGATORIO: DMVCFramework ignora (404 silencioso) un controller sin
+                 // al menos un atributo a nivel de CLASE, aunque cada metodo ya tenga su
+                 // propio [MVCPath] completo. Confirmado empiricamente en la Fase 2 Task 1.
   TEquivalenciaController = class(TMVCController)
   public
     [MVCPath('/equivalencias')]
@@ -303,12 +309,12 @@ Expected: el servidor arranca bien (Fase 1 sigue viva) pero `GetEquivalencias_Re
 Run:
 ```
 "C:\Program Files (x86)\Embarcadero\Studio\23.0\bin\DCC32.EXE" -B -Q ^
-  -U"C:\Users\Alejo\Downloads\delphimvcframework-master\sources";"C:\Users\Alejo\Downloads\delphimvcframework-master\lib\loggerpro";"C:\Users\Alejo\Downloads\delphimvcframework-master\lib\swagdoc\Source";"F:\Proyectos\delphi_backend\purchasebridge\backend\.claude\worktrees\horse-to-dmvc-phase2\dmvc";"F:\Proyectos\delphi_backend\purchasebridge\backend\.claude\worktrees\horse-to-dmvc-phase2\dmvc\Controllers";"F:\Proyectos\delphi_backend\purchasebridge\backend\.claude\worktrees\horse-to-dmvc-phase2\dmvc\DTOs";"F:\Proyectos\delphi_backend\purchasebridge\backend\.claude\worktrees\horse-to-dmvc-phase2\services";"F:\Proyectos\delphi_backend\purchasebridge\backend\.claude\worktrees\horse-to-dmvc-phase2\database" ^
+  -U"C:\Users\Alejo\Downloads\delphimvcframework-master\sources";"C:\Users\Alejo\Downloads\delphimvcframework-master\lib\loggerpro";"C:\Users\Alejo\Downloads\delphimvcframework-master\lib\swagdoc\Source";"F:\Proyectos\delphi_backend\purchasebridge\backend\.claude\worktrees\horse-to-dmvc-phase2\dmvc";"F:\Proyectos\delphi_backend\purchasebridge\backend\.claude\worktrees\horse-to-dmvc-phase2\dmvc\Controllers";"F:\Proyectos\delphi_backend\purchasebridge\backend\.claude\worktrees\horse-to-dmvc-phase2\dmvc\DTOs";"F:\Proyectos\delphi_backend\purchasebridge\backend\.claude\worktrees\horse-to-dmvc-phase2\services";"F:\Proyectos\delphi_backend\purchasebridge\backend\.claude\worktrees\horse-to-dmvc-phase2\database";"F:\Proyectos\delphi_backend\purchasebridge\backend\.claude\worktrees\horse-to-dmvc-phase2\config";"F:\Proyectos\delphi_backend\purchasebridge\backend\.claude\worktrees\horse-to-dmvc-phase2\utils";"F:\Proyectos\delphi_backend\purchasebridge\backend\.claude\worktrees\horse-to-dmvc-phase2\repositories" ^
   -I"C:\Users\Alejo\Downloads\delphimvcframework-master\sources" ^
   -E"F:\Proyectos\delphi_backend\purchasebridge\backend\.claude\worktrees\horse-to-dmvc-phase2\bin" ^
   "F:\Proyectos\delphi_backend\purchasebridge\backend\.claude\worktrees\horse-to-dmvc-phase2\PurchaseBridgeDMVC.dpr"
 ```
-Nota: se agregaron `services` y `database` al `-U` porque `EquivalenciaController.pas`(DMVC) ahora depende de `EquivalenciaService.pas`, que a su vez depende de `FirebirdConnection.pas`. Si DCC32 se queja de otra unit no encontrada (p.ej. `HConfig.pas`, `uPaths.pas`), agrega también `config` y `utils` a esta lista de `-U` — son las carpetas donde viven esas dependencias transitivas en este repo.
+Nota: `services`/`database`/`config`/`utils`/`repositories` ya están todos en esta lista porque, entre `EquivalenciaController.pas` (→ `EquivalenciaService.pas` → `FirebirdConnection.pas` → `HConfig.pas`/`uPaths.pas`) y `ProveedorController.pas` (→ `ProveedorRepository.pas`), las 3 tasks de esta fase terminan necesitando las 5 carpetas — confirmado empíricamente durante la implementación. El test project necesita el mismo conjunto además de las rutas de DUnitX (ver Task 1 Step 5).
 
 Expected: `0 Error(s)`.
 
@@ -395,7 +401,9 @@ En la sección `type`, dentro de `TEquivalenciaControllerTests`, agregar:
 En `implementation`, agregar el cuerpo:
 **CORRECCIÓN (post Task 1, con evidencia real de la base de pruebas — no copiar los valores originales de abajo, usar los corregidos):**
 1. `UNIDADH` es `VARCHAR(5)` en el schema real (`database/scripts/create_tables.txt`) — el tag `__PHASE2TEST__UNI` (18 caracteres) NO CABE. Usar un tag corto de máximo 5 caracteres, p.ej. `P2T2` (el fix de la Task 1 ya usó `P2TU` para su propio tag — usa uno DISTINTO para no chocar con filas que ese test pueda dejar, aunque ese test limpia después de sí mismo).
-2. Más importante — **`referenciaH`/`unidadH` deben enviarse en el body con el MISMO valor que `referenciaP`/`unidadP`**. Motivo: `EliminarEquivalencia` (llamada por el `DELETE`) filtra internamente por las columnas `REFERENCIAH`/`UNIDADH` (ver la nota de comportamiento preexistente en Global Constraints) — si el POST de este test solo llena `REFERENCIAP`/`UNIDADP` y deja `REFERENCIAH`/`UNIDADH` vacíos (comportamiento por defecto si no se envían en el body), el `DELETE` posterior no va a encontrar la fila (busca por `REFERENCIAH`/`UNIDADH`, que quedaron vacíos) y el test fallaría con 404 en el `Delete`. Esto no es un bug del test, es una consecuencia directa de la inconsistencia preexistente que este plan decidió preservar — el test tiene que trabajar CON ella, no ignorarla.
+2. Más importante — **`referenciaH`/`unidadH` deben enviarse en el body con el MISMO valor que `referenciaP`/`unidadP`**. Motivo real (corregido tras revisión — la explicación original de esta nota estaba mal): `CrearEquivalencia` (la función real, no el controller) hace `if AReferenciaH.Trim.IsEmpty or AUnidadH.Trim.IsEmpty then raise Exception.Create(...)` — si el body del POST no envía `referenciaH`/`unidadH`, el DTO los deja vacíos vía `ValueOrDefault`, y el `CREATE` mismo falla con 500 (no llega a crear ninguna fila). Enviarlos iguales a `referenciaP`/`unidadP` evita ese 500 Y además hace que el `DELETE` posterior (que filtra por `REFERENCIAH`/`UNIDADH`, ver nota de comportamiento preexistente en Global Constraints) sí encuentre la fila. Esto no es un bug del test, es una consecuencia directa de la inconsistencia preexistente que este plan decidió preservar — el test tiene que trabajar CON ella, no ignorarla.
+
+**Nota post-revisión**: la primera versión de este test (abajo tenía solo el `try/finally` externo sobre `LHttp`) no limpiaba de forma incondicional — si el `Assert` del create o del delete fallaba, la fila de prueba podía quedar huérfana. La versión final (la que quedó commiteada) agrega un `finally` con un `DELETE` SQL crudo de respaldo, igual al patrón ya usado en el test de listado de la Task 1:
 
 ```pascal
 procedure TEquivalenciaControllerTests.CreateThenDeleteEquivalencia_RoundTrips;
@@ -408,45 +416,65 @@ var
   LPostBody: TStringStream;
   LResponse: string;
   LDeleteUrl: string;
+  LCleanupQuery: TFDQuery;
 begin
   LHttp := TIdHTTP.Create(nil);
   try
-    // 1. Crear — referenciaH/unidadH se envian IGUALES a referenciaP/unidadP a
-    // proposito, para que el DELETE (que filtra por REFERENCIAH/UNIDADH, ver
-    // nota de comportamiento preexistente) despues SI encuentre la fila.
-    LBodyJson := TJSONObject.Create;
     try
-      LBodyJson.AddPair('codigoH', TJSONNumber.Create(999999));
-      LBodyJson.AddPair('subCodigoH', TJSONNumber.Create(1));
-      LBodyJson.AddPair('nombreH', 'Test Phase2');
-      LBodyJson.AddPair('referenciaH', TEST_REF);
-      LBodyJson.AddPair('unidadH', TEST_UNI);
-      LBodyJson.AddPair('referenciaP', TEST_REF);
-      LBodyJson.AddPair('unidadP', TEST_UNI);
-      LBodyJson.AddPair('factor', TJSONNumber.Create(1.5));
-
-      LPostBody := TStringStream.Create(LBodyJson.ToJSON, TEncoding.UTF8);
+      // 1. Crear — referenciaH/unidadH se envian IGUALES a referenciaP/unidadP a
+      // proposito, para que el DELETE (que filtra por REFERENCIAH/UNIDADH, ver
+      // nota de comportamiento preexistente) despues SI encuentre la fila.
+      LBodyJson := TJSONObject.Create;
       try
-        LHttp.Request.ContentType := 'application/json';
-        LResponse := LHttp.Post(Format('http://localhost:%d/api/equivalencia', [TEST_PORT]), LPostBody);
-        Assert.AreEqual(200, LHttp.ResponseCode, 'Create debe responder 200/OK: ' + LResponse);
-      finally
-        LPostBody.Free;
-      end;
-    finally
-      LBodyJson.Free;
-    end;
+        LBodyJson.AddPair('codigoH', TJSONNumber.Create(999999));
+        LBodyJson.AddPair('subCodigoH', TJSONNumber.Create(1));
+        LBodyJson.AddPair('nombreH', 'Test Phase2');
+        LBodyJson.AddPair('referenciaH', TEST_REF);
+        LBodyJson.AddPair('unidadH', TEST_UNI);
+        LBodyJson.AddPair('referenciaP', TEST_REF);
+        LBodyJson.AddPair('unidadP', TEST_UNI);
+        LBodyJson.AddPair('factor', TJSONNumber.Create(1.5));
 
-    // 2. Borrar lo recien creado (limpieza) y verificar que el borrado reporta exito
-    LDeleteUrl := Format('http://localhost:%d/api/equivalencia?referenciaP=%s&unidadP=%s',
-      [TEST_PORT, TEST_REF, TEST_UNI]);
-    LResponse := LHttp.Delete(LDeleteUrl);
-    Assert.AreEqual(200, LHttp.ResponseCode, 'Delete debe responder 200/OK: ' + LResponse);
+        LPostBody := TStringStream.Create(LBodyJson.ToJSON, TEncoding.UTF8);
+        try
+          LHttp.Request.ContentType := 'application/json';
+          LResponse := LHttp.Post(Format('http://localhost:%d/api/equivalencia', [TEST_PORT]), LPostBody);
+          Assert.AreEqual(200, LHttp.ResponseCode, 'Create debe responder 200/OK: ' + LResponse);
+        finally
+          LPostBody.Free;
+        end;
+      finally
+        LBodyJson.Free;
+      end;
+
+      // 2. Borrar lo recien creado via la API (es lo que este test principalmente
+      // verifica) y confirmar que el borrado reporta exito.
+      LDeleteUrl := Format('http://localhost:%d/api/equivalencia?referenciaP=%s&unidadP=%s',
+        [TEST_PORT, TEST_REF, TEST_UNI]);
+      LResponse := LHttp.Delete(LDeleteUrl);
+      Assert.AreEqual(200, LHttp.ResponseCode, 'Delete debe responder 200/OK: ' + LResponse);
+    finally
+      // Cleanup incondicional de respaldo: si el create o el delete via HTTP
+      // fallaron a mitad de camino (assertion failure), este DELETE crudo por
+      // SQL garantiza que la fila de prueba no quede huerfana en la base,
+      // igual que el patron ya establecido en GetEquivalencias_WithTaggedRow_
+      // ReturnsCorrectFields (Task 1).
+      LCleanupQuery := FirebirdConnection.GetBridgeQuery;
+      try
+        LCleanupQuery.SQL.Text := 'DELETE FROM EQUIVALENCIA WHERE REFERENCIAH = :REFH AND UNIDADH = :UNIH';
+        LCleanupQuery.ParamByName('REFH').AsString := TEST_REF;
+        LCleanupQuery.ParamByName('UNIH').AsString := TEST_UNI;
+        LCleanupQuery.ExecSQL;
+      finally
+        LCleanupQuery.Free;
+      end;
+    end;
   finally
     LHttp.Free;
   end;
 end;
 ```
+(requiere `FirebirdConnection` y `FireDAC.Comp.Client` en el `uses` de `implementation` — ya deberían estar ahí por el test de la Task 1.)
 
 **Antes de implementar**: recompila y corre el test ahora (mismos comandos del Task 1 Steps 5-7, mismas rutas) — debe fallar con 404 en el POST (RED), porque los métodos `CreateEquivalencia`/`DeleteEquivalencia` todavía no existen en el controller.
 
@@ -492,10 +520,11 @@ begin
   if (not ADatos.Factor.HasValue) or (ADatos.Factor.Value <= 0) then
     raise EMVCException.Create(HTTP_STATUS.BadRequest, 'factor must be greater than 0');
 
-  // Ver nota de comportamiento preexistente en Global Constraints: los nombres
-  // de parametro de EquivalenciaService.CrearEquivalencia no corresponden 1:1
-  // con las columnas que terminan usandose; se pasan en el mismo orden que
-  // usaba el controller Horse original para no alterar el comportamiento.
+  // Los argumentos de CrearEquivalencia SI corresponden 1:1 a su firma (a
+  // diferencia de ListarEquivalencias/EliminarEquivalencia, que reciben
+  // referenciaP/unidadP pero filtran por REFERENCIAH/UNIDADH — ver Global
+  // Constraints). Se pasan en el mismo orden que usaba el controller Horse
+  // original para no alterar el comportamiento.
   EquivalenciaService.CrearEquivalencia(
     ADatos.CodigoH.Value,
     ADatos.SubCodigoH.ValueOrDefault,
@@ -583,6 +612,8 @@ type
     property Codigo: String read fCodigo write fCodigo;
   end;
 
+implementation
+
 end.
 ```
 
@@ -647,7 +678,12 @@ var
 begin
   LHttp := TIdHTTP.Create(nil);
   try
-    LBody := LHttp.Get(Format('http://localhost:%d/api/proveedor/000000000-TEST', [TEST_PORT]));
+    // NOTA: se fija anio=2025 explicitamente. Sin este parametro, ValidarAnio
+    // usa el año calendario actual, pero la tabla CPMA<año actual> todavia no
+    // existe en la instancia real de Helisa de este entorno (aprovisionamiento
+    // de datos en vivo, no un bug de la migracion) — sin el pin, esta llamada
+    // devuelve 500 en vez de 200/existe:false.
+    LBody := LHttp.Get(Format('http://localhost:%d/api/proveedor/000000000-TEST?anio=2025', [TEST_PORT]));
     Assert.AreEqual(200, LHttp.ResponseCode);
     LJson := TJSONObject.ParseJSONValue(LBody) as TJSONObject;
     try
@@ -682,10 +718,12 @@ unit DMVC.Controllers.ProveedorController;
 interface
 
 uses
-  MVCFramework,
+  MVCFramework, MVCFramework.Commons,
   DMVC.DTOs.Proveedor;
 
 type
+  [MVCPath('/')] // OBLIGATORIO — ver nota en el controller de Equivalencia (Task 1):
+                 // sin esto, DMVCFramework ignora el controller entero (404 silencioso).
   TProveedorController = class(TMVCController)
   public
     [MVCPath('/proveedor/($nit)')]
@@ -738,11 +776,11 @@ end;
 
 Mismos comandos de compilación del Task 1 (Steps 5-6) — agrega `repositories` y `config` a la lista de `-U` del servidor si `ProveedorRepository.pas`/`HConfig.pas` no se encuentran (deberían estar ya cubiertos si seguiste la nota de la Task 1 Step 6, revisa igual).
 
-Correr `PurchaseBridge.Tests.exe` — deben pasar TODOS los tests de la Fase 1 y la Fase 2 (5 en total: sanity, ping, equivalencias-list, equivalencias-create-delete, proveedor).
+Correr `PurchaseBridge.Tests.exe` — deben pasar TODOS los tests de la Fase 1 y la Fase 2 (6 en total: sanity, ping, equivalencias-list, equivalencias-field-mapping, equivalencia-create-delete, proveedor).
 
 - [ ] **Step 6: Verificación manual**
 
-`curl http://localhost:9091/api/proveedor/000000000-TEST` → `{"existe":false}`. Si tienes un NIT real de prueba a mano, verifica también la rama `existe:true` manualmente (no está automatizado — ver Global Constraints sobre no depender de datos reales de Helisa en los tests).
+`curl "http://localhost:9091/api/proveedor/000000000-TEST?anio=2025"` → `{"existe":false}` (ver nota sobre el pin de `anio` en el Step 2). Si tienes un NIT real de prueba a mano, verifica también la rama `existe:true` manualmente (no está automatizado — ver Global Constraints sobre no depender de datos reales de Helisa en los tests).
 
 - [ ] **Step 7: Commit**
 
