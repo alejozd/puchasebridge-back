@@ -446,7 +446,7 @@ procedure BuildEstadoFields(const AResponse: TJSONObject);
 begin
   AResponse.AddPair('estado', TLicenciaService.LicenciaActual.Estado);
 
-  if TLicenciaService.LicenciaActual.Mensaje = 'Licencia requiere reactivaci' + #243 + 'n' then
+  if TLicenciaService.LicenciaActual.Mensaje = 'Licencia requiere reactivaci' + #243 + ' n' then
   begin
     AResponse.AddPair('expira', TJSONNull.Create);
     AResponse.AddPair('dias_restantes', TJSONNumber.Create(0));
@@ -521,7 +521,7 @@ begin
   LResponse := TJSONObject.Create;
   try
     if not LSuccess and Assigned(TLicenciaService.LicenciaActual) and
-       (TLicenciaService.LicenciaActual.Mensaje = 'Licencia no v' + #225 + 'lida para este equipo') then
+       (TLicenciaService.LicenciaActual.Mensaje = 'Licencia no v' + #225 + ' lida para este equipo') then
       LResponse.AddPair('error', TLicenciaService.LicenciaActual.Mensaje)
     else
     begin
@@ -565,6 +565,8 @@ end;
 
 end.
 ```
+
+**ADVERTENCIA (hallazgo de review, corregido):** los literales `'Licencia requiere reactivaci' + #243 + ' n'` y `'Licencia no v' + #225 + ' lida para este equipo'` de arriba llevan un ESPACIO antes de la última letra — parece un error tipográfico pero NO lo es: es el valor EXACTO que `services/LicenseService.pas` asigna en runtime (confirmado leyendo el archivo, líneas con `FLicenciaActual.Mensaje :=`). Si se “corrige” quitando el espacio, la comparación de igualdad de string deja de coincidir nunca y esas ramas de negocio (reactivación requerida / equipo no autorizado) quedan muertas en silencio, sin que ningún test lo detecte a menos que se pruebe contra un estado de licencia real con ese mensaje exacto. Copiar estos literales carácter por carácter, sin “limpiarlos”.
 
 Notas de fidelidad con el Horse original:
 - `GetEstado`/`ActivarOnline` comparten exactamente la misma lógica condicional de campos (`BuildEstadoFields`, extraída como función libre en la sección `implementation` para no duplicar el bloque de 20 líneas dos veces — esto es refactor MECÁNICO sin cambio de comportamiento, no una abstracción nueva de diseño).
