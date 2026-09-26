@@ -134,6 +134,20 @@ para arrancar el engine DMVC en el puerto 9000 (el de producción), eliminar
 entrypoint, quitar dependencias Horse de `boss.json` y `modules/`, verificar
 con `PurchaseBridge.postman_collection.json` contra el servidor DMVC.
 
+**Pendiente de la Fase 3 (guard de licencia dormido)**: `DMVC.Middleware.License.pas`
+(Fase 3, Task 2) está correctamente implementado pero es un no-op en el
+servidor paralelo — nada en `PurchaseBridgeDMVC.dpr` llama a
+`TLicenciaService.InicializarLicencia`/`StartPeriodicValidation` (Horse sí lo
+hace, `ServerBootstrap.pas:178-179`), así que `FSistemaBloqueado` nunca se
+activa. Esto fue deliberado: `InicializarLicencia` hace una llamada de red real
+y bloquea todo el sistema (`BloquearSistema`, fail-closed) si `[LICENCIA]
+URLServidor` no está configurado — activarlo en el entorno de pruebas de las
+Fases 3-4 habría roto todos los tests. En la Fase 5, con el `config.ini` de
+producción real (con `[LICENCIA]` válido), agregar la misma llamada a
+`InicializarLicencia`/`StartPeriodicValidation` en el arranque de
+`PurchaseBridgeDMVC.dpr` (o su equivalente tras el cutover), replicando el
+orden de `ServerBootstrap.pas`.
+
 **Depende de:** Fase 4 completa y verificada.
 
 ---
