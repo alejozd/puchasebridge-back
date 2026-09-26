@@ -18,7 +18,8 @@ uses
   DMVC.TestServerProcess in 'DMVC\DMVC.TestServerProcess.pas',
   DMVC.PingControllerTests in 'DMVC\DMVC.PingControllerTests.pas',
   DMVC.EquivalenciaControllerTests in 'DMVC\DMVC.EquivalenciaControllerTests.pas',
-  DMVC.ProveedorControllerTests in 'DMVC\DMVC.ProveedorControllerTests.pas';
+  DMVC.ProveedorControllerTests in 'DMVC\DMVC.ProveedorControllerTests.pas',
+  DMVC.CORSMiddlewareTests in 'DMVC\DMVC.CORSMiddlewareTests.pas';
 
 var
   runner: ITestRunner;

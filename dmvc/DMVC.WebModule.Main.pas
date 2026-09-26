@@ -23,12 +23,16 @@ implementation
 uses
   DMVC.Controllers.PingController,
   DMVC.Controllers.EquivalenciaController,
-  DMVC.Controllers.ProveedorController;
+  DMVC.Controllers.ProveedorController,
+  DMVC.Middleware.HttpLogger,
+  DMVC.Middleware.CORS;
 
 constructor TPurchaseBridgeDMVCWebModule.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
   FEngine := TMVCEngine.Create(Self);
+  FEngine.AddMiddleware(TPurchaseBridgeTraceMiddleware.Create);
+  FEngine.AddMiddleware(TPurchaseBridgeCORSMiddleware.Create);
   FEngine.AddController(TPingController);
   FEngine.AddController(TEquivalenciaController);
   FEngine.AddController(TProveedorController);
