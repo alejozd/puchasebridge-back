@@ -534,7 +534,7 @@ Mismos comandos de compilación del Task 1 (Steps 5-6), luego correr `PurchaseBr
 
 - [ ] **Step 5: Verificación manual**
 
-Con el server corriendo: `curl -X POST http://localhost:9091/api/equivalencia -H "Content-Type: application/json" -d "{\"codigoH\":1,\"referenciaP\":\"MANUALTEST\",\"unidadP\":\"UN\",\"factor\":1}"` → debe responder 200. Luego `curl -X DELETE "http://localhost:9091/api/equivalencia?referenciaP=MANUALTEST&unidadP=UN"` → debe responder 200. Confirma que no quedó el registro de prueba manual en la base (si `curl` no está disponible, usa `Invoke-RestMethod` de PowerShell con la sintaxis equivalente).
+Con el server corriendo: `curl -X POST http://localhost:9091/api/equivalencia -H "Content-Type: application/json" -d "{\"codigoH\":1,\"referenciaP\":\"MANUALTEST\",\"unidadP\":\"UN\",\"referenciaH\":\"MANUALTEST\",\"unidadH\":\"UN\",\"factor\":1}"` → debe responder 200 (nota: `referenciaH`/`unidadH` van iguales a `referenciaP`/`unidadP` por el mismo motivo que en el test automatizado — ver CORRECCIÓN de la Task 2 arriba; si se omiten, el `DELETE` posterior no va a encontrar la fila y responde 404/500, no es un bug del controller). Luego `curl -X DELETE "http://localhost:9091/api/equivalencia?referenciaP=MANUALTEST&unidadP=UN"` → debe responder 200. Confirma que no quedó el registro de prueba manual en la base (si `curl` no está disponible, usa `Invoke-RestMethod` de PowerShell con la sintaxis equivalente).
 
 - [ ] **Step 6: Commit**
 
