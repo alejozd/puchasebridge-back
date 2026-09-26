@@ -17,7 +17,8 @@ uses
   SanityTests in 'Sample\SanityTests.pas',
   DMVC.TestServerProcess in 'DMVC\DMVC.TestServerProcess.pas',
   DMVC.PingControllerTests in 'DMVC\DMVC.PingControllerTests.pas',
-  DMVC.EquivalenciaControllerTests in 'DMVC\DMVC.EquivalenciaControllerTests.pas';
+  DMVC.EquivalenciaControllerTests in 'DMVC\DMVC.EquivalenciaControllerTests.pas',
+  DMVC.ProveedorControllerTests in 'DMVC\DMVC.ProveedorControllerTests.pas';
 
 var
   runner: ITestRunner;

@@ -22,7 +22,8 @@ implementation
 
 uses
   DMVC.Controllers.PingController,
-  DMVC.Controllers.EquivalenciaController;
+  DMVC.Controllers.EquivalenciaController,
+  DMVC.Controllers.ProveedorController;
 
 constructor TPurchaseBridgeDMVCWebModule.Create(AOwner: TComponent);
 begin
@@ -30,6 +31,7 @@ begin
   FEngine := TMVCEngine.Create(Self);
   FEngine.AddController(TPingController);
   FEngine.AddController(TEquivalenciaController);
+  FEngine.AddController(TProveedorController);
 end;
 
 destructor TPurchaseBridgeDMVCWebModule.Destroy;
