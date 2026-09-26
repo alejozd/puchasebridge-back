@@ -10,6 +10,7 @@ type
   TEquivalenciaControllerTests = class
   private
     FServer: TTestServerProcess;
+    FToken: string;
   public
     [Setup]
     procedure Setup;
@@ -28,7 +29,7 @@ implementation
 
 uses
   System.SysUtils, System.IOUtils, System.JSON, System.Classes, IdHTTP,
-  FirebirdConnection, FireDAC.Comp.Client;
+  FirebirdConnection, FireDAC.Comp.Client, DMVC.TestAuthHelper;
 
 const
   TEST_PORT = 9091;
@@ -43,6 +44,9 @@ begin
   FServer := TTestServerProcess.Create;
   FServer.Start(ServerExePath, TEST_PORT);
   Assert.IsTrue(FServer.WaitForReady(TEST_PORT), 'El servidor DMVC no respondió a tiempo en /ping');
+  // Equivalencia esta protegida por JWT (ver Task 4): se necesita un token
+  // real (credenciales de [AUTH_TEST] en config.ini) para llegar al controller.
+  FToken := ObtenerTokenDePrueba(TEST_PORT);
 end;
 
 procedure TEquivalenciaControllerTests.TearDown;
@@ -59,6 +63,7 @@ var
 begin
   LHttp := TIdHTTP.Create(nil);
   try
+    LHttp.Request.CustomHeaders.AddValue('Authorization', 'Bearer ' + FToken);
     LBody := LHttp.Get(Format('http://localhost:%d/api/equivalencias?limite=5', [TEST_PORT]));
     Assert.AreEqual(200, LHttp.ResponseCode);
     LJson := TJSONObject.ParseJSONValue(LBody);
@@ -101,6 +106,7 @@ begin
   try
     LHttp := TIdHTTP.Create(nil);
     try
+      LHttp.Request.CustomHeaders.AddValue('Authorization', 'Bearer ' + FToken);
       LBody := LHttp.Get(Format('http://localhost:%d/api/equivalencias?referenciaP=%s&limite=50',
         [TEST_PORT, TAG_REF]));
       Assert.AreEqual(200, LHttp.ResponseCode);
@@ -146,6 +152,7 @@ var
 begin
   LHttp := TIdHTTP.Create(nil);
   try
+    LHttp.Request.CustomHeaders.AddValue('Authorization', 'Bearer ' + FToken);
     try
       // 1. Crear — referenciaH/unidadH se envian IGUALES a referenciaP/unidadP a
       // proposito, para que el DELETE (que filtra por REFERENCIAH/UNIDADH, ver

@@ -10,6 +10,7 @@ type
   TProveedorControllerTests = class
   private
     FServer: TTestServerProcess;
+    FToken: string;
   public
     [Setup]
     procedure Setup;
@@ -23,7 +24,7 @@ type
 implementation
 
 uses
-  System.SysUtils, System.IOUtils, System.JSON, IdHTTP;
+  System.SysUtils, System.IOUtils, System.JSON, IdHTTP, DMVC.TestAuthHelper;
 
 const
   TEST_PORT = 9091;
@@ -38,6 +39,9 @@ begin
   FServer := TTestServerProcess.Create;
   FServer.Start(ServerExePath, TEST_PORT);
   Assert.IsTrue(FServer.WaitForReady(TEST_PORT), 'El servidor DMVC no respondió a tiempo en /ping');
+  // Proveedor esta protegido por JWT (ver Task 4): se necesita un token real
+  // (credenciales de [AUTH_TEST] en config.ini) para llegar al controller.
+  FToken := ObtenerTokenDePrueba(TEST_PORT);
 end;
 
 procedure TProveedorControllerTests.TearDown;
@@ -54,6 +58,7 @@ var
 begin
   LHttp := TIdHTTP.Create(nil);
   try
+    LHttp.Request.CustomHeaders.AddValue('Authorization', 'Bearer ' + FToken);
     // anio=2025 pinned explicitly: ObtenerProveedorPorNit defaults to the CURRENT
     // calendar year's CPMAxxxx table when anio is omitted, and this live Helisa
     // instance does not yet have a CPMA2026 table provisioned (confirmed via a

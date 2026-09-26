@@ -21,7 +21,9 @@ uses
   DMVC.ProveedorControllerTests in 'DMVC\DMVC.ProveedorControllerTests.pas',
   DMVC.CORSMiddlewareTests in 'DMVC\DMVC.CORSMiddlewareTests.pas',
   DMVC.LicenseMiddlewareTests in 'DMVC\DMVC.LicenseMiddlewareTests.pas',
-  DMVC.StaticAppMiddlewareTests in 'DMVC\DMVC.StaticAppMiddlewareTests.pas';
+  DMVC.StaticAppMiddlewareTests in 'DMVC\DMVC.StaticAppMiddlewareTests.pas',
+  DMVC.AuthTests in 'DMVC\DMVC.AuthTests.pas',
+  DMVC.TestAuthHelper in 'DMVC\DMVC.TestAuthHelper.pas';
 
 var
   runner: ITestRunner;

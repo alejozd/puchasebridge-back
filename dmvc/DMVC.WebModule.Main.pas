@@ -3,8 +3,9 @@ unit DMVC.WebModule.Main;
 interface
 
 uses
-  System.SysUtils, System.Classes, Web.HTTPApp,
-  MVCFramework;
+  System.SysUtils, System.Classes, System.IniFiles, Web.HTTPApp,
+  MVCFramework, MVCFramework.JWT, MVCFramework.Middleware.JWT,
+  uPaths;
 
 type
   TPurchaseBridgeDMVCWebModule = class(TWebModule)
@@ -27,7 +28,21 @@ uses
   DMVC.Middleware.HttpLogger,
   DMVC.Middleware.CORS,
   DMVC.Middleware.License,
-  DMVC.Middleware.StaticApp;
+  DMVC.Middleware.StaticApp,
+  DMVC.Security.JWTClaims,
+  DMVC.Security.AuthHandler;
+
+function GetJWTSecret: string;
+var
+  LIni: TIniFile;
+begin
+  LIni := TIniFile.Create(uPaths.GetConfigPath);
+  try
+    Result := LIni.ReadString('AUTH', 'JWTSecret', '');
+  finally
+    LIni.Free;
+  end;
+end;
 
 constructor TPurchaseBridgeDMVCWebModule.Create(AOwner: TComponent);
 begin
@@ -38,6 +53,13 @@ begin
   FEngine.AddMiddleware(TPurchaseBridgeLicenseMiddleware.Create);
   FEngine.AddMiddleware(TPurchaseBridgeStaticAppMiddleware.Create(
     ExtractFilePath(ParamStr(0)) + 'www'));
+  FEngine.AddMiddleware(TMVCJWTAuthenticationMiddleware.Create(
+    TPurchaseBridgeAuthHandler.Create,
+    SetupPurchaseBridgeJWTClaims,
+    GetJWTSecret,
+    '/api/auth/login',
+    [TJWTCheckableClaim.ExpirationTime, TJWTCheckableClaim.NotBefore, TJWTCheckableClaim.IssuedAt],
+    30));
   FEngine.AddController(TPingController);
   FEngine.AddController(TEquivalenciaController);
   FEngine.AddController(TProveedorController);
