@@ -32,28 +32,33 @@ var
   LItem: TEquivalenciaDTO;
 begin
   Result := TObjectList<TEquivalenciaDTO>.Create(True);
-  // Ver nota de comportamiento preexistente en el Global Constraints de este plan:
-  // EquivalenciaService.ListarEquivalencias filtra por REFERENCIAH/UNIDADH, no por
-  // REFERENCIAP/UNIDADP, aunque asi se llamen los query-params de esta ruta. Preservado
-  // a proposito (viene de Horse, no es un bug introducido aqui).
-  LQuery := EquivalenciaService.ListarEquivalencias(AReferenciaP, AUnidadP, ALimite);
   try
-    while not LQuery.Eof do
-    begin
-      LItem := TEquivalenciaDTO.Create;
-      LItem.CodigoH := LQuery.FieldByName('CODIGOH').AsInteger;
-      LItem.SubCodigoH := LQuery.FieldByName('SUBCODIGOH').AsInteger;
-      LItem.NombreH := LQuery.FieldByName('NOMBREH').AsString;
-      LItem.ReferenciaH := LQuery.FieldByName('REFERENCIAH').AsString;
-      LItem.UnidadH := LQuery.FieldByName('UNIDADH').AsString;
-      LItem.ReferenciaP := LQuery.FieldByName('REFERENCIAP').AsString;
-      LItem.UnidadP := LQuery.FieldByName('UNIDADP').AsString;
-      LItem.Factor := LQuery.FieldByName('FACTOR').AsFloat;
-      Result.Add(LItem);
-      LQuery.Next;
+    // Ver nota de comportamiento preexistente en el Global Constraints de este plan:
+    // EquivalenciaService.ListarEquivalencias filtra por REFERENCIAH/UNIDADH, no por
+    // REFERENCIAP/UNIDADP, aunque asi se llamen los query-params de esta ruta. Preservado
+    // a proposito (viene de Horse, no es un bug introducido aqui).
+    LQuery := EquivalenciaService.ListarEquivalencias(AReferenciaP, AUnidadP, ALimite);
+    try
+      while not LQuery.Eof do
+      begin
+        LItem := TEquivalenciaDTO.Create;
+        LItem.CodigoH := LQuery.FieldByName('CODIGOH').AsInteger;
+        LItem.SubCodigoH := LQuery.FieldByName('SUBCODIGOH').AsInteger;
+        LItem.NombreH := LQuery.FieldByName('NOMBREH').AsString;
+        LItem.ReferenciaH := LQuery.FieldByName('REFERENCIAH').AsString;
+        LItem.UnidadH := LQuery.FieldByName('UNIDADH').AsString;
+        LItem.ReferenciaP := LQuery.FieldByName('REFERENCIAP').AsString;
+        LItem.UnidadP := LQuery.FieldByName('UNIDADP').AsString;
+        LItem.Factor := LQuery.FieldByName('FACTOR').AsFloat;
+        Result.Add(LItem);
+        LQuery.Next;
+      end;
+    finally
+      LQuery.Free;
     end;
-  finally
-    LQuery.Free;
+  except
+    Result.Free;
+    raise;
   end;
 end;
 

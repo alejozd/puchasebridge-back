@@ -18,12 +18,15 @@ type
 
     [Test]
     procedure GetEquivalencias_ReturnsJsonArray;
+    [Test]
+    procedure GetEquivalencias_WithTaggedRow_ReturnsCorrectFields;
   end;
 
 implementation
 
 uses
-  System.SysUtils, System.IOUtils, System.JSON, IdHTTP;
+  System.SysUtils, System.IOUtils, System.JSON, IdHTTP,
+  FirebirdConnection, FireDAC.Comp.Client;
 
 const
   TEST_PORT = 9091;
@@ -64,6 +67,66 @@ begin
     end;
   finally
     LHttp.Free;
+  end;
+end;
+
+procedure TEquivalenciaControllerTests.GetEquivalencias_WithTaggedRow_ReturnsCorrectFields;
+const
+  TAG_REF = '__PHASE2TEST_LIST_REF__';
+  // UNIDADH/UNIDADP are VARCHAR(5)/VARCHAR(10); keep this <= 5 chars to fit the narrower column.
+  TAG_UNI = 'P2TU';
+var
+  LInsertQuery: TFDQuery;
+  LHttp: TIdHTTP;
+  LBody: string;
+  LArray: TJSONArray;
+  LItem: TJSONObject;
+begin
+  LInsertQuery := FirebirdConnection.GetBridgeQuery;
+  try
+    LInsertQuery.SQL.Text :=
+      'INSERT INTO EQUIVALENCIA (CODIGOH, SUBCODIGOH, NOMBREH, REFERENCIAH, UNIDADH, UNIDADP, REFERENCIAP, FACTOR) ' +
+      'VALUES (777777, 3, ''Test Fase 2 List'', :REFH, :UNIH, :UNIP, :REFP, 2.5)';
+    LInsertQuery.ParamByName('REFH').AsString := TAG_REF;
+    LInsertQuery.ParamByName('UNIH').AsString := TAG_UNI;
+    LInsertQuery.ParamByName('UNIP').AsString := TAG_UNI;
+    LInsertQuery.ParamByName('REFP').AsString := TAG_REF;
+    LInsertQuery.ExecSQL;
+  finally
+    LInsertQuery.Free;
+  end;
+
+  try
+    LHttp := TIdHTTP.Create(nil);
+    try
+      LBody := LHttp.Get(Format('http://localhost:%d/api/equivalencias?referenciaP=%s&limite=50',
+        [TEST_PORT, TAG_REF]));
+      Assert.AreEqual(200, LHttp.ResponseCode);
+      LArray := TJSONObject.ParseJSONValue(LBody) as TJSONArray;
+      try
+        Assert.AreEqual(1, LArray.Count, 'Debe encontrar exactamente la fila insertada por el test');
+        LItem := LArray.Items[0] as TJSONObject;
+        Assert.AreEqual(777777, LItem.GetValue<Integer>('codigoH'));
+        Assert.AreEqual(3, LItem.GetValue<Integer>('subCodigoH'));
+        Assert.AreEqual('Test Fase 2 List', LItem.GetValue<string>('nombreH'));
+        Assert.AreEqual(TAG_REF, LItem.GetValue<string>('referenciaH'));
+        Assert.AreEqual(TAG_UNI, LItem.GetValue<string>('unidadH'));
+      finally
+        LArray.Free;
+      end;
+    finally
+      LHttp.Free;
+    end;
+  finally
+    LInsertQuery := FirebirdConnection.GetBridgeQuery;
+    try
+      LInsertQuery.SQL.Text := 'DELETE FROM EQUIVALENCIA WHERE REFERENCIAH = :REFH AND UNIDADH = :UNIH';
+      LInsertQuery.ParamByName('REFH').AsString := TAG_REF;
+      LInsertQuery.ParamByName('UNIH').AsString := TAG_UNI;
+      LInsertQuery.ExecSQL;
+    finally
+      LInsertQuery.Free;
+    end;
   end;
 end;
 
