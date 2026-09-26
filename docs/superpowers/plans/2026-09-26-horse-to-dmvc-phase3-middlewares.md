@@ -448,6 +448,16 @@ begin
     AContext.Response.RawWebResponse.StatusCode := 403;
     AContext.Response.RawWebResponse.ContentType := TMVCMediaType.APPLICATION_JSON + '; charset=utf-8';
     AContext.Response.RawWebResponse.Content := LJson.ToJSON;
+    // CRITICO (descubierto empiricamente en la Task 1 de esta fase, ver
+    // DMVC.Middleware.CORS.pas): bajo el hosting TIdHTTPWebBrokerBridge de
+    // este proyecto, TMVCEngine.InternalExecuteAction.Result NUNCA se vuelve
+    // True solo porque un middleware puso AHandled:=True en OnBeforeRouting
+    // -- eso deja que TWebRequestHandler.HandleRequest omita el envio de la
+    // respuesta por completo (status/headers/body quedan descartados en
+    // silencio), sin importar si el body esta vacio o no. Hay que llamar
+    // SendResponse explicitamente ANTES de marcar AHandled, igual que hace
+    // TMVCEngine.OnBeforeDispatch en su propio manejo de excepciones.
+    AContext.Response.RawWebResponse.SendResponse;
   finally
     LJson.Free;
   end;
@@ -599,6 +609,8 @@ git commit -m "feat: migrate license guard middleware to DMVCFramework"
 - Produces: nada que otras tasks consuman.
 
 **Patrón (de NexoPago, adaptado)**: envolver `TMVCStaticFilesMiddleware('/', <carpeta>, 'index.html', True)` con un wrapper que en `OnBeforeRouting` excluye por prefijo (`/api`, `/auth`, `/licencia`, o exacto `/ping` — el set completo de `IsExcludedPath` de Horse) ANTES de delegar al middleware interno. Si no excluyes, `AStaticFilesPath='/'` matchea CUALQUIER ruta (toda ruta HTTP empieza con `/`) y el fallback SPA se comería `/api/equivalencias` devolviendo `index.html` con 200 en vez de dejarlo llegar a los controllers.
+
+**ADVERTENCIA de la Task 1 de esta fase (verificar, no asumir)**: se descubrió empíricamente que bajo el hosting `TIdHTTPWebBrokerBridge` de este proyecto, un middleware que corta la cadena con `AHandled:=True` en `OnBeforeRouting` puede no enviar la respuesta en absoluto (`TMVCEngine.InternalExecuteAction.Result` no se vuelve `True` solo por eso) salvo que llame `SendResponse` explícitamente — ver el fix real en `DMVC.Middleware.CORS.pas` (commit de la Task 1) y el equivalente aplicado en `DMVC.Middleware.License.pas` (Task 2). `TMVCStaticFilesMiddleware` es código de framework, probablemente ya maneja esto correctamente (por algo NexoPago lo usa en producción sin este problema), pero **verifícalo con un test real antes de asumirlo** — si al servir un archivo estático o el fallback SPA la respuesta se pierde/queda vacía, aplica el mismo patrón (`SendResponse` + `ContentStream` si el body queda vacío) en el wrapper `TPurchaseBridgeStaticAppMiddleware`, no en el middleware de stock.
 
 - [ ] **Step 1: Escribir el middleware**
 
@@ -817,6 +829,8 @@ git commit -m "feat: migrate static files/SPA fallback middleware to DMVCFramewo
 **Interfaces:**
 - Consumes: `FirebirdConnection.GetHelisaQuery: TFDQuery` (unidad existente `database/FirebirdConnection.pas`, sin cambios) para consultar `USUARIOS` en `OnAuthentication`. `HConfig`/`uPaths.GetConfigPath` (existentes) para leer `[AUTH] JWTSecret` de `config.ini`.
 - Produces: nada que otras tasks de esta fase consuman — es la última task.
+
+**Nota heredada de la Task 1 (SendResponse)**: `TMVCJWTAuthenticationMiddleware` es código de framework (igual que `TMVCStaticFilesMiddleware`), así que probablemente ya maneja correctamente el envío de sus respuestas 401 bajo este hosting — no deberías necesitar tocar nada al respecto aquí. Si el test `GetEquivalencias_WithoutToken_Returns401` (Step 5) falla de forma rara (conexión se cierra sin excepción `EIdHTTPProtocolException`, o el body queda vacío en vez de traer el mensaje de error del framework), revisa si aplica el mismo problema de `SendResponse`/`ContentStream` documentado en `DMVC.Middleware.CORS.pas` (Task 1) y `DMVC.Middleware.License.pas` (Task 2).
 
 **IMPORTANTE — decisión de arquitectura ya tomada, no la reconsideres**: auth = JWT real (no el modelo de GUID en memoria de Horse). `OnAuthorization` siempre `True` para cualquier usuario autenticado (Horse no tiene permisos granulares). `OnRequest` deniega por defecto salvo `TPingController` (nombre completo de clase, patrón NexoPago) — esto es lo que resuelve el riesgo de auth anotado en el roadmap, no hace falta enrutar por prefijo de URL.
 
