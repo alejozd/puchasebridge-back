@@ -386,9 +386,371 @@ git commit -m "feat: migrate HelisaController to DMVCFramework"
 
 ### Task 2: LicenciaController (4 rutas)
 
-**Objetivo:** `GET /licencia/estado`, `POST /licencia/registrar` (+ alias `/licencia/activar`), `POST /licencia/activar-online` — todas usan `services/LicenseService.pas` (`TLicenciaService`, sin cambios). `GetEstado` llama `ValidarLicencia` (red real) — decidir si se testea automatizado o solo manual. `Registrar`/`ActivarOnline` mutan estado real de licencia — NO automatizar el flujo completo, solo validación de input (400 sin body/código).
+**Files:**
+- Create: `dmvc/Controllers/DMVC.Controllers.LicenciaController.pas`
+- Modify: `dmvc/DMVC.WebModule.Main.pas` (registrar el controller)
+- Create: `tests/DMVC/DMVC.LicenciaControllerTests.pas`
+- Modify: `tests/PurchaseBridge.Tests.dpr`
 
-**Archivos:** `dmvc/DTOs/DMVC.DTOs.Licencia.pas`, `dmvc/Controllers/DMVC.Controllers.LicenciaController.pas`, tests correspondientes.
+**Interfaces:**
+- Consumes: `services/LicenseService.pas` (`TLicenciaService.ValidarLicencia`, `.RegistrarLicencia`, `.ActivarOnline`, `.LicenciaActual`, sin cambios) y `config/HConfig.pas` (`THConfig.GetInstance.License`, sin cambios).
+- No DTOs: el shape de respuesta es dinámico (campos condicionales: `expira` null/fecha, `dias_restantes` null/número, `mensaje_vencimiento`/`requiere_reactivacion`/`detalle` solo en ciertas ramas) — se preserva construyendo `TJSONObject` a mano igual que el Horse original, y se envía con `ContentType := TMVCMediaType.APPLICATION_JSON; Render(LResponse.ToJSON);` (patrón ya usado en `DMVC.Middleware.License.pas` de la Fase 3 para el content-type; `Render(string)` ya existe en `TMVCController`).
+
+**Decisión de testing (importante, ver Global Constraints):** `GetEstado` llama `ValidarLicencia` y `ActivarOnline`/`Registrar` (tras pasar la validación de input) llaman a servicios que hacen peticiones de red reales y pueden mutar el archivo de licencia real — en el entorno de test de este worktree NO hay sección `[LICENCIA]` configurada (mismo hecho ya documentado en la Fase 3 para el guard de licencia dormido), así que ejecutar esas rutas de verdad en un test automatizado dañaría el estado real o fallaría de forma impredecible por falta de red/config. Por lo tanto, los tests automatizados de esta task se limitan a:
+1. La validación de input de `Registrar` (falla ANTES de tocar la red, se puede probar con seguridad).
+2. La protección JWT de las 4 rutas (falla en el middleware, ANTES de que el controller ejecute cualquier llamada de red — seguro de probar).
+
+No se automatiza el camino feliz de `GetEstado`/`Registrar`/`ActivarOnline` contra la red real — queda para verificación manual (Step 6), igual que Fase 3 dejó dormido el guard de licencia.
+
+- [ ] **Step 1: Escribir el controller**
+
+Crear `dmvc/Controllers/DMVC.Controllers.LicenciaController.pas`:
+
+```pascal
+unit DMVC.Controllers.LicenciaController;
+
+interface
+
+uses
+  MVCFramework, MVCFramework.Commons;
+
+type
+  [MVCPath('/')]
+  TLicenciaController = class(TMVCController)
+  public
+    [MVCPath('/licencia/estado')]
+    [MVCPath('/api/licencia/estado')]
+    [MVCHTTPMethod([httpGET])]
+    procedure GetEstado;
+
+    [MVCPath('/licencia/registrar')]
+    [MVCPath('/api/licencia/registrar')]
+    [MVCPath('/licencia/activar')]
+    [MVCPath('/api/licencia/activar')]
+    [MVCHTTPMethod([httpPOST])]
+    procedure Registrar;
+
+    [MVCPath('/licencia/activar-online')]
+    [MVCPath('/api/licencia/activar-online')]
+    [MVCHTTPMethod([httpPOST])]
+    procedure ActivarOnline;
+  end;
+
+implementation
+
+uses
+  System.SysUtils, System.JSON, System.DateUtils,
+  LicenseService, HConfig, uLogger;
+
+procedure BuildEstadoFields(const AResponse: TJSONObject);
+begin
+  AResponse.AddPair('estado', TLicenciaService.LicenciaActual.Estado);
+
+  if TLicenciaService.LicenciaActual.Mensaje = 'Licencia requiere reactivaci' + #243 + 'n' then
+  begin
+    AResponse.AddPair('expira', TJSONNull.Create);
+    AResponse.AddPair('dias_restantes', TJSONNumber.Create(0));
+    AResponse.AddPair('mensaje', TLicenciaService.LicenciaActual.Mensaje);
+    AResponse.AddPair('detalle', 'Licencia activa sin expiraci' + #243 + 'n calculada');
+    AResponse.AddPair('requiere_reactivacion', TJSONBool.Create(True));
+  end
+  else if TLicenciaService.LicenciaActual.EsPermanente then
+  begin
+    AResponse.AddPair('expira', TJSONNull.Create);
+    AResponse.AddPair('dias_restantes', TJSONNull.Create);
+    AResponse.AddPair('mensaje_vencimiento', 'Licencia permanente');
+  end
+  else
+  begin
+    AResponse.AddPair('expira', DateToISO8601(TLicenciaService.LicenciaActual.Expira));
+    AResponse.AddPair('dias_restantes', TJSONNumber.Create(TLicenciaService.LicenciaActual.DiasRestantes));
+  end;
+
+  if TLicenciaService.LicenciaActual.TipoLicencia.Trim.IsEmpty then
+    AResponse.AddPair('tipo_licencia', 'demo')
+  else
+    AResponse.AddPair('tipo_licencia', TLicenciaService.LicenciaActual.TipoLicencia);
+end;
+
+procedure TLicenciaController.GetEstado;
+var
+  LConfig: TLicensingConfig;
+  LResponse: TJSONObject;
+begin
+  LConfig := THConfig.GetInstance.License;
+
+  TLicenciaService.ValidarLicencia(LConfig.Nit, LConfig.InstalacionHash);
+
+  if Assigned(TLicenciaService.LicenciaActual) then
+  begin
+    LResponse := TJSONObject.Create;
+    try
+      BuildEstadoFields(LResponse);
+      LResponse.AddPair('instalacion_hash', LConfig.InstalacionHash);
+      ContentType := TMVCMediaType.APPLICATION_JSON;
+      Render(LResponse.ToJSON);
+    finally
+      LResponse.Free;
+    end;
+  end
+  else
+    raise EMVCException.Create(HTTP_STATUS.NotFound, 'No se pudo obtener el estado de la licencia');
+end;
+
+procedure TLicenciaController.Registrar;
+var
+  LBody: TJSONObject;
+  LCodigo: string;
+  LConfig: TLicensingConfig;
+  LSuccess: Boolean;
+  LResponse: TJSONObject;
+begin
+  LBody := TJSONObject.ParseJSONValue(Context.Request.Body) as TJSONObject;
+  try
+    if not Assigned(LBody) or not LBody.TryGetValue('codigo', LCodigo) then
+      raise EMVCException.Create(HTTP_STATUS.BadRequest, 'C' + #243 + 'digo de registro no proporcionado');
+  finally
+    LBody.Free;
+  end;
+
+  LConfig := THConfig.GetInstance.License;
+  Log('Intento de registro de licencia con c' + #243 + 'digo: ' + LCodigo, llInfo);
+
+  LSuccess := TLicenciaService.RegistrarLicencia(LConfig.Nit, LConfig.InstalacionHash, LCodigo);
+
+  LResponse := TJSONObject.Create;
+  try
+    if not LSuccess and Assigned(TLicenciaService.LicenciaActual) and
+       (TLicenciaService.LicenciaActual.Mensaje = 'Licencia no v' + #225 + 'lida para este equipo') then
+      LResponse.AddPair('error', TLicenciaService.LicenciaActual.Mensaje)
+    else
+    begin
+      LResponse.AddPair('success', TJSONBool.Create(LSuccess));
+      if LSuccess and Assigned(TLicenciaService.LicenciaActual) then
+        LResponse.AddPair('mensaje', TLicenciaService.LicenciaActual.Mensaje)
+      else
+        LResponse.AddPair('mensaje', 'Error al registrar la licencia. Verifique el c' + #243 + 'digo o la conexi' + #243 + 'n.');
+    end;
+
+    ContentType := TMVCMediaType.APPLICATION_JSON;
+    Render(LResponse.ToJSON);
+  finally
+    LResponse.Free;
+  end;
+end;
+
+procedure TLicenciaController.ActivarOnline;
+var
+  LSuccess: Boolean;
+  LResponse: TJSONObject;
+begin
+  Log('Intento de activacion online de licencia', llInfo);
+
+  LSuccess := TLicenciaService.ActivarOnline;
+
+  LResponse := TJSONObject.Create;
+  try
+    LResponse.AddPair('success', TJSONBool.Create(LSuccess));
+    if LSuccess and Assigned(TLicenciaService.LicenciaActual) then
+      BuildEstadoFields(LResponse)
+    else
+      LResponse.AddPair('mensaje', 'Error al activar la licencia online. Verifique su conexi' + #243 + 'n.');
+
+    ContentType := TMVCMediaType.APPLICATION_JSON;
+    Render(LResponse.ToJSON);
+  finally
+    LResponse.Free;
+  end;
+end;
+
+end.
+```
+
+Notas de fidelidad con el Horse original:
+- `GetEstado`/`ActivarOnline` comparten exactamente la misma lógica condicional de campos (`BuildEstadoFields`, extraída como función libre en la sección `implementation` para no duplicar el bloque de 20 líneas dos veces — esto es refactor MECÁNICO sin cambio de comportamiento, no una abstracción nueva de diseño).
+- `Registrar` valida el body ANTES de tocar `LicenseService` — igual que el original — por eso el test de 400 es seguro de automatizar.
+- Errores ahora se señalizan con `raise EMVCException.Create(...)` (convención DMVC ya usada en Fases 2-3) en vez de `Res.Status(...).Send(...)` (convención Horse).
+- `Context.Request.Body` (string) reemplaza `Req.Body<TJSONObject>` de Horse — verificar el nombre exacto de la propiedad en `MVCFramework.pas` (`TWebContext.Request.Body`) antes de compilar; si el nombre real difiere, usar el que corresponda (mismo patrón ya usado en controllers de Fase 2 si alguno parsea JSON crudo).
+
+- [ ] **Step 2: Registrar el controller en el WebModule**
+
+Modificar `dmvc/DMVC.WebModule.Main.pas`: agregar `DMVC.Controllers.LicenciaController` al `uses` y `FEngine.AddController(TLicenciaController);` después de `THelisaController`.
+
+- [ ] **Step 3: Escribir los tests (RED → GREEN)**
+
+Crear `tests/DMVC/DMVC.LicenciaControllerTests.pas` (mismo patrón `TTestServerProcess` + `ObtenerTokenDePrueba` de la Task 1):
+
+```pascal
+unit DMVC.LicenciaControllerTests;
+
+interface
+
+uses
+  DUnitX.TestFramework, DMVC.TestServerProcess;
+
+type
+  [TestFixture]
+  TLicenciaControllerTests = class
+  private
+    FServer: TTestServerProcess;
+    FToken: string;
+  public
+    [Setup]
+    procedure Setup;
+    [TearDown]
+    procedure TearDown;
+
+    [Test]
+    procedure Registrar_WithoutCodigo_Returns400;
+
+    [Test]
+    procedure GetEstado_WithoutToken_Returns401;
+
+    [Test]
+    procedure Registrar_WithoutToken_Returns401;
+
+    [Test]
+    procedure ActivarOnline_WithoutToken_Returns401;
+  end;
+
+implementation
+
+uses
+  System.SysUtils, System.IOUtils, IdHTTP, IdGlobal, DMVC.TestAuthHelper;
+
+const
+  TEST_PORT = 9091;
+
+function ServerExePath: string;
+begin
+  Result := TPath.GetFullPath(TPath.Combine(TPath.GetDirectoryName(ParamStr(0)), '..\..\bin\PurchaseBridgeDMVC.exe'));
+end;
+
+procedure TLicenciaControllerTests.Setup;
+begin
+  FServer := TTestServerProcess.Create;
+  FServer.Start(ServerExePath, TEST_PORT);
+  Assert.IsTrue(FServer.WaitForReady(TEST_PORT), 'El servidor DMVC no respondió a tiempo en /ping');
+  FToken := ObtenerTokenDePrueba(TEST_PORT);
+end;
+
+procedure TLicenciaControllerTests.TearDown;
+begin
+  FServer.Stop;
+  FServer.Free;
+end;
+
+procedure TLicenciaControllerTests.Registrar_WithoutCodigo_Returns400;
+var
+  LHttp: TIdHTTP;
+  LBytes: TIdBytes;
+begin
+  LHttp := TIdHTTP.Create(nil);
+  try
+    LHttp.Request.CustomHeaders.AddValue('Authorization', 'Bearer ' + FToken);
+    LHttp.Request.ContentType := 'application/json';
+    LBytes := IndyTextEncoding_UTF8.GetBytes('{}');
+    try
+      LHttp.Post(Format('http://localhost:%d/api/licencia/registrar', [TEST_PORT]), TIdMemoryStream.Create);
+      Assert.Fail('Se esperaba una excepcion HTTP 400');
+    except
+      on E: EIdHTTPProtocolException do
+        Assert.AreEqual(400, E.ErrorCode);
+    end;
+  finally
+    LHttp.Free;
+  end;
+end;
+
+procedure TLicenciaControllerTests.GetEstado_WithoutToken_Returns401;
+var
+  LHttp: TIdHTTP;
+begin
+  LHttp := TIdHTTP.Create(nil);
+  try
+    try
+      LHttp.Get(Format('http://localhost:%d/api/licencia/estado', [TEST_PORT]));
+      Assert.Fail('Se esperaba una excepcion HTTP 401');
+    except
+      on E: EIdHTTPProtocolException do
+        Assert.AreEqual(401, E.ErrorCode);
+    end;
+  finally
+    LHttp.Free;
+  end;
+end;
+
+procedure TLicenciaControllerTests.Registrar_WithoutToken_Returns401;
+var
+  LHttp: TIdHTTP;
+  LResponse: TStringStream;
+  LRequest: TStringStream;
+begin
+  LHttp := TIdHTTP.Create(nil);
+  LRequest := TStringStream.Create('{"codigo":"X"}', TEncoding.UTF8);
+  LResponse := TStringStream.Create;
+  try
+    LHttp.Request.ContentType := 'application/json';
+    try
+      LHttp.Post(Format('http://localhost:%d/api/licencia/registrar', [TEST_PORT]), LRequest, LResponse);
+      Assert.Fail('Se esperaba una excepcion HTTP 401');
+    except
+      on E: EIdHTTPProtocolException do
+        Assert.AreEqual(401, E.ErrorCode);
+    end;
+  finally
+    LRequest.Free;
+    LResponse.Free;
+    LHttp.Free;
+  end;
+end;
+
+procedure TLicenciaControllerTests.ActivarOnline_WithoutToken_Returns401;
+var
+  LHttp: TIdHTTP;
+  LResponse: TStringStream;
+begin
+  LHttp := TIdHTTP.Create(nil);
+  LResponse := TStringStream.Create;
+  try
+    try
+      LHttp.Post(Format('http://localhost:%d/api/licencia/activar-online', [TEST_PORT]), TStream(nil), LResponse);
+      Assert.Fail('Se esperaba una excepcion HTTP 401');
+    except
+      on E: EIdHTTPProtocolException do
+        Assert.AreEqual(401, E.ErrorCode);
+    end;
+  finally
+    LResponse.Free;
+    LHttp.Free;
+  end;
+end;
+
+end.
+```
+
+**Antes de escribir el código final, quien implemente debe:**
+1. Revisar `tests/DMVC/DMVC.EquivalenciaControllerTests.pas` o `DMVC.ProveedorControllerTests.pas` (Fase 2/3) para copiar el patrón EXACTO de cómo se hace un POST con body JSON vía `TIdHTTP` en este proyecto (el snippet de `Registrar_WithoutCodigo_Returns400`/`Registrar_WithoutToken_Returns401` de arriba es ilustrativo del INTENTO, no necesariamente sintácticamente perfecto para `TIdHTTP.Post` — unificar con el helper/patrón que ya exista, en vez de introducir uno nuevo).
+2. Verificar la firma real de `ObtenerTokenDePrueba`.
+
+Modificar `tests/PurchaseBridge.Tests.dpr`: agregar `DMVC.LicenciaControllerTests in 'DMVC\DMVC.LicenciaControllerTests.pas';`.
+
+Compilar servidor + tests (mismas rutas `-U` que la Task 1, sin carpetas nuevas ya que no hay DTOs nuevos). Correr la suite completa — deben pasar los 18 anteriores + 4 nuevos = 22.
+
+- [ ] **Step 4: Verificación manual (camino feliz, NO automatizado)**
+
+Con el server corriendo y un token válido:
+- `curl -H "Authorization: Bearer <token>" http://localhost:9091/api/licencia/estado` → observar respuesta (puede fallar por falta de `[LICENCIA]` en `config.ini` de este entorno — está bien, documentar el resultado observado tal cual, igual que se documentó el guard dormido en la Fase 3).
+- NO ejecutar `registrar`/`activar-online` con datos reales a menos que el usuario lo pida explícitamente (mutan estado real de licencia).
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add dmvc/Controllers/DMVC.Controllers.LicenciaController.pas dmvc/DMVC.WebModule.Main.pas tests/DMVC/DMVC.LicenciaControllerTests.pas tests/PurchaseBridge.Tests.dpr
+git commit -m "feat: migrate LicenciaController to DMVCFramework"
+```
+
+**Después de este commit: PARAR y pedir aprobación del usuario antes de escribir el detalle de la Task 3.**
 
 ### Task 3: XmlValidationController (2 rutas)
 
