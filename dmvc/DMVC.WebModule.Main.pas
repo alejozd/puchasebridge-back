@@ -42,6 +42,9 @@ begin
   finally
     LIni.Free;
   end;
+  if Length(Result) < 32 then
+    raise Exception.Create('config.ini debe tener [AUTH] JWTSecret con al menos 32 caracteres. ' +
+      'Un secreto vacio o corto permite falsificar tokens JWT validos.');
 end;
 
 constructor TPurchaseBridgeDMVCWebModule.Create(AOwner: TComponent);

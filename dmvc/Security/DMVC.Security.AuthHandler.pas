@@ -6,6 +6,14 @@ uses
   System.Generics.Collections,
   MVCFramework;
 
+const
+  // Ancho de USUARIOS.NOMBRE (VARCHAR(15)) en Helisa. Ver comentario en
+  // OnAuthentication: FireDAC deriva el tamano del parametro de esta
+  // metadata y lanza EFDException si AUserName la excede, ANTES de abrir
+  // la consulta -- se usa esta constante para descartar ese caso temprano
+  // sin tocar ParamByName(...).Size.
+  HELISA_USUARIOS_NOMBRE_MAXLEN = 15;
+
 type
   TPurchaseBridgeAuthHandler = class(TInterfacedObject, IMVCAuthenticationHandler)
   public
@@ -49,16 +57,14 @@ begin
   // large for variable") si AUserName excede ese ancho, ANTES de abrir la
   // consulta. Un username mas largo que la columna nunca puede coincidir con
   // ningun usuario real, asi que se descarta antes de tocar la base -- evita
-  // el crash sin necesitar conocer/hardcodear el ancho exacto de la columna
-  // (que ademas podria variarse entre instalaciones de Helisa) y sin tocar
-  // ParamByName(...).Size (probado: fijar Size manualmente antes de Prepare
-  // desincroniza el ciclo de vida del cursor de FireDAC/Firebird y produce un
-  // EIBNativeException "Attempt to reclose a closed cursor" distinto, peor,
-  // en este entorno). services/AuthService.pas tiene el mismo patron original
-  // sin ningun guard (no se modifica, por restriccion explicita de esta
-  // task) y hereda el mismo bug preexistente para usernames largos -- fuera
-  // de alcance aqui.
-  if Length(AUserName) > 15 then
+  // el crash sin tocar ParamByName(...).Size (probado: fijar Size manualmente
+  // antes de Prepare desincroniza el ciclo de vida del cursor de
+  // FireDAC/Firebird y produce un EIBNativeException "Attempt to reclose a
+  // closed cursor" distinto, peor, en este entorno). services/AuthService.pas
+  // tiene el mismo patron original sin ningun guard (no se modifica, por
+  // restriccion explicita de esta task) y hereda el mismo bug preexistente
+  // para usernames largos -- fuera de alcance aqui.
+  if Length(AUserName) > HELISA_USUARIOS_NOMBRE_MAXLEN then
     Exit;
 
   LQuery := FirebirdConnection.GetHelisaQuery;

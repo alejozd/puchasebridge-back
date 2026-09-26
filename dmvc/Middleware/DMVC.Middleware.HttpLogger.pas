@@ -6,10 +6,15 @@ uses
   MVCFramework;
 
 type
-  // Mide la duracion desde OnBeforeRouting hasta OnAfterControllerAction y
-  // loguea con el mismo filtro que uHttpLoggerMiddleware.pas (Horse): siempre
-  // loguea errores (status >= 400), excluye assets/estaticos, siempre loguea
-  // api/auth/licencia/ping.
+  // Mide la duracion desde OnBeforeRouting hasta OnAfterRouting y loguea con
+  // el mismo filtro que uHttpLoggerMiddleware.pas (Horse): siempre loguea
+  // errores (status >= 400), excluye assets/estaticos, siempre loguea
+  // api/auth/licencia/ping. Se loguea en OnAfterRouting (no en
+  // OnAfterControllerAction) porque el engine de DMVCFramework NO llama a
+  // OnAfterControllerAction cuando la ruta no matchea (404) o cuando una
+  // excepcion/rechazo de auth corta el flujo antes del controller action
+  // (401 de JWT, 403 del guard de licencia) -- OnAfterRouting si se ejecuta
+  // siempre, verificado contra MVCFramework.pas.
   TPurchaseBridgeTraceMiddleware = class(TInterfacedObject, IMVCMiddleware)
   private const
     START_TICK_KEY = 'purchasebridge.trace.starttick';
@@ -67,6 +72,11 @@ end;
 
 procedure TPurchaseBridgeTraceMiddleware.OnAfterControllerAction(AContext: TWebContext;
   const AControllerQualifiedClassName: string; const AActionName: string; const AHandled: Boolean);
+begin
+  // No-op.
+end;
+
+procedure TPurchaseBridgeTraceMiddleware.OnAfterRouting(AContext: TWebContext; const AHandled: Boolean);
 var
   LStartTickStr: string;
   LStartTick: Int64;
@@ -85,11 +95,6 @@ begin
   if ShouldLogRequest(LPath, LStatus) then
     uLogger.LogInfo(Format('%s %s -> %d (%dms)',
       [AContext.Request.HTTPMethodAsString, LPath, LStatus, LDuration]), 'http');
-end;
-
-procedure TPurchaseBridgeTraceMiddleware.OnAfterRouting(AContext: TWebContext; const AHandled: Boolean);
-begin
-  // No-op.
 end;
 
 end.
