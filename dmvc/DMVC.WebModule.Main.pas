@@ -26,7 +26,8 @@ uses
   DMVC.Controllers.ProveedorController,
   DMVC.Middleware.HttpLogger,
   DMVC.Middleware.CORS,
-  DMVC.Middleware.License;
+  DMVC.Middleware.License,
+  DMVC.Middleware.StaticApp;
 
 constructor TPurchaseBridgeDMVCWebModule.Create(AOwner: TComponent);
 begin
@@ -35,6 +36,8 @@ begin
   FEngine.AddMiddleware(TPurchaseBridgeTraceMiddleware.Create);
   FEngine.AddMiddleware(TPurchaseBridgeCORSMiddleware.Create);
   FEngine.AddMiddleware(TPurchaseBridgeLicenseMiddleware.Create);
+  FEngine.AddMiddleware(TPurchaseBridgeStaticAppMiddleware.Create(
+    ExtractFilePath(ParamStr(0)) + 'www'));
   FEngine.AddController(TPingController);
   FEngine.AddController(TEquivalenciaController);
   FEngine.AddController(TProveedorController);

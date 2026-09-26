@@ -20,7 +20,8 @@ uses
   DMVC.EquivalenciaControllerTests in 'DMVC\DMVC.EquivalenciaControllerTests.pas',
   DMVC.ProveedorControllerTests in 'DMVC\DMVC.ProveedorControllerTests.pas',
   DMVC.CORSMiddlewareTests in 'DMVC\DMVC.CORSMiddlewareTests.pas',
-  DMVC.LicenseMiddlewareTests in 'DMVC\DMVC.LicenseMiddlewareTests.pas';
+  DMVC.LicenseMiddlewareTests in 'DMVC\DMVC.LicenseMiddlewareTests.pas',
+  DMVC.StaticAppMiddlewareTests in 'DMVC\DMVC.StaticAppMiddlewareTests.pas';
 
 var
   runner: ITestRunner;
