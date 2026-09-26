@@ -19,7 +19,8 @@ uses
   DMVC.PingControllerTests in 'DMVC\DMVC.PingControllerTests.pas',
   DMVC.EquivalenciaControllerTests in 'DMVC\DMVC.EquivalenciaControllerTests.pas',
   DMVC.ProveedorControllerTests in 'DMVC\DMVC.ProveedorControllerTests.pas',
-  DMVC.CORSMiddlewareTests in 'DMVC\DMVC.CORSMiddlewareTests.pas';
+  DMVC.CORSMiddlewareTests in 'DMVC\DMVC.CORSMiddlewareTests.pas',
+  DMVC.LicenseMiddlewareTests in 'DMVC\DMVC.LicenseMiddlewareTests.pas';
 
 var
   runner: ITestRunner;
