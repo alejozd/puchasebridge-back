@@ -393,11 +393,15 @@ En la sección `type`, dentro de `TEquivalenciaControllerTests`, agregar:
 ```
 
 En `implementation`, agregar el cuerpo:
+**CORRECCIÓN (post Task 1, con evidencia real de la base de pruebas — no copiar los valores originales de abajo, usar los corregidos):**
+1. `UNIDADH` es `VARCHAR(5)` en el schema real (`database/scripts/create_tables.txt`) — el tag `__PHASE2TEST__UNI` (18 caracteres) NO CABE. Usar un tag corto de máximo 5 caracteres, p.ej. `P2T2` (el fix de la Task 1 ya usó `P2TU` para su propio tag — usa uno DISTINTO para no chocar con filas que ese test pueda dejar, aunque ese test limpia después de sí mismo).
+2. Más importante — **`referenciaH`/`unidadH` deben enviarse en el body con el MISMO valor que `referenciaP`/`unidadP`**. Motivo: `EliminarEquivalencia` (llamada por el `DELETE`) filtra internamente por las columnas `REFERENCIAH`/`UNIDADH` (ver la nota de comportamiento preexistente en Global Constraints) — si el POST de este test solo llena `REFERENCIAP`/`UNIDADP` y deja `REFERENCIAH`/`UNIDADH` vacíos (comportamiento por defecto si no se envían en el body), el `DELETE` posterior no va a encontrar la fila (busca por `REFERENCIAH`/`UNIDADH`, que quedaron vacíos) y el test fallaría con 404 en el `Delete`. Esto no es un bug del test, es una consecuencia directa de la inconsistencia preexistente que este plan decidió preservar — el test tiene que trabajar CON ella, no ignorarla.
+
 ```pascal
 procedure TEquivalenciaControllerTests.CreateThenDeleteEquivalencia_RoundTrips;
 const
-  TEST_REF = '__PHASE2TEST__REF';
-  TEST_UNI = '__PHASE2TEST__UNI';
+  TEST_REF = 'P2T2REF'; // cabe en REFERENCIAP(50)/REFERENCIAH(40)
+  TEST_UNI = 'P2T2'; // 4 caracteres — DEBE caber en UNIDADH VARCHAR(5)
 var
   LHttp: TIdHTTP;
   LBodyJson: TJSONObject;
@@ -407,7 +411,9 @@ var
 begin
   LHttp := TIdHTTP.Create(nil);
   try
-    // 1. Crear
+    // 1. Crear — referenciaH/unidadH se envian IGUALES a referenciaP/unidadP a
+    // proposito, para que el DELETE (que filtra por REFERENCIAH/UNIDADH, ver
+    // nota de comportamiento preexistente) despues SI encuentre la fila.
     LBodyJson := TJSONObject.Create;
     try
       LBodyJson.AddPair('codigoH', TJSONNumber.Create(999999));
