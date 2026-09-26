@@ -25,6 +25,7 @@ uses
   DMVC.Controllers.PingController,
   DMVC.Controllers.EquivalenciaController,
   DMVC.Controllers.ProveedorController,
+  DMVC.Controllers.HelisaController,
   DMVC.Middleware.HttpLogger,
   DMVC.Middleware.CORS,
   DMVC.Middleware.License,
@@ -66,6 +67,7 @@ begin
   FEngine.AddController(TPingController);
   FEngine.AddController(TEquivalenciaController);
   FEngine.AddController(TProveedorController);
+  FEngine.AddController(THelisaController);
 end;
 
 destructor TPurchaseBridgeDMVCWebModule.Destroy;

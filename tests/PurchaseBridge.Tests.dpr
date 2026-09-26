@@ -23,7 +23,8 @@ uses
   DMVC.LicenseMiddlewareTests in 'DMVC\DMVC.LicenseMiddlewareTests.pas',
   DMVC.StaticAppMiddlewareTests in 'DMVC\DMVC.StaticAppMiddlewareTests.pas',
   DMVC.AuthTests in 'DMVC\DMVC.AuthTests.pas',
-  DMVC.TestAuthHelper in 'DMVC\DMVC.TestAuthHelper.pas';
+  DMVC.TestAuthHelper in 'DMVC\DMVC.TestAuthHelper.pas',
+  DMVC.HelisaControllerTests in 'DMVC\DMVC.HelisaControllerTests.pas';
 
 var
   runner: ITestRunner;
