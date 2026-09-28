@@ -31,7 +31,8 @@ uses
   DMVC.DocumentosControllerTests in 'DMVC\DMVC.DocumentosControllerTests.pas',
   DMVC.AuthMeTests in 'DMVC\DMVC.AuthMeTests.pas',
   DMVC.XmlControllerReadTests in 'DMVC\DMVC.XmlControllerReadTests.pas',
-  DMVC.XmlControllerWriteTests in 'DMVC\DMVC.XmlControllerWriteTests.pas';
+  DMVC.XmlControllerWriteTests in 'DMVC\DMVC.XmlControllerWriteTests.pas',
+  DMVC.ServerBootstrapTests in 'DMVC\DMVC.ServerBootstrapTests.pas';
 
 var
   runner: ITestRunner;
