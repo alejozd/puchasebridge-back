@@ -23,7 +23,7 @@ var
 implementation
 
 uses
-  ServerMain,
+  DMVC.ServerMain,
   uLogger;
 
 {$R *.dfm}
@@ -43,7 +43,7 @@ begin
   try
     Log('PurchaseBridgeService iniciando...', llInfo);
 
-    // Inicio del backend Horse en hilo separado para no bloquear el SCM.
+    // Inicio del backend DMVC en hilo separado para no bloquear el SCM.
     StartServer(True, 3, 5000);
 
     Log('PurchaseBridgeService iniciado.', llInfo);
@@ -62,7 +62,7 @@ begin
   try
     Log('PurchaseBridgeService deteniendose...', llInfo);
 
-    // Parada segura del backend Horse al recibir STOP del servicio.
+    // Parada segura del backend DMVC al recibir STOP del servicio.
     StopServer;
 
     Log('PurchaseBridgeService detenido.', llInfo);

@@ -124,24 +124,31 @@
         <DelphiCompile Include="$(MainSource)">
             <MainSource>MainSource</MainSource>
         </DelphiCompile>
-        <DCCReference Include="ServerBootstrap.pas"/>
-        <DCCReference Include="ServerMain.pas"/>
+        <DCCReference Include="dmvc\DMVC.ServerBootstrap.pas"/>
+        <DCCReference Include="dmvc\DMVC.ServerMain.pas"/>
+        <DCCReference Include="dmvc\DMVC.WebModule.Main.pas"/>
+        <DCCReference Include="dmvc\Controllers\DMVC.Controllers.AuthController.pas"/>
+        <DCCReference Include="dmvc\Controllers\DMVC.Controllers.DocumentosController.pas"/>
+        <DCCReference Include="dmvc\Controllers\DMVC.Controllers.EquivalenciaController.pas"/>
+        <DCCReference Include="dmvc\Controllers\DMVC.Controllers.HelisaController.pas"/>
+        <DCCReference Include="dmvc\Controllers\DMVC.Controllers.ImportController.pas"/>
+        <DCCReference Include="dmvc\Controllers\DMVC.Controllers.LicenciaController.pas"/>
+        <DCCReference Include="dmvc\Controllers\DMVC.Controllers.PingController.pas"/>
+        <DCCReference Include="dmvc\Controllers\DMVC.Controllers.ProveedorController.pas"/>
+        <DCCReference Include="dmvc\Controllers\DMVC.Controllers.XmlController.pas"/>
+        <DCCReference Include="dmvc\Controllers\DMVC.Controllers.XmlValidationController.pas"/>
+        <DCCReference Include="dmvc\DTOs\DMVC.DTOs.Equivalencia.pas"/>
+        <DCCReference Include="dmvc\DTOs\DMVC.DTOs.EquivalenciaCreate.pas"/>
+        <DCCReference Include="dmvc\DTOs\DMVC.DTOs.Helisa.pas"/>
+        <DCCReference Include="dmvc\DTOs\DMVC.DTOs.Proveedor.pas"/>
+        <DCCReference Include="dmvc\Middleware\DMVC.Middleware.CORS.pas"/>
+        <DCCReference Include="dmvc\Middleware\DMVC.Middleware.HttpLogger.pas"/>
+        <DCCReference Include="dmvc\Middleware\DMVC.Middleware.License.pas"/>
+        <DCCReference Include="dmvc\Middleware\DMVC.Middleware.StaticApp.pas"/>
+        <DCCReference Include="dmvc\Security\DMVC.Security.AuthHandler.pas"/>
+        <DCCReference Include="dmvc\Security\DMVC.Security.JWTClaims.pas"/>
         <DCCReference Include="config\HConfig.pas"/>
-        <DCCReference Include="controllers\AuthController.pas"/>
-        <DCCReference Include="controllers\DocumentosController.pas"/>
-        <DCCReference Include="controllers\EquivalenciaController.pas"/>
-        <DCCReference Include="controllers\HelisaController.pas"/>
-        <DCCReference Include="controllers\ImportController.pas"/>
-        <DCCReference Include="controllers\LicenciaController.pas"/>
-        <DCCReference Include="controllers\ProveedorController.pas"/>
-        <DCCReference Include="controllers\XmlController.pas"/>
-        <DCCReference Include="controllers\XmlValidationController.pas"/>
         <DCCReference Include="database\FirebirdConnection.pas"/>
-        <DCCReference Include="middleware\AuthMiddleware.pas"/>
-        <DCCReference Include="middleware\CORSMiddleware.pas"/>
-        <DCCReference Include="middleware\LicenseMiddleware.pas"/>
-        <DCCReference Include="middleware\uStaticFilesMiddleware.pas"/>
-        <DCCReference Include="middleware\uHttpLoggerMiddleware.pas"/>
         <DCCReference Include="repositories\ProductoRepository.pas"/>
         <DCCReference Include="repositories\ProveedorRepository.pas"/>
         <DCCReference Include="service\PurchaseBridge.Service.pas">
@@ -149,7 +156,6 @@
             <FormType>dfm</FormType>
             <DesignClass>TService</DesignClass>
         </DCCReference>
-        <DCCReference Include="services\AuthService.pas"/>
         <DCCReference Include="services\DianUnits.pas"/>
         <DCCReference Include="services\DocumentoService.pas"/>
         <DCCReference Include="services\EquivalenciaService.pas"/>
@@ -159,7 +165,6 @@
         <DCCReference Include="services\XMLFacturaService.pas"/>
         <DCCReference Include="services\XmlParserService.pas"/>
         <DCCReference Include="services\XmlPersistenceService.pas"/>
-        <DCCReference Include="utils\ErrorResponseUtils.pas"/>
         <DCCReference Include="utils\HelisaUtils.pas"/>
         <DCCReference Include="utils\uLogger.pas"/>
         <DCCReference Include="utils\uPaths.pas"/>
