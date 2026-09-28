@@ -756,9 +756,571 @@ git commit -m "feat: migrate LicenciaController to DMVCFramework"
 
 ### Task 3: XmlValidationController (2 rutas)
 
-**Objetivo:** `POST /xml/validate` (body `{fileName}`, lee de `GetInputPath`), `POST /xml/validate/batch` (body `{files:[...]}` o todos los `.xml` de Input si no se especifica). Usa `XmlParserService`/`XmlPersistenceService`/`ValidationService`/`uPaths` (sin cambios). El response shape es un JSON armado a mano con muchos campos (`valido`, `requiereHomologacion`, `proveedorExiste`, `productos`, `errores`, etc.) — decidir si se modela como DTO completo o se preserva como JSON crudo vía `TJSONObject`/`IMVCResponse` dado lo dinámico del shape.
+**Files:**
+- Create: `dmvc/Controllers/DMVC.Controllers.XmlValidationController.pas`
+- Modify: `dmvc/DMVC.WebModule.Main.pas` (registrar el controller)
+- Create: `tests/DMVC/DMVC.XmlValidationControllerTests.pas`
+- Modify: `tests/PurchaseBridge.Tests.dpr`
 
-**Archivos:** `dmvc/Controllers/DMVC.Controllers.XmlValidationController.pas`, tests correspondientes.
+**Interfaces:**
+- Consumes: `services/XmlParserService.pas` (`TXmlParserService.Parse`, `TParsedInvoice`), `services/XmlPersistenceService.pas` (`UpsertXMLInvoice`), `services/ValidationService.pas` (`ValidarDocumento`), `utils/uPaths.pas` (`GetInputPath`) — todos sin cambios.
+- Sin DTOs: mismo criterio que la Task 2 — el shape de respuesta es dinámico (`valido`/`requiereHomologacion`/`proveedorExiste`/`productos`/`errores` varían según la rama), se preserva construyendo `TJSONObject` a mano y enviando con `ContentType := TMVCMediaType.APPLICATION_JSON;` + `Render(...)`.
+
+**Decisión de testing (mismo criterio de seguridad que la Task 2):** `InternalValidateFile` (función compartida por ambas rutas) NUNCA lanza excepción — atrapa todo internamente y siempre devuelve HTTP 200 con el resultado embebido en el JSON (`valido:true/false`). El único caso de error HTTP real (400) es la validación de `fileName` faltante en `Validate`, que ocurre ANTES de tocar el filesystem — segura de automatizar. Para cubrir el resto del comportamiento SIN depender de archivos XML reales ni escribir en las tablas de staging reales (`UpsertXMLInvoice` sí persiste si el parseo tiene éxito), los tests usan nombres de archivo que DETERMINÍSTICAMENTE no existen en el disco — eso dispara la rama "Archivo no encontrado" (la primera guarda de `InternalValidateFile`, antes de leer/parsear/persistir nada), que es 100% determinística y no requiere red ni DB. No se prueba el camino feliz completo (XML real parseado + persistido) en esta task — igual que Fase 3 dejó dormido el guard de licencia y la Task 2 dejó sin automatizar el camino de red real.
+
+- [ ] **Step 1: Escribir el controller**
+
+Crear `dmvc/Controllers/DMVC.Controllers.XmlValidationController.pas`:
+
+```pascal
+unit DMVC.Controllers.XmlValidationController;
+
+interface
+
+uses
+  MVCFramework, MVCFramework.Commons;
+
+type
+  [MVCPath('/')]
+  TXmlValidationController = class(TMVCController)
+  public
+    [MVCPath('/xml/validate')]
+    [MVCPath('/api/xml/validate')]
+    [MVCHTTPMethod([httpPOST])]
+    procedure Validate;
+
+    [MVCPath('/xml/validate/batch')]
+    [MVCPath('/api/xml/validate/batch')]
+    [MVCHTTPMethod([httpPOST])]
+    procedure ValidateBatch;
+  end;
+
+implementation
+
+uses
+  System.SysUtils, System.JSON, System.IOUtils, System.Classes,
+  XmlParserService, XmlPersistenceService, ValidationService, uPaths;
+
+function ParsedInvoiceToJSONObject(const AParsedInvoice: TParsedInvoice): TJSONObject;
+var
+  LProveedor, LTotales, LProducto: TJSONObject;
+  LProductosArr: TJSONArray;
+  I: Integer;
+begin
+  Result := TJSONObject.Create;
+  try
+    LProveedor := TJSONObject.Create;
+    LProveedor.AddPair('nit', AParsedInvoice.Provider.NIT);
+    LProveedor.AddPair('nombre', AParsedInvoice.Provider.Nombre);
+    LProveedor.AddPair('nombreLegal', AParsedInvoice.Provider.NombreLegal);
+    LProveedor.AddPair('tipoIdentificacion', AParsedInvoice.Provider.TipoIdentificacion);
+    LProveedor.AddPair('direccion', AParsedInvoice.Provider.Direccion);
+    Result.AddPair('proveedor', LProveedor);
+
+    LProductosArr := TJSONArray.Create;
+    for I := 0 to Length(AParsedInvoice.Products) - 1 do
+    begin
+      LProducto := TJSONObject.Create;
+      LProducto.AddPair('idLinea', AParsedInvoice.Products[I].IDLinea);
+      LProducto.AddPair('descripcion', AParsedInvoice.Products[I].Descripcion);
+      LProducto.AddPair('referencia', AParsedInvoice.Products[I].Referencia);
+      LProducto.AddPair('referenciaEstandar', AParsedInvoice.Products[I].ReferenciaEstandar);
+      LProducto.AddPair('cantidad', TJSONNumber.Create(AParsedInvoice.Products[I].Cantidad));
+      LProducto.AddPair('unidadXML', AParsedInvoice.Products[I].Unidad);
+      LProducto.AddPair('precioBase', TJSONNumber.Create(AParsedInvoice.Products[I].PrecioBase));
+      LProducto.AddPair('valorUnitario', TJSONNumber.Create(AParsedInvoice.Products[I].ValorUnitario));
+      LProducto.AddPair('valorTotal', TJSONNumber.Create(AParsedInvoice.Products[I].ValorTotal));
+      LProducto.AddPair('impuesto', TJSONNumber.Create(AParsedInvoice.Products[I].Impuesto));
+      LProducto.AddPair('porcentajeImpuesto', TJSONNumber.Create(AParsedInvoice.Products[I].ImpuestoPorcentaje));
+      LProductosArr.Add(LProducto);
+    end;
+    Result.AddPair('productos', LProductosArr);
+
+    LTotales := TJSONObject.Create;
+    LTotales.AddPair('subtotal', TJSONNumber.Create(AParsedInvoice.Totals.Subtotal));
+    LTotales.AddPair('taxExclusiveAmount', TJSONNumber.Create(AParsedInvoice.Totals.TaxExclusiveAmount));
+    LTotales.AddPair('taxInclusiveAmount', TJSONNumber.Create(AParsedInvoice.Totals.TaxInclusiveAmount));
+    LTotales.AddPair('impuestoTotal', TJSONNumber.Create(AParsedInvoice.Totals.ImpuestoTotal));
+    LTotales.AddPair('total', TJSONNumber.Create(AParsedInvoice.Totals.Total));
+    Result.AddPair('totales', LTotales);
+  except
+    Result.Free;
+    raise;
+  end;
+end;
+
+function InternalValidateFile(const AFileName: string): TJSONObject;
+var
+  LPath, LFullFile, LXMLContent, LParsedJSONStr, LValidationResult: string;
+  LParsedInvoice: TParsedInvoice;
+  LParsedObj: TJSONObject;
+  LErroresArray: TJSONArray;
+  LVal: TJSONValue;
+begin
+  try
+    LPath := GetInputPath;
+    LFullFile := TPath.Combine(LPath, AFileName);
+
+    if not TFile.Exists(LFullFile) then
+    begin
+      Result := TJSONObject.Create;
+      Result.AddPair('fileName', AFileName);
+      Result.AddPair('valido', TJSONBool.Create(False));
+      Result.AddPair('requiereHomologacion', TJSONBool.Create(False));
+      Result.AddPair('proveedorExiste', TJSONBool.Create(False));
+      Result.AddPair('productos', TJSONArray.Create);
+      LErroresArray := TJSONArray.Create;
+      LErroresArray.Add('Archivo no encontrado');
+      Result.AddPair('errores', LErroresArray);
+      Exit;
+    end;
+
+    try
+      LXMLContent := TFile.ReadAllText(LFullFile, TEncoding.UTF8);
+    except
+      on E: Exception do
+      begin
+        Result := TJSONObject.Create;
+        Result.AddPair('fileName', AFileName);
+        Result.AddPair('valido', TJSONBool.Create(False));
+        Result.AddPair('requiereHomologacion', TJSONBool.Create(False));
+        Result.AddPair('proveedorExiste', TJSONBool.Create(False));
+        Result.AddPair('productos', TJSONArray.Create);
+        LErroresArray := TJSONArray.Create;
+        LErroresArray.Add('Error al leer el archivo: ' + E.Message);
+        Result.AddPair('errores', LErroresArray);
+        Exit;
+      end;
+    end;
+
+    try
+      LParsedInvoice := TXmlParserService.Parse(LXMLContent);
+      LParsedObj := ParsedInvoiceToJSONObject(LParsedInvoice);
+      try
+        LParsedJSONStr := LParsedObj.ToJSON;
+      finally
+        LParsedObj.Free;
+      end;
+    except
+      on E: Exception do
+      begin
+        Result := TJSONObject.Create;
+        Result.AddPair('fileName', AFileName);
+        Result.AddPair('valido', TJSONBool.Create(False));
+        Result.AddPair('requiereHomologacion', TJSONBool.Create(False));
+        Result.AddPair('proveedorExiste', TJSONBool.Create(False));
+        Result.AddPair('productos', TJSONArray.Create);
+        LErroresArray := TJSONArray.Create;
+        LErroresArray.Add('XML inválido o error en parseo: ' + E.Message);
+        Result.AddPair('errores', LErroresArray);
+        Exit;
+      end;
+    end;
+
+    try
+      LValidationResult := ValidarDocumento(LParsedJSONStr);
+
+      try
+        UpsertXMLInvoice(AFileName, LParsedInvoice);
+      except
+        // Non-blocking error for staging
+      end;
+
+      LVal := TJSONObject.ParseJSONValue(LValidationResult);
+      if LVal is TJSONObject then
+      begin
+        Result := LVal as TJSONObject;
+        if Result.GetValue('fileName') = nil then
+          Result.AddPair('fileName', AFileName);
+      end
+      else
+      begin
+        if Assigned(LVal) then LVal.Free;
+        Result := TJSONObject.Create;
+        Result.AddPair('fileName', AFileName);
+        Result.AddPair('valido', TJSONBool.Create(False));
+        Result.AddPair('requiereHomologacion', TJSONBool.Create(False));
+        Result.AddPair('proveedorExiste', TJSONBool.Create(False));
+        Result.AddPair('productos', TJSONArray.Create);
+        LErroresArray := TJSONArray.Create;
+        LErroresArray.Add('Error al procesar el resultado de validación');
+        Result.AddPair('errores', LErroresArray);
+      end;
+    except
+      on E: Exception do
+      begin
+        Result := TJSONObject.Create;
+        Result.AddPair('fileName', AFileName);
+        Result.AddPair('valido', TJSONBool.Create(False));
+        Result.AddPair('requiereHomologacion', TJSONBool.Create(False));
+        Result.AddPair('proveedorExiste', TJSONBool.Create(False));
+        Result.AddPair('productos', TJSONArray.Create);
+        LErroresArray := TJSONArray.Create;
+        LErroresArray.Add('Error en validación: ' + E.Message);
+        Result.AddPair('errores', LErroresArray);
+      end;
+    end;
+  except
+    on E: Exception do
+    begin
+      Result := TJSONObject.Create;
+      Result.AddPair('fileName', AFileName);
+      Result.AddPair('valido', TJSONBool.Create(False));
+      Result.AddPair('requiereHomologacion', TJSONBool.Create(False));
+      Result.AddPair('proveedorExiste', TJSONBool.Create(False));
+      Result.AddPair('productos', TJSONArray.Create);
+      LErroresArray := TJSONArray.Create;
+      LErroresArray.Add('Error inesperado: ' + E.Message);
+      Result.AddPair('errores', LErroresArray);
+    end;
+  end;
+end;
+
+procedure TXmlValidationController.Validate;
+var
+  LBody: TJSONObject;
+  LFileName: string;
+  LHasFileName: Boolean;
+  LResultJSON: TJSONObject;
+  LErroresArr: TJSONArray;
+begin
+  ContentType := TMVCMediaType.APPLICATION_JSON;
+  try
+    LBody := TJSONObject.ParseJSONValue(Context.Request.Body) as TJSONObject;
+    try
+      LHasFileName := Assigned(LBody) and LBody.TryGetValue('fileName', LFileName);
+    finally
+      LBody.Free;
+    end;
+
+    if not LHasFileName then
+    begin
+      LResultJSON := TJSONObject.Create;
+      try
+        LResultJSON.AddPair('fileName', TJSONNull.Create);
+        LResultJSON.AddPair('valido', TJSONBool.Create(False));
+        LResultJSON.AddPair('requiereHomologacion', TJSONBool.Create(False));
+        LErroresArr := TJSONArray.Create;
+        LErroresArr.Add('fileName is required in the body');
+        LResultJSON.AddPair('errores', LErroresArr);
+        Render(HTTP_STATUS.BadRequest, LResultJSON.ToJSON);
+      finally
+        LResultJSON.Free;
+      end;
+      Exit;
+    end;
+
+    LFileName := TPath.GetFileName(LFileName);
+    LResultJSON := InternalValidateFile(LFileName);
+    try
+      Render(LResultJSON.ToJSON);
+    finally
+      LResultJSON.Free;
+    end;
+  except
+    on E: Exception do
+    begin
+      LResultJSON := TJSONObject.Create;
+      try
+        LResultJSON.AddPair('fileName', TJSONNull.Create);
+        LResultJSON.AddPair('valido', TJSONBool.Create(False));
+        LResultJSON.AddPair('requiereHomologacion', TJSONBool.Create(False));
+        LErroresArr := TJSONArray.Create;
+        LErroresArr.Add('Error inesperado: ' + E.Message);
+        LResultJSON.AddPair('errores', LErroresArr);
+        Render(HTTP_STATUS.InternalServerError, LResultJSON.ToJSON);
+      finally
+        LResultJSON.Free;
+      end;
+    end;
+  end;
+end;
+
+procedure TXmlValidationController.ValidateBatch;
+var
+  LBody: TJSONObject;
+  LFilesArr: TJSONArray;
+  LFiles: TStringList;
+  LFileName, LPath: string;
+  LOutputJSON, LSummary: TJSONObject;
+  LDocumentsArr: TJSONArray;
+  LResultDoc: TJSONObject;
+  LValido: Boolean;
+  LTotal, LValidos, LConErrores: Integer;
+  I: Integer;
+  LFilesValue: TJSONValue;
+begin
+  ContentType := TMVCMediaType.APPLICATION_JSON;
+  LFiles := TStringList.Create;
+  try
+    LBody := TJSONObject.ParseJSONValue(Context.Request.Body) as TJSONObject;
+    try
+      if Assigned(LBody) then
+      begin
+        LFilesValue := LBody.GetValue('files');
+        if (LFilesValue <> nil) and (LFilesValue is TJSONArray) then
+        begin
+          LFilesArr := LFilesValue as TJSONArray;
+          for I := 0 to LFilesArr.Count - 1 do
+            LFiles.Add(TPath.GetFileName(LFilesArr.Items[I].Value));
+        end;
+      end;
+    finally
+      LBody.Free;
+    end;
+
+    if LFiles.Count = 0 then
+    begin
+      LPath := GetInputPath;
+      if TDirectory.Exists(LPath) then
+      begin
+        for LFileName in TDirectory.GetFiles(LPath, '*.xml') do
+          LFiles.Add(TPath.GetFileName(LFileName));
+      end;
+    end;
+
+    LOutputJSON := TJSONObject.Create;
+    try
+      LDocumentsArr := TJSONArray.Create;
+      LTotal := LFiles.Count;
+      LValidos := 0;
+      LConErrores := 0;
+
+      for I := 0 to LFiles.Count - 1 do
+      begin
+        LResultDoc := InternalValidateFile(LFiles[I]);
+
+        LValido := False;
+        if (LResultDoc.GetValue('valido') <> nil) and (LResultDoc.GetValue('valido') is TJSONBool) then
+          LValido := (LResultDoc.GetValue('valido') as TJSONBool).AsBoolean;
+
+        if LValido then
+          Inc(LValidos)
+        else
+          Inc(LConErrores);
+
+        LDocumentsArr.Add(LResultDoc);
+      end;
+
+      LOutputJSON.AddPair('documentos', LDocumentsArr);
+
+      LSummary := TJSONObject.Create;
+      LSummary.AddPair('total', TJSONNumber.Create(LTotal));
+      LSummary.AddPair('validos', TJSONNumber.Create(LValidos));
+      LSummary.AddPair('conErrores', TJSONNumber.Create(LConErrores));
+      LOutputJSON.AddPair('resumen', LSummary);
+
+      Render(LOutputJSON.ToJSON);
+    finally
+      LOutputJSON.Free;
+    end;
+  finally
+    LFiles.Free;
+  end;
+end;
+
+end.
+```
+
+Notas de fidelidad con el Horse original:
+- `ParsedInvoiceToJSONObject`/`InternalValidateFile` son copia EXACTA de la lógica de negocio del Horse original (`controllers/XmlValidationController.pas`), solo cambia el contenedor (funciones libres en `implementation` en vez de funciones de unidad Horse) — respetar cada literal de string y cada nombre de campo JSON tal cual (recordar la advertencia de la Task 2 sobre nunca "limpiar" literales copiados de Horse; en esta task no hay literales con espacios sospechosos conocidos, pero aplica el mismo principio general de copiar carácter por carácter).
+- `Res.Status(400).Send(...)` / `Res.Send<TJSONObject>(...)` de Horse se reemplazan por `Render(HTTP_STATUS.BadRequest, json.ToJSON)` / `Render(json.ToJSON)` de DMVC — confirmar que el overload `Render(const AStatusCode: Integer; const AContent: string)` existe en esta versión de `TMVCController` (ya listado en `MVCFramework.pas` de este framework) antes de compilar.
+- `UpsertXMLInvoice` solo se alcanza a llamar cuando el parseo XML tiene éxito — los tests de esta task usan nombres de archivo inexistentes, por lo que NUNCA llegan a esa línea (verificado leyendo el flujo: el `Exit` de "Archivo no encontrado" ocurre antes).
+
+- [ ] **Step 2: Registrar el controller en el WebModule**
+
+Modificar `dmvc/DMVC.WebModule.Main.pas`: agregar `DMVC.Controllers.XmlValidationController` al `uses` y `FEngine.AddController(TXmlValidationController);` después de `TLicenciaController`.
+
+- [ ] **Step 3: Escribir los tests (RED → GREEN)**
+
+Crear `tests/DMVC/DMVC.XmlValidationControllerTests.pas` (mismo patrón `TTestServerProcess` + `ObtenerTokenDePrueba` + `TStringStream` request/response de la Task 2):
+
+```pascal
+unit DMVC.XmlValidationControllerTests;
+
+interface
+
+uses
+  DUnitX.TestFramework, DMVC.TestServerProcess;
+
+type
+  [TestFixture]
+  TXmlValidationControllerTests = class
+  private
+    FServer: TTestServerProcess;
+    FToken: string;
+  public
+    [Setup]
+    procedure Setup;
+    [TearDown]
+    procedure TearDown;
+
+    [Test]
+    procedure Validate_WithoutFileName_Returns400;
+
+    [Test]
+    procedure Validate_WithNonexistentFile_ReturnsValidoFalse;
+
+    [Test]
+    procedure ValidateBatch_WithNonexistentFiles_ReturnsSummary;
+
+    [Test]
+    procedure Validate_WithoutToken_Returns401;
+  end;
+
+implementation
+
+uses
+  System.SysUtils, System.IOUtils, System.JSON, System.Classes, IdHTTP, DMVC.TestAuthHelper;
+
+const
+  TEST_PORT = 9091;
+
+function ServerExePath: string;
+begin
+  Result := TPath.GetFullPath(TPath.Combine(TPath.GetDirectoryName(ParamStr(0)), '..\..\bin\PurchaseBridgeDMVC.exe'));
+end;
+
+procedure TXmlValidationControllerTests.Setup;
+begin
+  FServer := TTestServerProcess.Create;
+  FServer.Start(ServerExePath, TEST_PORT);
+  Assert.IsTrue(FServer.WaitForReady(TEST_PORT), 'El servidor DMVC no respondió a tiempo en /ping');
+  FToken := ObtenerTokenDePrueba(TEST_PORT);
+end;
+
+procedure TXmlValidationControllerTests.TearDown;
+begin
+  FServer.Stop;
+  FServer.Free;
+end;
+
+procedure TXmlValidationControllerTests.Validate_WithoutFileName_Returns400;
+var
+  LHttp: TIdHTTP;
+  LRequest, LResponse: TStringStream;
+begin
+  LHttp := TIdHTTP.Create(nil);
+  LRequest := TStringStream.Create('{}', TEncoding.UTF8);
+  LResponse := TStringStream.Create;
+  try
+    LHttp.Request.CustomHeaders.AddValue('Authorization', 'Bearer ' + FToken);
+    LHttp.Request.ContentType := 'application/json';
+    try
+      LHttp.Post(Format('http://localhost:%d/api/xml/validate', [TEST_PORT]), LRequest, LResponse);
+      Assert.Fail('Se esperaba una excepcion HTTP 400');
+    except
+      on E: EIdHTTPProtocolException do
+        Assert.AreEqual(400, E.ErrorCode);
+    end;
+  finally
+    LRequest.Free;
+    LResponse.Free;
+    LHttp.Free;
+  end;
+end;
+
+procedure TXmlValidationControllerTests.Validate_WithNonexistentFile_ReturnsValidoFalse;
+var
+  LHttp: TIdHTTP;
+  LRequest, LResponse: TStringStream;
+  LJson: TJSONObject;
+begin
+  LHttp := TIdHTTP.Create(nil);
+  LRequest := TStringStream.Create('{"fileName":"__phase4_no_existe__.xml"}', TEncoding.UTF8);
+  LResponse := TStringStream.Create;
+  try
+    LHttp.Request.CustomHeaders.AddValue('Authorization', 'Bearer ' + FToken);
+    LHttp.Request.ContentType := 'application/json';
+    LHttp.Post(Format('http://localhost:%d/api/xml/validate', [TEST_PORT]), LRequest, LResponse);
+    Assert.AreEqual(200, LHttp.ResponseCode);
+    LJson := TJSONObject.ParseJSONValue(LResponse.DataString) as TJSONObject;
+    try
+      Assert.IsNotNull(LJson);
+      Assert.IsFalse((LJson.GetValue('valido') as TJSONBool).AsBoolean);
+    finally
+      LJson.Free;
+    end;
+  finally
+    LRequest.Free;
+    LResponse.Free;
+    LHttp.Free;
+  end;
+end;
+
+procedure TXmlValidationControllerTests.ValidateBatch_WithNonexistentFiles_ReturnsSummary;
+var
+  LHttp: TIdHTTP;
+  LRequest, LResponse: TStringStream;
+  LJson, LResumen: TJSONObject;
+begin
+  LHttp := TIdHTTP.Create(nil);
+  LRequest := TStringStream.Create('{"files":["__a__.xml","__b__.xml"]}', TEncoding.UTF8);
+  LResponse := TStringStream.Create;
+  try
+    LHttp.Request.CustomHeaders.AddValue('Authorization', 'Bearer ' + FToken);
+    LHttp.Request.ContentType := 'application/json';
+    LHttp.Post(Format('http://localhost:%d/api/xml/validate/batch', [TEST_PORT]), LRequest, LResponse);
+    Assert.AreEqual(200, LHttp.ResponseCode);
+    LJson := TJSONObject.ParseJSONValue(LResponse.DataString) as TJSONObject;
+    try
+      LResumen := LJson.GetValue('resumen') as TJSONObject;
+      Assert.AreEqual(2, (LResumen.GetValue('total') as TJSONNumber).AsInt);
+      Assert.AreEqual(0, (LResumen.GetValue('validos') as TJSONNumber).AsInt);
+      Assert.AreEqual(2, (LResumen.GetValue('conErrores') as TJSONNumber).AsInt);
+    finally
+      LJson.Free;
+    end;
+  finally
+    LRequest.Free;
+    LResponse.Free;
+    LHttp.Free;
+  end;
+end;
+
+procedure TXmlValidationControllerTests.Validate_WithoutToken_Returns401;
+var
+  LHttp: TIdHTTP;
+  LRequest, LResponse: TStringStream;
+begin
+  LHttp := TIdHTTP.Create(nil);
+  LRequest := TStringStream.Create('{"fileName":"x.xml"}', TEncoding.UTF8);
+  LResponse := TStringStream.Create;
+  try
+    LHttp.Request.ContentType := 'application/json';
+    try
+      LHttp.Post(Format('http://localhost:%d/api/xml/validate', [TEST_PORT]), LRequest, LResponse);
+      Assert.Fail('Se esperaba una excepcion HTTP 401');
+    except
+      on E: EIdHTTPProtocolException do
+        Assert.AreEqual(401, E.ErrorCode);
+    end;
+  finally
+    LRequest.Free;
+    LResponse.Free;
+    LHttp.Free;
+  end;
+end;
+
+end.
+```
+
+Modificar `tests/PurchaseBridge.Tests.dpr`: agregar `DMVC.XmlValidationControllerTests in 'DMVC\DMVC.XmlValidationControllerTests.pas';`.
+
+Compilar servidor + tests. Correr la suite completa — deben pasar los 22 anteriores + 4 nuevos = 26.
+
+- [ ] **Step 4: Verificación manual (opcional)**
+
+Con el server corriendo y un token válido, probar `POST /api/xml/validate` con un `fileName` que exista de verdad en la carpeta `Input` configurada (si el usuario tiene uno de prueba disponible) para confirmar el camino feliz completo — NO obligatorio si no hay un XML de prueba a mano; los tests automatizados ya cubren el contrato de la ruta.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add dmvc/Controllers/DMVC.Controllers.XmlValidationController.pas dmvc/DMVC.WebModule.Main.pas tests/DMVC/DMVC.XmlValidationControllerTests.pas tests/PurchaseBridge.Tests.dpr
+git commit -m "feat: migrate XmlValidationController to DMVCFramework"
+```
+
+**Después de este commit: PARAR y pedir aprobación del usuario antes de escribir el detalle de la Task 4.**
 
 ### Task 4: ImportController (1 ruta)
 
