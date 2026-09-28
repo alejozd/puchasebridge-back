@@ -27,6 +27,7 @@ uses
   DMVC.Controllers.ProveedorController,
   DMVC.Controllers.HelisaController,
   DMVC.Controllers.LicenciaController,
+  DMVC.Controllers.XmlValidationController,
   DMVC.Middleware.HttpLogger,
   DMVC.Middleware.CORS,
   DMVC.Middleware.License,
@@ -70,6 +71,7 @@ begin
   FEngine.AddController(TProveedorController);
   FEngine.AddController(THelisaController);
   FEngine.AddController(TLicenciaController);
+  FEngine.AddController(TXmlValidationController);
 end;
 
 destructor TPurchaseBridgeDMVCWebModule.Destroy;

@@ -25,7 +25,8 @@ uses
   DMVC.AuthTests in 'DMVC\DMVC.AuthTests.pas',
   DMVC.TestAuthHelper in 'DMVC\DMVC.TestAuthHelper.pas',
   DMVC.HelisaControllerTests in 'DMVC\DMVC.HelisaControllerTests.pas',
-  DMVC.LicenciaControllerTests in 'DMVC\DMVC.LicenciaControllerTests.pas';
+  DMVC.LicenciaControllerTests in 'DMVC\DMVC.LicenciaControllerTests.pas',
+  DMVC.XmlValidationControllerTests in 'DMVC\DMVC.XmlValidationControllerTests.pas';
 
 var
   runner: ITestRunner;
