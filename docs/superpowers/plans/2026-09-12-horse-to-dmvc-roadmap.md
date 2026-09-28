@@ -180,4 +180,4 @@ orden de `ServerBootstrap.pas`.
 - [x] Fase 2 — Controllers de bajo riesgo
 - [x] Fase 3 — Middlewares transversales
 - [x] Fase 4 — Controllers de alto riesgo/volumen
-- [ ] Fase 5 — Cutover
+- [x] Fase 5 — Cutover
