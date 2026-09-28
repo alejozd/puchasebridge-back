@@ -43,6 +43,7 @@ begin
   Result := LPath.StartsWith('/api') or
             LPath.StartsWith('/auth') or
             LPath.StartsWith('/licencia') or
+            LPath.StartsWith('/factura') or
             (LPath = '/ping');
 end;
 
