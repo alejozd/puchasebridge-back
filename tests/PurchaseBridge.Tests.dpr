@@ -30,7 +30,8 @@ uses
   DMVC.ImportControllerTests in 'DMVC\DMVC.ImportControllerTests.pas',
   DMVC.DocumentosControllerTests in 'DMVC\DMVC.DocumentosControllerTests.pas',
   DMVC.AuthMeTests in 'DMVC\DMVC.AuthMeTests.pas',
-  DMVC.XmlControllerReadTests in 'DMVC\DMVC.XmlControllerReadTests.pas';
+  DMVC.XmlControllerReadTests in 'DMVC\DMVC.XmlControllerReadTests.pas',
+  DMVC.XmlControllerWriteTests in 'DMVC\DMVC.XmlControllerWriteTests.pas';
 
 var
   runner: ITestRunner;

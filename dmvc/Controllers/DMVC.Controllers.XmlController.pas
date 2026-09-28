@@ -40,15 +40,32 @@ type
     [MVCPath('/api/dashboard/metrics')]
     [MVCHTTPMethod([httpGET])]
     procedure GetDashboardMetrics;
+
+    [MVCPath('/xml/upload')]
+    [MVCPath('/api/xml/upload')]
+    [MVCHTTPMethod([httpPOST])]
+    procedure Upload;
+
+    [MVCPath('/xml/procesar')]
+    [MVCPath('/api/xml/procesar')]
+    [MVCHTTPMethod([httpPOST])]
+    procedure ProcesarBatch;
+
+    [MVCPath('/xml/homologar')]
+    [MVCPath('/api/xml/homologar')]
+    [MVCHTTPMethod([httpPOST])]
+    procedure Homologar;
   end;
 
 implementation
 
 uses
-  System.SysUtils, System.JSON, System.IOUtils, System.Types,
+  System.SysUtils, System.JSON, System.IOUtils, System.Types, System.Classes,
   System.Generics.Collections, System.Generics.Defaults,
+  Web.HTTPApp,
   FireDAC.Comp.Client, FirebirdConnection,
-  XmlParserService, DianUnits, uPaths;
+  XmlParserService, DianUnits, uPaths,
+  EquivalenciaService, HelisaService, uLogger;
 
 type
   TCombinedFileInfo = record
@@ -623,6 +640,425 @@ begin
     end;
   finally
     Q.Free;
+  end;
+end;
+
+procedure TXmlController.Upload;
+var
+  LFile: TAbstractWebRequestFile;
+  LPath, LFileName, LFullFile: string;
+  LResponse: TJSONObject;
+  I: Integer;
+  LFound: Boolean;
+  LFileStream: TFileStream;
+  Q: TFDQuery;
+begin
+  ContentType := TMVCMediaType.APPLICATION_JSON;
+  try
+    LFound := False;
+    LFile := nil;
+
+    for I := 0 to Context.Request.Files.Count - 1 do
+    begin
+      if SameText(Context.Request.Files[I].FieldName, 'file') then
+      begin
+        LFile := Context.Request.Files[I];
+        LFound := True;
+        Break;
+      end;
+    end;
+
+    if not LFound then
+      raise EMVCException.Create(HTTP_STATUS.BadRequest, 'No file uploaded with field name "file"');
+
+    LFileName := LFile.FileName;
+    if not SameText(ExtractFileExt(LFileName), '.xml') then
+      raise EMVCException.Create(HTTP_STATUS.BadRequest, 'The file must have a .xml extension');
+
+    LPath := GetInputPath;
+    if not TDirectory.Exists(LPath) then
+      TDirectory.CreateDirectory(LPath);
+
+    LFullFile := TPath.Combine(LPath, LFileName);
+
+    LFile.Stream.Position := 0;
+    LFileStream := TFileStream.Create(LFullFile, fmCreate);
+    try
+      LFileStream.CopyFrom(LFile.Stream, LFile.Stream.Size);
+    finally
+      LFileStream.Free;
+    end;
+
+    Q := GetBridgeQuery;
+    try
+      Q.SQL.Text := 'SELECT ID FROM XML_FILES WHERE FILE_NAME = :FNAME';
+      Q.ParamByName('FNAME').AsString := LFileName;
+      Q.Open;
+      if Q.IsEmpty then
+      begin
+        Q.Close;
+        Q.SQL.Text :=
+          'INSERT INTO XML_FILES (FILE_NAME, ESTADO, MENSAJE_ERROR, FECHA_CARGA) ' +
+          'VALUES (:FNAME, ''CARGADO'', NULL, CURRENT_TIMESTAMP)';
+        Q.ParamByName('FNAME').AsString := LFileName;
+        Q.ExecSQL;
+      end
+      else
+      begin
+        Q.Close;
+        Q.SQL.Text :=
+          'UPDATE XML_FILES SET ESTADO = ''CARGADO'', MENSAJE_ERROR = NULL, FECHA_CARGA = CURRENT_TIMESTAMP ' +
+          'WHERE FILE_NAME = :FNAME';
+        Q.ParamByName('FNAME').AsString := LFileName;
+        Q.ExecSQL;
+      end;
+    finally
+      Q.Free;
+    end;
+
+    LResponse := TJSONObject.Create;
+    try
+      LResponse.AddPair('success', TJSONBool.Create(True));
+      LResponse.AddPair('message', 'XML uploaded successfully');
+      LResponse.AddPair('fileName', LFileName);
+      LResponse.AddPair('path', LFullFile.Replace('\', '/'));
+      Render(LResponse.ToJSON);
+    finally
+      LResponse.Free;
+    end;
+  except
+    on E: EMVCException do
+      raise;
+    on E: Exception do
+      raise EMVCException.Create(HTTP_STATUS.InternalServerError, 'Error saving file: ' + E.Message);
+  end;
+end;
+
+procedure TXmlController.ProcesarBatch;
+var
+  Q: TFDQuery;
+  LBody: TJSONObject;
+  LIdsArr: TJSONArray;
+  LId: Integer;
+  I: Integer;
+  LResponse: TJSONObject;
+  LProcesadosArr, LRechazadosArr: TJSONArray;
+  LHasPendientes: Boolean;
+  LEstadoFinal: string;
+  LProcesadosCount, LRechazadosCount: Integer;
+  LRechazadosLabel: string;
+begin
+  ContentType := TMVCMediaType.APPLICATION_JSON;
+  LBody := TJSONObject.ParseJSONValue(Context.Request.Body) as TJSONObject;
+  try
+    // LIdsArr es un valor JSON hijo de LBody (no una copia) -- LBody debe
+    // seguir vivo mientras se use LIdsArr, por eso LBody.Free se pospone
+    // hasta el finally mas externo (ver mas abajo), no se libera aqui.
+    if (LBody = nil) or not LBody.TryGetValue('ids', LIdsArr) then
+      raise EMVCException.Create(HTTP_STATUS.BadRequest, 'ids is required');
+
+    LProcesadosArr := TJSONArray.Create;
+    LRechazadosArr := TJSONArray.Create;
+    LProcesadosCount := 0;
+    LRechazadosCount := 0;
+
+    Q := GetBridgeQuery;
+    try
+      for I := 0 to LIdsArr.Count - 1 do
+    begin
+      LId := StrToIntDef(LIdsArr.Items[I].Value, 0);
+      if LId = 0 then Continue;
+
+      try
+        if not Q.Connection.InTransaction then
+          Q.Connection.StartTransaction;
+
+        Q.SQL.Text :=
+          'SELECT COUNT(*) as TOTAL ' +
+          'FROM XML_PRODUCTOS ' +
+          'WHERE XML_FILE_ID = :FILEID ' +
+          'AND COALESCE(ESTADO_VALIDACION, ''PENDIENTE'') <> ''HOMOLOGADO''';
+        Q.ParamByName('FILEID').AsInteger := LId;
+        Q.Open;
+        LHasPendientes := Q.FieldByName('TOTAL').AsInteger > 0;
+        Q.Close;
+
+        if LHasPendientes then
+        begin
+          Q.SQL.Text := 'UPDATE XML_FILES SET ESTADO = ''PENDIENTE'', MENSAJE_ERROR = :MSG WHERE ID = :ID';
+          Q.ParamByName('MSG').AsString := 'El documento contiene productos sin homologar y no puede ser procesado';
+          Q.ParamByName('ID').AsInteger := LId;
+          Q.ExecSQL;
+          Q.Connection.Commit;
+          LRechazadosArr.AddElement(TJSONNumber.Create(LId));
+          Inc(LRechazadosCount);
+          Log(Format('Documento %d no procesado: productos pendientes de homologación', [LId]), llWarn);
+          Continue;
+        end;
+
+        Q.SQL.Text := 'UPDATE XML_FILES SET ESTADO = ''PROCESADO'', MENSAJE_ERROR = NULL, FECHA_PROCESO = CURRENT_TIMESTAMP WHERE ID = :ID';
+        Q.ParamByName('ID').AsInteger := LId;
+        Q.ExecSQL;
+
+        Q.SQL.Text := 'SELECT ESTADO FROM XML_FILES WHERE ID = :ID';
+        Q.ParamByName('ID').AsInteger := LId;
+        Q.Open;
+        LEstadoFinal := UpperCase(Trim(Q.FieldByName('ESTADO').AsString));
+        Q.Close;
+        if LEstadoFinal <> 'PROCESADO' then
+          raise Exception.CreateFmt('Estado final inválido para ID %d. Estado actual: %s', [LId, LEstadoFinal]);
+
+        Log('Documento actualizado a PROCESADO ID: ' + IntToStr(LId), llInfo);
+        Q.Connection.Commit;
+
+        LProcesadosArr.AddElement(TJSONNumber.Create(LId));
+        Inc(LProcesadosCount);
+      except
+        on E: Exception do
+        begin
+          if Q.Connection.InTransaction then
+            Q.Connection.Rollback;
+          LRechazadosArr.AddElement(TJSONNumber.Create(LId));
+          Inc(LRechazadosCount);
+          Log(Format('Documento %d no procesado: %s', [LId, E.Message]), llError);
+        end;
+      end;
+    end;
+
+    if LRechazadosCount = 1 then
+      LRechazadosLabel := 'rechazado'
+    else
+      LRechazadosLabel := 'rechazados';
+
+    LResponse := TJSONObject.Create;
+    try
+      LResponse.AddPair('success', TJSONBool.Create(True));
+      LResponse.AddPair('procesados', LProcesadosArr);
+      LProcesadosArr := nil;
+      LResponse.AddPair('rechazados', LRechazadosArr);
+      LRechazadosArr := nil;
+      LResponse.AddPair(
+        'mensaje',
+        Format('%d documentos procesados, %d %s por productos pendientes',
+          [LProcesadosCount, LRechazadosCount, LRechazadosLabel])
+      );
+      Render(LResponse.ToJSON);
+    finally
+      LResponse.Free;
+    end;
+    finally
+      Q.Free;
+    end;
+  finally
+    LBody.Free;
+  end;
+end;
+
+procedure TXmlController.Homologar;
+var
+  LBody, LResponse: TJSONObject;
+  LReferenciaXML, LUnidadXML, LReferenciaErp, LUnidadErp, LNombreH, LUnidadErpSigla: string;
+  LCodigoH, LSubCodigoH: Integer;
+  LFactor: Double;
+  LEquivalenciaID: Integer;
+  LXMLFileID, LPendientes: Integer;
+  LTieneProducto: Boolean;
+  LConn, LHelisaConn: TFDConnection;
+  Q: TFDQuery;
+begin
+  ContentType := TMVCMediaType.APPLICATION_JSON;
+  LConn := GetBridgeConnection;
+  try
+    try
+      LBody := TJSONObject.ParseJSONValue(Context.Request.Body) as TJSONObject;
+      try
+        if not Assigned(LBody) then
+          raise Exception.Create('JSON body inválido o vacío');
+
+        if not LBody.TryGetValue('referenciaXml', LReferenciaXML) then
+          if not LBody.TryGetValue('referenciaXML', LReferenciaXML) then
+            raise Exception.Create('referenciaXml es requerido');
+
+        if not LBody.TryGetValue('unidadXml', LUnidadXML) then
+          if not LBody.TryGetValue('unidadXML', LUnidadXML) then
+            raise Exception.Create('unidadXml es requerido');
+
+        if not LBody.TryGetValue('codigoH', LCodigoH) then
+          raise Exception.Create('codigoH (Código ERP) es requerido');
+
+        if not LBody.TryGetValue('nombreH', LNombreH) then
+          raise Exception.Create('nombreH (Nombre ERP) es requerido');
+
+        if not LBody.TryGetValue('subCodigoH', LSubCodigoH) then
+          LSubCodigoH := 0;
+
+        if not LBody.TryGetValue('referenciaErp', LReferenciaErp) then
+          if not LBody.TryGetValue('referenciaP', LReferenciaErp) then
+            raise Exception.Create('referenciaErp es requerido');
+
+        if not LBody.TryGetValue('unidadErp', LUnidadErp) then
+          if not LBody.TryGetValue('unidadP', LUnidadErp) then
+            raise Exception.Create('unidadErp es requerido');
+
+        if not LBody.TryGetValue('factor', LFactor) then
+        begin
+           if LBody.GetValue('factor') <> nil then
+             LFactor := StrToFloatDef(LBody.GetValue('factor').Value, 1)
+           else
+             LFactor := 1;
+        end;
+
+        if LReferenciaErp.Trim.IsEmpty then raise Exception.Create('Referencia ERP vacía');
+        if LUnidadErp.Trim.IsEmpty then raise Exception.Create('Unidad ERP vacía');
+
+        LConn.StartTransaction;
+        try
+          LHelisaConn := GetHelisaConnection;
+          try
+            try
+              LUnidadErpSigla := HelisaService.ObtenerSiglaUnidad(LHelisaConn, LUnidadErp);
+              if not LUnidadErpSigla.IsEmpty then
+                LUnidadErp := LUnidadErpSigla;
+            except
+              on E: Exception do
+              begin
+                // NOTA (hallazgo empirico via TDD, servicio fuera de alcance
+                // de esta task -- no se toca services/HelisaService.pas):
+                // ObtenerSiglaUnidad abre un TFDQuery y lo libera sin un
+                // Close explicito; cuando el codigo de unidad no existe en
+                // Helisa (cero filas), el driver FireDAC/Firebird de este
+                // entorno ya cierra el cursor fisico al llegar a EOF durante
+                // Open, y el Close implicito del destructor revienta con
+                // "[FireDAC][Phys][FB]Attempt to reclose a closed cursor".
+                // Mismo codigo/patron que el Horse original (defecto
+                // preexistente, no introducido por esta migracion). Se
+                // captura SOLO ese error puntual y se preserva el
+                // comportamiento observable de "sigla no encontrada" (se
+                // mantiene LUnidadErp original) -- cualquier OTRO error real
+                // (Helisa caida, timeout, credenciales) debe seguir
+                // propagando y terminar en el rollback + 500 de siempre,
+                // igual que el Horse original, no quedar silenciado aqui.
+                if Pos('RECLOSE A CLOSED CURSOR', UpperCase(E.Message)) = 0 then
+                  raise;
+                Log('No se pudo resolver la sigla de unidad via Helisa para "' +
+                  LUnidadErp + '", se mantiene el valor original: ' + E.Message, llWarn);
+              end;
+            end;
+          finally
+            // El cursor fisico ya "reventado" dentro de ObtenerSiglaUnidad
+            // (ver nota arriba) puede dejar la conexion de Helisa en un
+            // estado interno inconsistente para FireDAC; Free en si mismo
+            // puede volver a disparar el mismo "Attempt to reclose a closed
+            // cursor" en cascada al intentar cerrar transacciones/cursores
+            // pendientes de esa conexion. Se ignora igual que arriba: esta
+            // conexion de Helisa es de solo lectura y de un solo uso dentro
+            // de este request, no hay estado compartido que proteger.
+            try
+              LHelisaConn.Free;
+            except
+              on E: Exception do
+                Log('Error liberando la conexion de Helisa (ignorado): ' + E.Message, llWarn);
+            end;
+          end;
+
+          LEquivalenciaID := EquivalenciaService.GetIDEquivalencia(LConn, LReferenciaXML, LUnidadXML);
+
+          if LEquivalenciaID = 0 then
+          begin
+            LEquivalenciaID := EquivalenciaService.CrearEquivalencia(
+              LConn, LCodigoH, LSubCodigoH, LNombreH, LReferenciaXML, LUnidadXML, LUnidadErp, LReferenciaErp, LFactor
+            );
+          end;
+
+          Q := TFDQuery.Create(nil);
+          try
+            Q.Connection := LConn;
+            Q.SQL.Text :=
+              'UPDATE XML_PRODUCTOS SET EQUIVALENCIA_ID = :EID, ESTADO_VALIDACION = ''HOMOLOGADO'', MENSAJE_VALIDACION = NULL ' +
+              'WHERE REFERENCIA = :REF AND UNIDAD = :UNI AND EQUIVALENCIA_ID IS NULL';
+            Q.ParamByName('EID').AsInteger := LEquivalenciaID;
+            Q.ParamByName('REF').AsString := LReferenciaXML;
+            Q.ParamByName('UNI').AsString := LUnidadXML;
+            Q.ExecSQL;
+
+            // NOTA (hallazgo empirico via TDD): la version original de esta
+            // consulta usaba "SELECT FIRST 1 ... " + Q.IsEmpty/Q.Close. Con
+            // el driver FireDAC/Firebird de este entorno, cuando "FIRST 1"
+            // no devuelve ninguna fila el cursor fisico ya queda cerrado al
+            // llegar a EOF durante Open, y el Q.Close explicito subsiguiente
+            // (o el Close implicito del destructor en el finally) dispara
+            // "[FireDAC][Phys][FB]Attempt to reclose a closed cursor",
+            // reventando la request con 500 -- reproducible con datos de
+            // prueba ficticios que no matchean ningun XML_PRODUCTOS (el
+            // caso mas comun de negocio: la primera vez que se homologa un
+            // par referencia/unidad nuevo). Se reemplaza por una consulta
+            // de agregado (MIN), que SIEMPRE devuelve exactamente una fila
+            // (con NULL si no hay match) igual que el COUNT(*) ya usado mas
+            // abajo -- ese patron esta probado y no dispara el mismo cierre
+            // prematuro del cursor.
+            Q.SQL.Text :=
+              'SELECT MIN(XML_FILE_ID) AS XML_FILE_ID ' +
+              'FROM XML_PRODUCTOS ' +
+              'WHERE REFERENCIA = :REF AND UNIDAD = :UNI';
+            Q.ParamByName('REF').AsString := LReferenciaXML;
+            Q.ParamByName('UNI').AsString := LUnidadXML;
+            Q.Open;
+            LTieneProducto := not Q.FieldByName('XML_FILE_ID').IsNull;
+            if LTieneProducto then
+              LXMLFileID := Q.FieldByName('XML_FILE_ID').AsInteger;
+            Q.Close;
+
+            if LTieneProducto then
+            begin
+              Q.SQL.Text :=
+                'SELECT COUNT(*) AS TOTAL ' +
+                'FROM XML_PRODUCTOS ' +
+                'WHERE XML_FILE_ID = :XML_FILE_ID ' +
+                'AND EQUIVALENCIA_ID IS NULL';
+              Q.ParamByName('XML_FILE_ID').AsInteger := LXMLFileID;
+              Q.Open;
+              LPendientes := Q.FieldByName('TOTAL').AsInteger;
+              Q.Close;
+
+              if LPendientes = 0 then
+                Q.SQL.Text := 'UPDATE XML_FILES SET ESTADO = ''VALIDADO'' WHERE ID = :XML_FILE_ID'
+              else
+                Q.SQL.Text := 'UPDATE XML_FILES SET ESTADO = ''PENDIENTE'' WHERE ID = :XML_FILE_ID';
+              Q.ParamByName('XML_FILE_ID').AsInteger := LXMLFileID;
+              Q.ExecSQL;
+            end;
+          finally
+            Q.Free;
+          end;
+
+          LConn.Commit;
+
+          LResponse := TJSONObject.Create;
+          try
+            LResponse.AddPair('success', TJSONBool.Create(True));
+            LResponse.AddPair('message', 'Homologación guardada correctamente');
+            Render(LResponse.ToJSON);
+          finally
+            LResponse.Free;
+          end;
+        except
+          on E: Exception do
+          begin
+            LConn.Rollback;
+            raise;
+          end;
+        end;
+      finally
+        LBody.Free;
+      end;
+    except
+      on E: EMVCException do
+        raise;
+      on E: Exception do
+        raise EMVCException.Create(HTTP_STATUS.InternalServerError, E.Message);
+    end;
+  finally
+    LConn.Free;
   end;
 end;
 
