@@ -1,52 +1,34 @@
 program PurchaseBridge;
 
-{$R *.res}
 {$APPTYPE CONSOLE}
 
 uses
   System.SysUtils,
-  ServerBootstrap in 'ServerBootstrap.pas',
-  HConfig in 'config\HConfig.pas',
-  FirebirdConnection in 'database\FirebirdConnection.pas',
-  ProveedorRepository in 'repositories\ProveedorRepository.pas',
-  ProductoRepository in 'repositories\ProductoRepository.pas',
-  XMLFacturaService in 'services\XMLFacturaService.pas',
-  XmlParserService in 'services\XmlParserService.pas',
-  XmlPersistenceService in 'services\XmlPersistenceService.pas',
-  HelisaUtils in 'utils\HelisaUtils.pas',
-  HelisaService in 'services\HelisaService.pas',
-  EquivalenciaService in 'services\EquivalenciaService.pas',
-  DianUnits in 'services\DianUnits.pas',
-  ValidationService in 'services\ValidationService.pas',
-  DocumentoService in 'services\DocumentoService.pas',
-  ImportController in 'controllers\ImportController.pas',
-  ProveedorController in 'controllers\ProveedorController.pas',
-  XmlController in 'controllers\XmlController.pas',
-  XmlValidationController in 'controllers\XmlValidationController.pas',
-  EquivalenciaController in 'controllers\EquivalenciaController.pas',
-  HelisaController in 'controllers\HelisaController.pas',
-  DocumentosController in 'controllers\DocumentosController.pas',
-  AuthService in 'services\AuthService.pas',
-  AuthController in 'controllers\AuthController.pas',
-  LicenciaController in 'controllers\LicenciaController.pas',
-  AuthMiddleware in 'middleware\AuthMiddleware.pas',
-  CORSMiddleware in 'middleware\CORSMiddleware.pas',
-  LicenseMiddleware in 'middleware\LicenseMiddleware.pas',
-  uStaticFilesMiddleware in 'middleware\uStaticFilesMiddleware.pas',
-  uHttpLoggerMiddleware in 'middleware\uHttpLoggerMiddleware.pas',
-  uLogger in 'utils\uLogger.pas',
-  uPaths in 'utils\uPaths.pas',
-  ErrorResponseUtils in 'utils\ErrorResponseUtils.pas',
-  LicenseService in 'services\LicenseService.pas';
+  IdHTTPWebBrokerBridge,
+  DMVC.ServerBootstrap in 'dmvc\DMVC.ServerBootstrap.pas',
+  DMVC.WebModule.Main in 'dmvc\DMVC.WebModule.Main.pas',
+  DMVC.Controllers.PingController in 'dmvc\Controllers\DMVC.Controllers.PingController.pas';
+
+procedure RunServer(APort: Integer);
+var
+  LServer: TIdHTTPWebBrokerBridge;
+begin
+  Writeln(Format('Starting PurchaseBridge DMVC server on port %d', [APort]));
+  DMVC.ServerBootstrap.InitializeServerDependencies;
+  LServer := DMVC.ServerBootstrap.CreateAndActivateServer(APort);
+  try
+    Readln;
+  finally
+    LServer.Free;
+  end;
+end;
 
 begin
+  ReportMemoryLeaksOnShutdown := True;
   try
-    StartServer;
+    RunServer(StrToIntDef(ParamStr(1), 9000));
   except
     on E: Exception do
-    begin
-      Log('Fallo fatal en ejecucion de consola: ' + E.Message, llError);
-      Halt(1);
-    end;
+      Writeln(E.ClassName, ': ', E.Message);
   end;
 end.

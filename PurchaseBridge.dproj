@@ -60,10 +60,9 @@
         <DCC_K>false</DCC_K>
         <DCC_Namespace>System;Xml;Data;Datasnap;Web;Soap;$(DCC_Namespace)</DCC_Namespace>
         <Icon_MainIcon>$(BDS)\bin\delphi_PROJECTICON.ico</Icon_MainIcon>
-        <DCC_Define>HORSE_CONSOLE;$(DCC_Define)</DCC_Define>
         <Icns_MainIcns>$(BDS)\bin\delphi_PROJECTICNS.icns</Icns_MainIcns>
         <SanitizedProjectName>PurchaseBridge</SanitizedProjectName>
-        <DCC_UnitSearchPath>middleware;utils;modules\.dcp;..\modules\.dcp;modules\.dcu;..\modules\.dcu;modules;..\modules;modules\handle-exception\src;..\modules\handle-exception\src;modules\horse\src;..\modules\horse\src;modules\horse-cors\src;..\modules\horse-cors\src;modules\horse-logger\src;..\modules\horse-logger\src;modules\horse-octet-stream\src;..\modules\horse-octet-stream\src;modules\horse-utils-clientip\src;..\modules\horse-utils-clientip\src;modules\jhonson\src;..\modules\jhonson\src;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
+        <DCC_UnitSearchPath>utils;dmvc;dmvc\Controllers;dmvc\DTOs;dmvc\Middleware;dmvc\Security;services;database;config;repositories;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base_Android)'!=''">
         <VerInfo_Keys>package=com.embarcadero.$(MSBuildProjectName);label=$(MSBuildProjectName);versionCode=1;versionName=1.0.0;persistent=False;restoreAnyVersion=False;installLocation=auto;largeHeap=False;theme=TitleBar;hardwareAccelerated=true;apiKey=;minSdkVersion=23;targetSdkVersion=34</VerInfo_Keys>
@@ -76,7 +75,7 @@
         <EnabledSysJars>activity-1.7.2.dex.jar;annotation-experimental-1.3.0.dex.jar;annotation-jvm-1.6.0.dex.jar;annotations-13.0.dex.jar;appcompat-1.2.0.dex.jar;appcompat-resources-1.2.0.dex.jar;billing-6.0.1.dex.jar;biometric-1.1.0.dex.jar;browser-1.4.0.dex.jar;cloud-messaging.dex.jar;collection-1.1.0.dex.jar;concurrent-futures-1.1.0.dex.jar;core-1.10.1.dex.jar;core-common-2.2.0.dex.jar;core-ktx-1.10.1.dex.jar;core-runtime-2.2.0.dex.jar;cursoradapter-1.0.0.dex.jar;customview-1.0.0.dex.jar;documentfile-1.0.0.dex.jar;drawerlayout-1.0.0.dex.jar;error_prone_annotations-2.9.0.dex.jar;exifinterface-1.3.6.dex.jar;firebase-annotations-16.2.0.dex.jar;firebase-common-20.3.1.dex.jar;firebase-components-17.1.0.dex.jar;firebase-datatransport-18.1.7.dex.jar;firebase-encoders-17.0.0.dex.jar;firebase-encoders-json-18.0.0.dex.jar;firebase-encoders-proto-16.0.0.dex.jar;firebase-iid-interop-17.1.0.dex.jar;firebase-installations-17.1.3.dex.jar;firebase-installations-interop-17.1.0.dex.jar;firebase-measurement-connector-19.0.0.dex.jar;firebase-messaging-23.1.2.dex.jar;fmx.dex.jar;fragment-1.2.5.dex.jar;google-play-licensing.dex.jar;interpolator-1.0.0.dex.jar;javax.inject-1.dex.jar;kotlin-stdlib-1.8.22.dex.jar;kotlin-stdlib-common-1.8.22.dex.jar;kotlin-stdlib-jdk7-1.8.22.dex.jar;kotlin-stdlib-jdk8-1.8.22.dex.jar;kotlinx-coroutines-android-1.6.4.dex.jar;kotlinx-coroutines-core-jvm-1.6.4.dex.jar;legacy-support-core-utils-1.0.0.dex.jar;lifecycle-common-2.6.1.dex.jar;lifecycle-livedata-2.6.1.dex.jar;lifecycle-livedata-core-2.6.1.dex.jar;lifecycle-runtime-2.6.1.dex.jar;lifecycle-service-2.6.1.dex.jar;lifecycle-viewmodel-2.6.1.dex.jar;lifecycle-viewmodel-savedstate-2.6.1.dex.jar;listenablefuture-1.0.dex.jar;loader-1.0.0.dex.jar;localbroadcastmanager-1.0.0.dex.jar;okio-jvm-3.4.0.dex.jar;play-services-ads-22.2.0.dex.jar;play-services-ads-base-22.2.0.dex.jar;play-services-ads-identifier-18.0.0.dex.jar;play-services-ads-lite-22.2.0.dex.jar;play-services-appset-16.0.1.dex.jar;play-services-base-18.1.0.dex.jar;play-services-basement-18.1.0.dex.jar;play-services-cloud-messaging-17.0.1.dex.jar;play-services-location-21.0.1.dex.jar;play-services-maps-18.1.0.dex.jar;play-services-measurement-base-20.1.2.dex.jar;play-services-measurement-sdk-api-20.1.2.dex.jar;play-services-stats-17.0.2.dex.jar;play-services-tasks-18.0.2.dex.jar;print-1.0.0.dex.jar;profileinstaller-1.3.0.dex.jar;room-common-2.2.5.dex.jar;room-runtime-2.2.5.dex.jar;savedstate-1.2.1.dex.jar;sqlite-2.1.0.dex.jar;sqlite-framework-2.1.0.dex.jar;startup-runtime-1.1.1.dex.jar;tracing-1.0.0.dex.jar;transport-api-3.0.0.dex.jar;transport-backend-cct-3.1.8.dex.jar;transport-runtime-3.1.8.dex.jar;user-messaging-platform-2.0.0.dex.jar;vectordrawable-1.1.0.dex.jar;vectordrawable-animated-1.1.0.dex.jar;versionedparcelable-1.1.1.dex.jar;viewpager-1.0.0.dex.jar;work-runtime-2.7.0.dex.jar</EnabledSysJars>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base_Win32)'!=''">
-        <DCC_UsePackage>dxPScxCommonRS29;dxRibbonRS29;vclwinx;DataSnapServer;dxPScxExtCommonRS29;dxRichEditControlCoreRS29;fmx;dxSpreadSheetReportDesignerRS29;vclie;DbxCommonDriver;bindengine;IndyIPCommon;VCLRESTComponents;DBXMSSQLDriver;FireDACCommonODBC;emsclient;dxComnRS29;dxFlowChartDesignerRS29;appanalytics;IndyProtocols;vclx;Skia.Package.RTL;dxBarExtDBItemsRS29;dbxcds;vcledge;cxVerticalGridRS29;FMX_FlexCel_Components;cxFireDACAdaptersRS29;FlexCel_Pdf;cxSchedulerWebServiceStorageRS29;DBXFirebirdDriver;dxRichEditControlRS29;dxPsPrVwAdvRS29;SKIA_FlexCel_Core;FireDACSqliteDriver;DbxClientDriver;dxPSdxGaugeControlLnkRS29;soapmidas;dxRibbonCustomizationFormRS29;frCoreLibrary29;dbexpress;dxEMFRS29;dxDockingRS29;inet;vcltouch;GLibWMI;dxPSdxFCLnkRS29;FMX_FlexCel_Core;dxorgcRS29;FireDACDBXDriver;dxSpreadSheetCoreConditionalFormattingDialogsRS29;fmxdae;dxPSRichEditControlLnkRS29;dxPSdxSpreadSheetLnkRS29;CustomIPTransport;FireDACMSSQLDriver;LockBox3DR;VCL_FlexCel_Core;cxADOAdaptersRS29;dxPSPrVwRibbonRS29;IndySystem;dxPScxTLLnkRS29;dxPSdxDBOCLnkRS29;frxe29;dxGDIPlusRS29;ibxbindings;vclFireDAC;dxPSCoreRS29;dxSpreadSheetRS29;FireDACCommon;DataSnapServerMidas;FireDACODBCDriver;emsserverresource;ExcelExportPackD104;cxGridEMFRS29;dxGanttControlRS29;dclExcelExportPackD104;dxPScxPivotGridLnkRS29;dxADOServerModeRS29;dxWizardControlRS29;dxPScxVGridLnkRS29;dxPSdxMapControlLnkRS29;bindcompdbx;DelphiAIDeveloper;FlexCel_Render;DOSCommandDR;rtl;FireDACMySQLDriver;dxCloudServiceLibraryRS29;cxIBXAdaptersRS29;dxServerModeRS29;VCL_FlexCel_Components;DBXSqliteDriver;dxBarDBNavRS29;DBXSybaseASEDriver;dxSpreadSheetCoreRS29;dxNavBarRS29;vclimg;DataSnapFireDAC;inetdbxpress;FireDAC;xmlrtl;ibxpress;dxFireDACEMFRS29;dsnap;FireDACDb2Driver;dxPSdxLCLnkRS29;DBXOracleDriver;DBXInformixDriver;vclib;fmxobj;bindcompvclsmp;DataSnapNativeClient;jsondoc_rt;frx29;DatasnapConnectorsFreePascal;dxPSLnksRS29;dxmdsRS29;dxPSdxOCLnkRS29;cxSchedulerGridRS29;dxPScxSchedulerLnkRS29;FlexCel_Report;emshosting;dxADOEMFRS29;dxChartControlRS29;dxPSdxDBTVLnkRS29;frxDB29;frLocalizationLibrary29;FireDACCommonDriver;dxGaugeControlRS29;IndyIPClient;dxPDFViewerRS29;bindcompvclwinx;dxOrgChartAdvancedCustomizeFormRS29;emsedge;bindcompfmx;dxBarExtItemsRS29;dxFlowChartLayoutsRS29;inetdb;dxdborRS29;ibmonitor;FireDACASADriver;dxPScxGridLnkRS29;cxPivotGridChartRS29;vclactnband;fmxFireDAC;FireDACInfxDriver;dxRichEditCoreRS29;cxTreeListdxBarPopupMenuRS29;DBXMySQLDriver;dxFlowChartAdvancedCustomizeFormRS29;VclSmp;cxSchedulerRibbonStyleEventEditorRS29;DataSnapCommon;fmxase;dxtrmdRS29;dxFlowChartRS29;DBXOdbcDriver;dbrtl;dxPScxPCProdRS29;FireDACOracleDriver;Skia.Package.FMX;horse_wizard;FlexCel_XlsAdapter;FireDACMSAccDriver;cxGridRS29;dxSpellCheckerRS29;DataSnapIndy10ServerTransport;dxRichEditDocumentModelRS29;dxMapControlRS29;DataSnapConnectors;vcldsnap;DBXInterBaseDriver;FireDACMongoDBDriver;FireDACTDataDriver;cxLibraryRS29;Skia.Package.VCL;vcldb;FlexCel_Core;dxPSdxPDFViewerLnkRS29;cxSchedulerTreeBrowserRS29;bindcomp;dxTabbedMDIRS29;cxExportRS29;inetstn;IndyCore;RESTBackendComponents;dxHttpIndyRequestRS29;dxTileControlRS29;dxFireDACServerModeRS29;cxPivotGridOLAPRS29;FireDACADSDriver;RESTComponents;IndyIPServer;vcl;dsnapxml;adortl;dsnapcon;DataSnapClient;DataSnapProviderClient;jsontreeview_rt;dxCoreRS29;cxPivotGridRS29;dxdbtrRS29;LockBoxDR;DBXDb2Driver;dxSkinsCoreRS29;emsclientfiredac;FireDACPgDriver;FireDACDSDriver;dxBarRS29;tethering;bindcompvcl;CloudService;DBXSybaseASADriver;dxSpreadSheetConditionalFormattingDialogsRS29;cxTreeListRS29;soaprtl;dxDBXServerModeRS29;cxSchedulerRS29;soapserver;FireDACIBDriver;$(DCC_UsePackage)</DCC_UsePackage>
+        <DCC_UsePackage>dxPScxCommonRS29;dxRibbonRS29;vclwinx;DataSnapServer;dxPScxExtCommonRS29;dxRichEditControlCoreRS29;fmx;dxSpreadSheetReportDesignerRS29;vclie;DbxCommonDriver;bindengine;IndyIPCommon;VCLRESTComponents;DBXMSSQLDriver;FireDACCommonODBC;emsclient;dxComnRS29;dxFlowChartDesignerRS29;appanalytics;IndyProtocols;vclx;Skia.Package.RTL;dxBarExtDBItemsRS29;dbxcds;vcledge;cxVerticalGridRS29;FMX_FlexCel_Components;cxFireDACAdaptersRS29;FlexCel_Pdf;cxSchedulerWebServiceStorageRS29;DBXFirebirdDriver;dxRichEditControlRS29;dxPsPrVwAdvRS29;SKIA_FlexCel_Core;FireDACSqliteDriver;DbxClientDriver;dxPSdxGaugeControlLnkRS29;soapmidas;dxRibbonCustomizationFormRS29;frCoreLibrary29;dbexpress;dxEMFRS29;dxDockingRS29;inet;vcltouch;GLibWMI;dxPSdxFCLnkRS29;FMX_FlexCel_Core;dxorgcRS29;FireDACDBXDriver;dxSpreadSheetCoreConditionalFormattingDialogsRS29;fmxdae;dxPSRichEditControlLnkRS29;dxPSdxSpreadSheetLnkRS29;CustomIPTransport;FireDACMSSQLDriver;LockBox3DR;VCL_FlexCel_Core;cxADOAdaptersRS29;dxPSPrVwRibbonRS29;IndySystem;dxPScxTLLnkRS29;dxPSdxDBOCLnkRS29;frxe29;dxGDIPlusRS29;ibxbindings;vclFireDAC;dxPSCoreRS29;dxSpreadSheetRS29;FireDACCommon;DataSnapServerMidas;FireDACODBCDriver;emsserverresource;ExcelExportPackD104;cxGridEMFRS29;dxGanttControlRS29;dclExcelExportPackD104;dxPScxPivotGridLnkRS29;dxADOServerModeRS29;dxWizardControlRS29;dxPScxVGridLnkRS29;dxPSdxMapControlLnkRS29;bindcompdbx;DelphiAIDeveloper;FlexCel_Render;DOSCommandDR;rtl;FireDACMySQLDriver;dxCloudServiceLibraryRS29;cxIBXAdaptersRS29;dxServerModeRS29;VCL_FlexCel_Components;DBXSqliteDriver;dxBarDBNavRS29;DBXSybaseASEDriver;dxSpreadSheetCoreRS29;dxNavBarRS29;vclimg;DataSnapFireDAC;inetdbxpress;FireDAC;xmlrtl;ibxpress;dxFireDACEMFRS29;dsnap;FireDACDb2Driver;dxPSdxLCLnkRS29;DBXOracleDriver;DBXInformixDriver;vclib;fmxobj;bindcompvclsmp;DataSnapNativeClient;jsondoc_rt;frx29;DatasnapConnectorsFreePascal;dxPSLnksRS29;dxmdsRS29;dxPSdxOCLnkRS29;cxSchedulerGridRS29;dxPScxSchedulerLnkRS29;FlexCel_Report;emshosting;dxADOEMFRS29;dxChartControlRS29;dxPSdxDBTVLnkRS29;frxDB29;frLocalizationLibrary29;FireDACCommonDriver;dxGaugeControlRS29;IndyIPClient;dxPDFViewerRS29;bindcompvclwinx;dxOrgChartAdvancedCustomizeFormRS29;emsedge;bindcompfmx;dxBarExtItemsRS29;dxFlowChartLayoutsRS29;inetdb;dxdborRS29;ibmonitor;FireDACASADriver;dxPScxGridLnkRS29;cxPivotGridChartRS29;vclactnband;fmxFireDAC;FireDACInfxDriver;dxRichEditCoreRS29;cxTreeListdxBarPopupMenuRS29;DBXMySQLDriver;dxFlowChartAdvancedCustomizeFormRS29;VclSmp;cxSchedulerRibbonStyleEventEditorRS29;DataSnapCommon;fmxase;dxtrmdRS29;dxFlowChartRS29;DBXOdbcDriver;dbrtl;dxPScxPCProdRS29;FireDACOracleDriver;Skia.Package.FMX;FlexCel_XlsAdapter;FireDACMSAccDriver;cxGridRS29;dxSpellCheckerRS29;DataSnapIndy10ServerTransport;dxRichEditDocumentModelRS29;dxMapControlRS29;DataSnapConnectors;vcldsnap;DBXInterBaseDriver;FireDACMongoDBDriver;FireDACTDataDriver;cxLibraryRS29;Skia.Package.VCL;vcldb;FlexCel_Core;dxPSdxPDFViewerLnkRS29;cxSchedulerTreeBrowserRS29;bindcomp;dxTabbedMDIRS29;cxExportRS29;inetstn;IndyCore;RESTBackendComponents;dxHttpIndyRequestRS29;dxTileControlRS29;dxFireDACServerModeRS29;cxPivotGridOLAPRS29;FireDACADSDriver;RESTComponents;IndyIPServer;vcl;dsnapxml;adortl;dsnapcon;DataSnapClient;DataSnapProviderClient;jsontreeview_rt;dxCoreRS29;cxPivotGridRS29;dxdbtrRS29;LockBoxDR;DBXDb2Driver;dxSkinsCoreRS29;emsclientfiredac;FireDACPgDriver;FireDACDSDriver;dxBarRS29;tethering;bindcompvcl;CloudService;DBXSybaseASADriver;dxSpreadSheetConditionalFormattingDialogsRS29;cxTreeListRS29;soaprtl;dxDBXServerModeRS29;cxSchedulerRS29;soapserver;FireDACIBDriver;$(DCC_UsePackage)</DCC_UsePackage>
         <DCC_Namespace>Winapi;System.Win;Data.Win;Datasnap.Win;Web.Win;Soap.Win;Xml.Win;Bde;$(DCC_Namespace)</DCC_Namespace>
         <BT_BuildType>Debug</BT_BuildType>
         <VerInfo_Keys>CompanyName=;FileDescription=$(MSBuildProjectName);FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProgramID=com.embarcadero.$(MSBuildProjectName);ProductName=$(MSBuildProjectName);ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
@@ -119,39 +118,44 @@
         <DelphiCompile Include="$(MainSource)">
             <MainSource>MainSource</MainSource>
         </DelphiCompile>
-        <DCCReference Include="ServerBootstrap.pas"/>
+        <DCCReference Include="dmvc\DMVC.ServerBootstrap.pas"/>
+        <DCCReference Include="dmvc\DMVC.WebModule.Main.pas"/>
+        <DCCReference Include="dmvc\Controllers\DMVC.Controllers.AuthController.pas"/>
+        <DCCReference Include="dmvc\Controllers\DMVC.Controllers.DocumentosController.pas"/>
+        <DCCReference Include="dmvc\Controllers\DMVC.Controllers.EquivalenciaController.pas"/>
+        <DCCReference Include="dmvc\Controllers\DMVC.Controllers.HelisaController.pas"/>
+        <DCCReference Include="dmvc\Controllers\DMVC.Controllers.ImportController.pas"/>
+        <DCCReference Include="dmvc\Controllers\DMVC.Controllers.LicenciaController.pas"/>
+        <DCCReference Include="dmvc\Controllers\DMVC.Controllers.PingController.pas"/>
+        <DCCReference Include="dmvc\Controllers\DMVC.Controllers.ProveedorController.pas"/>
+        <DCCReference Include="dmvc\Controllers\DMVC.Controllers.XmlController.pas"/>
+        <DCCReference Include="dmvc\Controllers\DMVC.Controllers.XmlValidationController.pas"/>
+        <DCCReference Include="dmvc\DTOs\DMVC.DTOs.Equivalencia.pas"/>
+        <DCCReference Include="dmvc\DTOs\DMVC.DTOs.EquivalenciaCreate.pas"/>
+        <DCCReference Include="dmvc\DTOs\DMVC.DTOs.Helisa.pas"/>
+        <DCCReference Include="dmvc\DTOs\DMVC.DTOs.Proveedor.pas"/>
+        <DCCReference Include="dmvc\Middleware\DMVC.Middleware.CORS.pas"/>
+        <DCCReference Include="dmvc\Middleware\DMVC.Middleware.HttpLogger.pas"/>
+        <DCCReference Include="dmvc\Middleware\DMVC.Middleware.License.pas"/>
+        <DCCReference Include="dmvc\Middleware\DMVC.Middleware.StaticApp.pas"/>
+        <DCCReference Include="dmvc\Security\DMVC.Security.AuthHandler.pas"/>
+        <DCCReference Include="dmvc\Security\DMVC.Security.JWTClaims.pas"/>
         <DCCReference Include="config\HConfig.pas"/>
         <DCCReference Include="database\FirebirdConnection.pas"/>
-        <DCCReference Include="repositories\ProveedorRepository.pas"/>
         <DCCReference Include="repositories\ProductoRepository.pas"/>
+        <DCCReference Include="repositories\ProveedorRepository.pas"/>
+        <DCCReference Include="services\DianUnits.pas"/>
+        <DCCReference Include="services\DocumentoService.pas"/>
+        <DCCReference Include="services\EquivalenciaService.pas"/>
+        <DCCReference Include="services\HelisaService.pas"/>
+        <DCCReference Include="services\LicenseService.pas"/>
+        <DCCReference Include="services\ValidationService.pas"/>
         <DCCReference Include="services\XMLFacturaService.pas"/>
         <DCCReference Include="services\XmlParserService.pas"/>
         <DCCReference Include="services\XmlPersistenceService.pas"/>
         <DCCReference Include="utils\HelisaUtils.pas"/>
-        <DCCReference Include="services\HelisaService.pas"/>
-        <DCCReference Include="services\EquivalenciaService.pas"/>
-        <DCCReference Include="services\DianUnits.pas"/>
-        <DCCReference Include="services\ValidationService.pas"/>
-        <DCCReference Include="services\DocumentoService.pas"/>
-        <DCCReference Include="controllers\ImportController.pas"/>
-        <DCCReference Include="controllers\ProveedorController.pas"/>
-        <DCCReference Include="controllers\XmlController.pas"/>
-        <DCCReference Include="controllers\XmlValidationController.pas"/>
-        <DCCReference Include="controllers\EquivalenciaController.pas"/>
-        <DCCReference Include="controllers\HelisaController.pas"/>
-        <DCCReference Include="controllers\DocumentosController.pas"/>
-        <DCCReference Include="services\AuthService.pas"/>
-        <DCCReference Include="controllers\AuthController.pas"/>
-        <DCCReference Include="controllers\LicenciaController.pas"/>
-        <DCCReference Include="middleware\AuthMiddleware.pas"/>
-        <DCCReference Include="middleware\CORSMiddleware.pas"/>
-        <DCCReference Include="middleware\LicenseMiddleware.pas"/>
-        <DCCReference Include="middleware\uStaticFilesMiddleware.pas"/>
-        <DCCReference Include="middleware\uHttpLoggerMiddleware.pas"/>
         <DCCReference Include="utils\uLogger.pas"/>
         <DCCReference Include="utils\uPaths.pas"/>
-        <DCCReference Include="utils\ErrorResponseUtils.pas"/>
-        <DCCReference Include="services\LicenseService.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>
