@@ -2008,9 +2008,691 @@ Sin gate de aprobación — seguir directo a escribir el detalle de la Task 6.
 
 #### Task 6a: XmlController — rutas de solo lectura (6 handlers, 7 registros de ruta)
 
-**Objetivo:** `GET /xml/list` + `/xml/files` (mismo handler `GetFiles`, alias — Horse marca `/xml/list` como deprecado en un comentario, preservar igual), `GET /xml/files/:id` (`GetFileById`, path param), `POST /xml/parse` (`Parse` — lee un archivo YA existente en Input/Processed y lo parsea, sin escribir nada), `GET /xml/productos/pendientes` (`GetProductosPendientes`), `GET /xml/productos/documento` (`GetProductosDocumento`), `GET /dashboard/metrics` (`GetDashboardMetrics`). Todas consultan `GetBridgeQuery` (BRIDGE local) y opcionalmente `TDianUnits.GetUnitName`/`ResolveUnidadSigla` (tablas/diccionario locales, sin red). Ninguna escribe nada — se puede automatizar el camino feliz completo sembrando filas de prueba en BRIDGE dentro del propio test (mismo patrón ya usado en la Fase 2).
+**Files:**
+- Create: `dmvc/Controllers/DMVC.Controllers.XmlController.pas` (arranca con estas 6 acciones; la Task 6b agrega 3 más al mismo archivo)
+- Modify: `dmvc/DMVC.WebModule.Main.pas`
+- Create: `tests/DMVC/DMVC.XmlControllerReadTests.pas`
+- Modify: `tests/PurchaseBridge.Tests.dpr`
 
-**Archivos:** Create `dmvc/Controllers/DMVC.Controllers.XmlController.pas` (arranca con estas 6 acciones), modify `dmvc/DMVC.WebModule.Main.pas`, create `tests/DMVC/DMVC.XmlControllerReadTests.pas`, modify `tests/PurchaseBridge.Tests.dpr`.
+**Interfaces:**
+- Consumes (sin cambios): `FirebirdConnection.GetBridgeQuery` (BRIDGE local, la misma BD de pruebas descartable usada desde la Fase 1), `services/XmlParserService.pas` (`TXmlParserService.Parse`, `TParsedInvoice`), `services/DianUnits.pas` (`TDianUnits.GetUnitName`), `utils/uPaths.pas` (`GetInputPath`, `GetProcessedPath`, `GetOutputPath`).
+- Sin DTOs: mismo criterio de tasks anteriores, `TJSONObject`/`TJSONArray` a mano + `ContentType := TMVCMediaType.APPLICATION_JSON; Render(...)`.
+- Normalización de errores ya aceptada desde la Fase 3: el Horse original mezcla formatos de error inconsistentes entre handlers (a veces `{success,message}` JSON, a veces un string plano vía `Res.Status(xxx).Send('texto')`) — todos se unifican aquí a `raise EMVCException.Create(status, mensaje)`, igual que en Tasks 1-5.
+
+- [ ] **Step 1: Escribir el controller (6 acciones de lectura)**
+
+Crear `dmvc/Controllers/DMVC.Controllers.XmlController.pas`:
+
+```pascal
+unit DMVC.Controllers.XmlController;
+
+interface
+
+uses
+  MVCFramework, MVCFramework.Commons;
+
+type
+  [MVCPath('/')]
+  TXmlController = class(TMVCController)
+  public
+    [MVCPath('/xml/list')]
+    [MVCPath('/api/xml/list')]
+    [MVCPath('/xml/files')]
+    [MVCPath('/api/xml/files')]
+    [MVCHTTPMethod([httpGET])]
+    procedure GetFiles;
+
+    [MVCPath('/xml/files/($id)')]
+    [MVCPath('/api/xml/files/($id)')]
+    [MVCHTTPMethod([httpGET])]
+    procedure GetFileById(const id: string);
+
+    [MVCPath('/xml/parse')]
+    [MVCPath('/api/xml/parse')]
+    [MVCHTTPMethod([httpPOST])]
+    procedure Parse;
+
+    [MVCPath('/xml/productos/pendientes')]
+    [MVCPath('/api/xml/productos/pendientes')]
+    [MVCHTTPMethod([httpGET])]
+    procedure GetProductosPendientes(const [MVCFromQueryString('fileName', '')] AFileName: String);
+
+    [MVCPath('/xml/productos/documento')]
+    [MVCPath('/api/xml/productos/documento')]
+    [MVCHTTPMethod([httpGET])]
+    procedure GetProductosDocumento(const [MVCFromQueryString('fileName', '')] AFileName: String);
+
+    [MVCPath('/dashboard/metrics')]
+    [MVCPath('/api/dashboard/metrics')]
+    [MVCHTTPMethod([httpGET])]
+    procedure GetDashboardMetrics;
+  end;
+
+implementation
+
+uses
+  System.SysUtils, System.JSON, System.IOUtils, System.Types,
+  System.Generics.Collections, System.Generics.Defaults,
+  FireDAC.Comp.Client, FirebirdConnection,
+  XmlParserService, DianUnits, uPaths;
+
+type
+  TCombinedFileInfo = record
+    ID: Integer;
+    FileName: string;
+    Size: Int64;
+    ProveedorNit: string;
+    Proveedor: string;
+    FechaDocumento: TDateTime;
+    Estado: string;
+    FechaCarga: TDateTime;
+    LastModified: TDateTime;
+  end;
+
+function ResolveUnidadSigla(const AUnidadCodigo: string): string;
+var
+  LCode: string;
+begin
+  LCode := UpperCase(AUnidadCodigo.Trim);
+  if (LCode = '94') or (LCode = 'NIU') then
+    Result := 'UND'
+  else if LCode = 'KGM' then
+    Result := 'KG'
+  else if LCode = 'LTR' then
+    Result := 'LT'
+  else
+    Result := AUnidadCodigo;
+end;
+
+function FindFileFullPath(const AFileName: string): string;
+var
+  LSearchPaths: TArray<string>;
+  LPath, LCandidate: string;
+begin
+  Result := '';
+  LSearchPaths := [GetInputPath, GetProcessedPath, GetOutputPath];
+  for LPath in LSearchPaths do
+  begin
+    LCandidate := TPath.Combine(LPath, AFileName);
+    if TFile.Exists(LCandidate) then
+      Exit(LCandidate);
+  end;
+end;
+
+function FindXmlFile(const AFileName: string): string;
+var
+  LInputPath, LProcessedPath: string;
+begin
+  Result := '';
+  LInputPath := GetInputPath;
+  LProcessedPath := GetProcessedPath;
+  if TFile.Exists(TPath.Combine(LInputPath, AFileName)) then
+    Exit(TPath.Combine(LInputPath, AFileName));
+  if TFile.Exists(TPath.Combine(LProcessedPath, AFileName)) then
+    Exit(TPath.Combine(LProcessedPath, AFileName));
+end;
+
+procedure TXmlController.GetFiles;
+var
+  Q: TFDQuery;
+  LPath, LFile, LFileNameOnly, LPhysicalPath, LKey: string;
+  LSearchPaths: TArray<string>;
+  LFiles: TStringDynArray;
+  LCombinedList: TList<TCombinedFileInfo>;
+  LInfo: TCombinedFileInfo;
+  LDBData: TDictionary<string, TCombinedFileInfo>;
+  LJSONList: TJSONArray;
+  LJSONObj: TJSONObject;
+begin
+  ContentType := TMVCMediaType.APPLICATION_JSON;
+  LCombinedList := TList<TCombinedFileInfo>.Create;
+  try
+    LDBData := TDictionary<string, TCombinedFileInfo>.Create;
+    try
+      Q := GetBridgeQuery;
+      try
+        Q.SQL.Text := 'SELECT * FROM XML_FILES';
+        Q.Open;
+        while not Q.Eof do
+        begin
+          LInfo := Default(TCombinedFileInfo);
+          LInfo.ID := Q.FieldByName('ID').AsInteger;
+          LInfo.FileName := Q.FieldByName('FILE_NAME').AsString;
+          LInfo.ProveedorNit := Q.FieldByName('PROVEEDOR_NIT').AsString;
+          LInfo.Proveedor := Q.FieldByName('PROVEEDOR_NOMBRE').AsString;
+          if LInfo.Proveedor.Trim.IsEmpty then LInfo.Proveedor := 'Sin proveedor';
+          LInfo.FechaDocumento := Q.FieldByName('FECHA_DOCUMENTO').AsDateTime;
+          LInfo.Estado := Q.FieldByName('ESTADO').AsString;
+          LInfo.FechaCarga := Q.FieldByName('FECHA_CARGA').AsDateTime;
+          LDBData.AddOrSetValue(LInfo.FileName.ToLower, LInfo);
+          Q.Next;
+        end;
+      finally
+        Q.Free;
+      end;
+
+      for LKey in LDBData.Keys do
+      begin
+        LInfo := LDBData.Items[LKey];
+        LPhysicalPath := FindFileFullPath(LInfo.FileName);
+        if not LPhysicalPath.IsEmpty then
+        begin
+          LInfo.Size := TFile.GetSize(LPhysicalPath);
+          LInfo.LastModified := TFile.GetLastWriteTime(LPhysicalPath);
+          LDBData.Items[LKey] := LInfo;
+        end;
+      end;
+
+      LSearchPaths := [GetInputPath, GetProcessedPath, GetOutputPath];
+      for LPath in LSearchPaths do
+      begin
+        if TDirectory.Exists(LPath) then
+        begin
+          LFiles := TDirectory.GetFiles(LPath, '*.xml');
+          for LFile in LFiles do
+          begin
+            LFileNameOnly := TPath.GetFileName(LFile);
+            if LDBData.TryGetValue(LFileNameOnly.ToLower, LInfo) then
+            begin
+              if (LInfo.Size <= 0) or (LInfo.LastModified <= 0) then
+              begin
+                LInfo.Size := TFile.GetSize(LFile);
+                LInfo.LastModified := TFile.GetLastWriteTime(LFile);
+                LDBData.Items[LFileNameOnly.ToLower] := LInfo;
+              end;
+            end
+            else
+            begin
+              LInfo := Default(TCombinedFileInfo);
+              LInfo.ID := 0;
+              LInfo.FileName := LFileNameOnly;
+              LInfo.Size := TFile.GetSize(LFile);
+              LInfo.LastModified := TFile.GetLastWriteTime(LFile);
+              LInfo.ProveedorNit := '';
+              LInfo.Proveedor := 'Sin procesar';
+              LInfo.FechaDocumento := 0;
+              LInfo.Estado := 'CARGADO';
+              LInfo.FechaCarga := LInfo.LastModified;
+              LDBData.Add(LFileNameOnly.ToLower, LInfo);
+            end;
+          end;
+        end;
+      end;
+
+      for LInfo in LDBData.Values do
+        LCombinedList.Add(LInfo);
+
+      LCombinedList.Sort(TComparer<TCombinedFileInfo>.Construct(
+        function(const Left, Right: TCombinedFileInfo): Integer
+        begin
+          if Left.FechaCarga < Right.FechaCarga then Result := 1
+          else if Left.FechaCarga > Right.FechaCarga then Result := -1
+          else Result := 0;
+        end));
+
+      LJSONList := TJSONArray.Create;
+      try
+        for LInfo in LCombinedList do
+        begin
+          LJSONObj := TJSONObject.Create;
+          LJSONObj.AddPair('id', TJSONNumber.Create(LInfo.ID));
+          LJSONObj.AddPair('fileName', LInfo.FileName);
+          if LInfo.Size > 0 then
+            LJSONObj.AddPair('size', TJSONNumber.Create(LInfo.Size))
+          else
+            LJSONObj.AddPair('size', TJSONNumber.Create(0));
+          LJSONObj.AddPair('proveedorNit', LInfo.ProveedorNit);
+          LJSONObj.AddPair('proveedor', LInfo.Proveedor);
+          LJSONObj.AddPair('proveedorNombre', LInfo.Proveedor);
+          if LInfo.FechaDocumento > 0 then
+            LJSONObj.AddPair('fechaDocumento', FormatDateTime('yyyy-mm-dd', LInfo.FechaDocumento))
+          else
+            LJSONObj.AddPair('fechaDocumento', TJSONNull.Create);
+          LJSONObj.AddPair('estado', LInfo.Estado);
+          LJSONObj.AddPair('fechaCarga', FormatDateTime('yyyy-mm-dd HH:nn:ss', LInfo.FechaCarga));
+          if LInfo.LastModified > 0 then
+            LJSONObj.AddPair('lastModified', FormatDateTime('yyyy-mm-dd HH:nn:ss', LInfo.LastModified))
+          else
+            LJSONObj.AddPair('lastModified', TJSONNull.Create);
+          LJSONList.AddElement(LJSONObj);
+        end;
+        Render(LJSONList.ToJSON);
+      finally
+        LJSONList.Free;
+      end;
+    finally
+      LDBData.Free;
+    end;
+  finally
+    LCombinedList.Free;
+  end;
+end;
+
+procedure TXmlController.GetFileById(const id: string);
+var
+  Q: TFDQuery;
+  LFileID: Integer;
+  LResponse, LProductObj: TJSONObject;
+  LProductsArr: TJSONArray;
+  LUnidadCodigo: string;
+begin
+  ContentType := TMVCMediaType.APPLICATION_JSON;
+  LFileID := StrToIntDef(id, 0);
+  if LFileID = 0 then
+    raise EMVCException.Create(HTTP_STATUS.BadRequest, 'ID inválido');
+
+  Q := GetBridgeQuery;
+  try
+    Q.SQL.Text := 'SELECT * FROM XML_FILES WHERE ID = :ID';
+    Q.ParamByName('ID').AsInteger := LFileID;
+    Q.Open;
+
+    if Q.IsEmpty then
+      raise EMVCException.Create(HTTP_STATUS.NotFound, 'Archivo no encontrado');
+
+    LResponse := TJSONObject.Create;
+    try
+      LResponse.AddPair('id', TJSONNumber.Create(Q.FieldByName('ID').AsInteger));
+      LResponse.AddPair('fileName', Q.FieldByName('FILE_NAME').AsString);
+      LResponse.AddPair('proveedorNit', Q.FieldByName('PROVEEDOR_NIT').AsString);
+      if Q.FieldByName('PROVEEDOR_NOMBRE').AsString.Trim.IsEmpty then
+      begin
+        LResponse.AddPair('proveedor', 'Sin proveedor');
+        LResponse.AddPair('proveedorNombre', 'Sin proveedor');
+      end
+      else
+      begin
+        LResponse.AddPair('proveedor', Q.FieldByName('PROVEEDOR_NOMBRE').AsString);
+        LResponse.AddPair('proveedorNombre', Q.FieldByName('PROVEEDOR_NOMBRE').AsString);
+      end;
+      LResponse.AddPair('fechaDocumento', FormatDateTime('yyyy-mm-dd', Q.FieldByName('FECHA_DOCUMENTO').AsDateTime));
+      LResponse.AddPair('estado', Q.FieldByName('ESTADO').AsString);
+      LResponse.AddPair('fechaCarga', FormatDateTime('yyyy-mm-dd HH:nn:ss', Q.FieldByName('FECHA_CARGA').AsDateTime));
+      if not Q.FieldByName('FECHA_VALIDACION').IsNull then
+        LResponse.AddPair('fechaValidacion', FormatDateTime('yyyy-mm-dd HH:nn:ss', Q.FieldByName('FECHA_VALIDACION').AsDateTime))
+      else
+        LResponse.AddPair('fechaValidacion', TJSONNull.Create);
+      if not Q.FieldByName('FECHA_PROCESO').IsNull then
+        LResponse.AddPair('fechaProceso', FormatDateTime('yyyy-mm-dd HH:nn:ss', Q.FieldByName('FECHA_PROCESO').AsDateTime))
+      else
+        LResponse.AddPair('fechaProceso', TJSONNull.Create);
+
+      Q.Close;
+      Q.SQL.Text := 'SELECT * FROM XML_PRODUCTOS WHERE XML_FILE_ID = :FILEID';
+      Q.ParamByName('FILEID').AsInteger := LFileID;
+      Q.Open;
+
+      LProductsArr := TJSONArray.Create;
+      while not Q.Eof do
+      begin
+        LProductObj := TJSONObject.Create;
+        LUnidadCodigo := Q.FieldByName('UNIDAD').AsString;
+        LProductObj.AddPair('id', TJSONNumber.Create(Q.FieldByName('ID').AsInteger));
+        LProductObj.AddPair('descripcion', Q.FieldByName('DESCRIPCION').AsString);
+        LProductObj.AddPair('referencia', Q.FieldByName('REFERENCIA').AsString);
+        LProductObj.AddPair('referenciaStd', Q.FieldByName('REFERENCIA_STD').AsString);
+        LProductObj.AddPair('cantidad', TJSONNumber.Create(Q.FieldByName('CANTIDAD').AsFloat));
+        LProductObj.AddPair('unidad', ResolveUnidadSigla(LUnidadCodigo));
+        LProductObj.AddPair('unidadDescripcion', TDianUnits.GetUnitName(LUnidadCodigo));
+        LProductObj.AddPair('valorUnitario', TJSONNumber.Create(Q.FieldByName('VALOR_UNITARIO').AsFloat));
+        LProductObj.AddPair('valorTotal', TJSONNumber.Create(Q.FieldByName('VALOR_TOTAL').AsFloat));
+        LProductObj.AddPair('impuesto', TJSONNumber.Create(Q.FieldByName('IMPUESTO').AsFloat));
+        if not Q.FieldByName('EQUIVALENCIA_ID').IsNull then
+        begin
+          LProductObj.AddPair('equivalenciaId', TJSONNumber.Create(Q.FieldByName('EQUIVALENCIA_ID').AsInteger));
+          LProductObj.AddPair('estadoProducto', 'HOMOLOGADO');
+        end
+        else
+        begin
+          LProductObj.AddPair('equivalenciaId', TJSONNull.Create);
+          LProductObj.AddPair('estadoProducto', 'PENDIENTE');
+        end;
+        LProductsArr.AddElement(LProductObj);
+        Q.Next;
+      end;
+      LResponse.AddPair('productos', LProductsArr);
+
+      Render(LResponse.ToJSON);
+    finally
+      LResponse.Free;
+    end;
+  finally
+    Q.Free;
+  end;
+end;
+
+procedure TXmlController.Parse;
+var
+  LBody: TJSONObject;
+  LFileName, LFullFile, LXMLContent: string;
+  LParsedInvoice: TParsedInvoice;
+  LResponse, LProveedorObj, LTotalesObj, LProductoObj: TJSONObject;
+  LProductosArr: TJSONArray;
+  I: Integer;
+begin
+  ContentType := TMVCMediaType.APPLICATION_JSON;
+  LBody := TJSONObject.ParseJSONValue(Context.Request.Body) as TJSONObject;
+  try
+    if (LBody = nil) or not LBody.TryGetValue('fileName', LFileName) then
+      raise EMVCException.Create(HTTP_STATUS.BadRequest, 'fileName is required in the body');
+  finally
+    LBody.Free;
+  end;
+
+  LFileName := TPath.GetFileName(LFileName);
+  LFullFile := FindXmlFile(LFileName);
+  if LFullFile.IsEmpty then
+    raise EMVCException.Create(HTTP_STATUS.NotFound, 'Archivo no encontrado');
+
+  try
+    LXMLContent := TFile.ReadAllText(LFullFile, TEncoding.UTF8);
+  except
+    on E: Exception do
+      raise EMVCException.Create(HTTP_STATUS.InternalServerError, 'Error reading file: ' + E.Message);
+  end;
+
+  try
+    LParsedInvoice := TXmlParserService.Parse(LXMLContent);
+  except
+    on E: Exception do
+      raise EMVCException.Create(HTTP_STATUS.UnprocessableEntity, 'XML inválido');
+  end;
+
+  LResponse := TJSONObject.Create;
+  try
+    LProveedorObj := TJSONObject.Create;
+    LProveedorObj.AddPair('nit', LParsedInvoice.Provider.NIT);
+    LProveedorObj.AddPair('nombre', LParsedInvoice.Provider.Nombre);
+    LProveedorObj.AddPair('nombreLegal', LParsedInvoice.Provider.NombreLegal);
+    LProveedorObj.AddPair('tipoIdentificacion', LParsedInvoice.Provider.TipoIdentificacion);
+    LProveedorObj.AddPair('direccion', LParsedInvoice.Provider.Direccion);
+    LResponse.AddPair('proveedor', LProveedorObj);
+
+    LProductosArr := TJSONArray.Create;
+    for I := 0 to Length(LParsedInvoice.Products) - 1 do
+    begin
+      LProductoObj := TJSONObject.Create;
+      LProductoObj.AddPair('idLinea', LParsedInvoice.Products[I].IDLinea);
+      LProductoObj.AddPair('descripcion', LParsedInvoice.Products[I].Descripcion);
+      LProductoObj.AddPair('referencia', LParsedInvoice.Products[I].Referencia);
+      LProductoObj.AddPair('referenciaEstandar', LParsedInvoice.Products[I].ReferenciaEstandar);
+      LProductoObj.AddPair('cantidad', TJSONNumber.Create(LParsedInvoice.Products[I].Cantidad));
+      LProductoObj.AddPair('unidad', LParsedInvoice.Products[I].Unidad);
+      LProductoObj.AddPair('precioBase', TJSONNumber.Create(LParsedInvoice.Products[I].PrecioBase));
+      LProductoObj.AddPair('valorUnitario', TJSONNumber.Create(LParsedInvoice.Products[I].ValorUnitario));
+      LProductoObj.AddPair('valorTotal', TJSONNumber.Create(LParsedInvoice.Products[I].ValorTotal));
+      LProductoObj.AddPair('impuesto', TJSONNumber.Create(LParsedInvoice.Products[I].Impuesto));
+      LProductoObj.AddPair('porcentajeImpuesto', TJSONNumber.Create(LParsedInvoice.Products[I].ImpuestoPorcentaje));
+      LProductosArr.AddElement(LProductoObj);
+    end;
+    LResponse.AddPair('productos', LProductosArr);
+
+    LTotalesObj := TJSONObject.Create;
+    LTotalesObj.AddPair('subtotal', TJSONNumber.Create(LParsedInvoice.Totals.Subtotal));
+    LTotalesObj.AddPair('taxExclusiveAmount', TJSONNumber.Create(LParsedInvoice.Totals.TaxExclusiveAmount));
+    LTotalesObj.AddPair('taxInclusiveAmount', TJSONNumber.Create(LParsedInvoice.Totals.TaxInclusiveAmount));
+    LTotalesObj.AddPair('impuestoTotal', TJSONNumber.Create(LParsedInvoice.Totals.ImpuestoTotal));
+    LTotalesObj.AddPair('retencion', TJSONNumber.Create(LParsedInvoice.Totals.RetencionTotal));
+    LTotalesObj.AddPair('total', TJSONNumber.Create(LParsedInvoice.Totals.Total));
+    LResponse.AddPair('totales', LTotalesObj);
+
+    Render(LResponse.ToJSON);
+  finally
+    LResponse.Free;
+  end;
+end;
+
+procedure TXmlController.GetProductosPendientes(const AFileName: String);
+var
+  Q: TFDQuery;
+  LJSONList: TJSONArray;
+  LJSONObj: TJSONObject;
+  LFileID: Integer;
+begin
+  ContentType := TMVCMediaType.APPLICATION_JSON;
+  if AFileName.Trim.IsEmpty then
+    raise EMVCException.Create(HTTP_STATUS.BadRequest, 'fileName is required');
+
+  Q := GetBridgeQuery;
+  try
+    Q.SQL.Text := 'SELECT ID FROM XML_FILES WHERE FILE_NAME = :FNAME';
+    Q.ParamByName('FNAME').AsString := AFileName;
+    Q.Open;
+
+    if Q.IsEmpty then
+      raise EMVCException.Create(HTTP_STATUS.NotFound, 'File not found in staging');
+
+    LFileID := Q.FieldByName('ID').AsInteger;
+    Q.Close;
+
+    Q.SQL.Text :=
+      'SELECT REFERENCIA AS REFERENCIAXML, DESCRIPCION AS NOMBREPRODUCTO, UNIDAD AS UNIDADXML ' +
+      'FROM XML_PRODUCTOS ' +
+      'WHERE XML_FILE_ID = :FILEID AND EQUIVALENCIA_ID IS NULL';
+    Q.ParamByName('FILEID').AsInteger := LFileID;
+    Q.Open;
+
+    LJSONList := TJSONArray.Create;
+    try
+      while not Q.Eof do
+      begin
+        LJSONObj := TJSONObject.Create;
+        LJSONObj.AddPair('referenciaXML', Q.FieldByName('REFERENCIAXML').AsString);
+        LJSONObj.AddPair('nombreProducto', Q.FieldByName('NOMBREPRODUCTO').AsString);
+        LJSONObj.AddPair('unidadXML', Q.FieldByName('UNIDADXML').AsString);
+        LJSONObj.AddPair('unidadXMLNombre', TDianUnits.GetUnitName(Q.FieldByName('UNIDADXML').AsString));
+        LJSONObj.AddPair('estado', 'pendiente');
+        LJSONList.AddElement(LJSONObj);
+        Q.Next;
+      end;
+      Render(LJSONList.ToJSON);
+    finally
+      LJSONList.Free;
+    end;
+  finally
+    Q.Free;
+  end;
+end;
+
+procedure TXmlController.GetProductosDocumento(const AFileName: String);
+var
+  Q: TFDQuery;
+  LResponse: TJSONObject;
+  LProductsArr: TJSONArray;
+  LProductObj: TJSONObject;
+  LFileID: Integer;
+  LTotalProductos, LTotalPendientes, LTotalHomologados: Integer;
+  LUnidadErp: string;
+begin
+  ContentType := TMVCMediaType.APPLICATION_JSON;
+  if AFileName.Trim.IsEmpty then
+    raise EMVCException.Create(HTTP_STATUS.BadRequest, 'fileName is required');
+
+  Q := GetBridgeQuery;
+  try
+    Q.SQL.Text := 'SELECT ID FROM XML_FILES WHERE FILE_NAME = :FNAME';
+    Q.ParamByName('FNAME').AsString := AFileName;
+    Q.Open;
+
+    if Q.IsEmpty then
+      raise EMVCException.Create(HTTP_STATUS.NotFound, 'File not found in staging');
+
+    LFileID := Q.FieldByName('ID').AsInteger;
+    Q.Close;
+
+    Q.SQL.Text :=
+      'SELECT P.REFERENCIA AS REFERENCIAXML, P.DESCRIPCION AS NOMBREPRODUCTO, P.UNIDAD AS UNIDADXML, ' +
+      '       E.REFERENCIAP AS REFERENCIAERP, E.NOMBREH AS NOMBREERP, E.UNIDADH AS UNIDADERP, E.FACTOR, ' +
+      '       P.EQUIVALENCIA_ID ' +
+      'FROM XML_PRODUCTOS P ' +
+      'LEFT JOIN EQUIVALENCIA E ON P.EQUIVALENCIA_ID = E.ID ' +
+      'WHERE P.XML_FILE_ID = :FILEID';
+    Q.ParamByName('FILEID').AsInteger := LFileID;
+    Q.Open;
+
+    LTotalProductos := 0;
+    LTotalPendientes := 0;
+    LTotalHomologados := 0;
+    LProductsArr := TJSONArray.Create;
+
+    while not Q.Eof do
+    begin
+      Inc(LTotalProductos);
+      LProductObj := TJSONObject.Create;
+      LProductObj.AddPair('referenciaXML', Q.FieldByName('REFERENCIAXML').AsString);
+      LProductObj.AddPair('nombreProducto', Q.FieldByName('NOMBREPRODUCTO').AsString);
+      LProductObj.AddPair('unidadXML', Q.FieldByName('UNIDADXML').AsString);
+      LProductObj.AddPair('unidadXMLNombre', TDianUnits.GetUnitName(Q.FieldByName('UNIDADXML').AsString));
+
+      if not Q.FieldByName('EQUIVALENCIA_ID').IsNull then
+      begin
+        Inc(LTotalHomologados);
+        LProductObj.AddPair('estado', 'HOMOLOGADO');
+        LProductObj.AddPair('referenciaErp', Q.FieldByName('REFERENCIAERP').AsString);
+        LProductObj.AddPair('nombreErp', Q.FieldByName('NOMBREERP').AsString);
+        LUnidadErp := Q.FieldByName('UNIDADERP').AsString;
+        LProductObj.AddPair('unidadErp', LUnidadErp);
+        LProductObj.AddPair('unidadErpNombre', LUnidadErp);
+        LProductObj.AddPair('factor', TJSONNumber.Create(Q.FieldByName('FACTOR').AsFloat));
+      end
+      else
+      begin
+        Inc(LTotalPendientes);
+        LProductObj.AddPair('estado', 'PENDIENTE');
+        LProductObj.AddPair('referenciaErp', TJSONNull.Create);
+        LProductObj.AddPair('nombreErp', TJSONNull.Create);
+        LProductObj.AddPair('unidadErp', TJSONNull.Create);
+        LProductObj.AddPair('unidadErpNombre', TJSONNull.Create);
+        LProductObj.AddPair('factor', TJSONNull.Create);
+      end;
+
+      LProductsArr.AddElement(LProductObj);
+      Q.Next;
+    end;
+
+    LResponse := TJSONObject.Create;
+    try
+      LResponse.AddPair('totalProductos', TJSONNumber.Create(LTotalProductos));
+      LResponse.AddPair('totalPendientes', TJSONNumber.Create(LTotalPendientes));
+      LResponse.AddPair('totalHomologados', TJSONNumber.Create(LTotalHomologados));
+      LResponse.AddPair('productos', LProductsArr);
+      Render(LResponse.ToJSON);
+    finally
+      LResponse.Free;
+    end;
+  finally
+    Q.Free;
+  end;
+end;
+
+procedure TXmlController.GetDashboardMetrics;
+var
+  Q: TFDQuery;
+  LResponse: TJSONObject;
+  LTotal, LCargados, LPendientes, LListos, LProcesados, LErrores: Integer;
+  LProcesadosHoy, LErroresHoy: Integer;
+  LEstado: string;
+begin
+  ContentType := TMVCMediaType.APPLICATION_JSON;
+  LCargados := 0; LPendientes := 0; LListos := 0; LProcesados := 0; LErrores := 0;
+
+  Q := GetBridgeQuery;
+  try
+    Q.SQL.Text := 'SELECT COUNT(*) AS TOTAL FROM XML_FILES';
+    Q.Open;
+    LTotal := Q.FieldByName('TOTAL').AsInteger;
+    Q.Close;
+
+    Q.SQL.Text := 'SELECT ESTADO, COUNT(*) AS TOTAL FROM XML_FILES GROUP BY ESTADO';
+    Q.Open;
+    while not Q.Eof do
+    begin
+      LEstado := UpperCase(Q.FieldByName('ESTADO').AsString.Trim);
+      if LEstado = 'CARGADO' then LCargados := Q.FieldByName('TOTAL').AsInteger
+      else if LEstado = 'PENDIENTE' then LPendientes := Q.FieldByName('TOTAL').AsInteger
+      else if LEstado = 'VALIDADO' then LListos := Q.FieldByName('TOTAL').AsInteger
+      else if LEstado = 'PROCESADO' then LProcesados := Q.FieldByName('TOTAL').AsInteger
+      else if LEstado = 'ERROR' then LErrores := Q.FieldByName('TOTAL').AsInteger;
+      Q.Next;
+    end;
+    Q.Close;
+
+    Q.SQL.Text :=
+      'SELECT COUNT(*) AS TOTAL FROM XML_FILES ' +
+      'WHERE ESTADO = ''PROCESADO'' AND CAST(COALESCE(FECHA_PROCESO, FECHA_CARGA) AS DATE) = CURRENT_DATE';
+    Q.Open;
+    LProcesadosHoy := Q.FieldByName('TOTAL').AsInteger;
+    Q.Close;
+
+    Q.SQL.Text :=
+      'SELECT COUNT(*) AS TOTAL FROM XML_FILES ' +
+      'WHERE ESTADO = ''ERROR'' AND CAST(COALESCE(FECHA_PROCESO, FECHA_CARGA) AS DATE) = CURRENT_DATE';
+    Q.Open;
+    LErroresHoy := Q.FieldByName('TOTAL').AsInteger;
+    Q.Close;
+
+    LResponse := TJSONObject.Create;
+    try
+      LResponse.AddPair('total', TJSONNumber.Create(LTotal));
+      LResponse.AddPair('cargados', TJSONNumber.Create(LCargados));
+      LResponse.AddPair('pendientes', TJSONNumber.Create(LPendientes));
+      LResponse.AddPair('listos', TJSONNumber.Create(LListos));
+      LResponse.AddPair('procesados', TJSONNumber.Create(LProcesados));
+      LResponse.AddPair('errores', TJSONNumber.Create(LErrores));
+      LResponse.AddPair('procesadosHoy', TJSONNumber.Create(LProcesadosHoy));
+      LResponse.AddPair('erroresHoy', TJSONNumber.Create(LErroresHoy));
+      Render(LResponse.ToJSON);
+    finally
+      LResponse.Free;
+    end;
+  finally
+    Q.Free;
+  end;
+end;
+
+end.
+```
+
+Notas:
+- El path param `($id)` se tipó como `string` (no `Integer`) a propósito: así se preserva EXACTAMENTE el comportamiento original de `StrToIntDef(Req.Params['id'], 0)` (un id no-numérico o `"0"` cae igual en el branch de 400) — si se tipara como `Integer` directamente en la firma del método, DMVCFramework intentaría bindear el segmento de URL como entero ANTES de que el código del controller corra, cambiando el comportamiento para valores no numéricos (probablemente un 400/404 del framework en vez del mensaje "ID inválido" propio). Verificar empíricamente que el binding de `($id)` a un parámetro `string` funciona como se espera (la Fase 4 no tiene otro ejemplo de path param todavía) — si no, ajustar según lo que el compilador/framework exija, pero mantener el chequeo manual de "ID inválido"/"Archivo no encontrado" tal cual.
+- `HTTP_STATUS.UnprocessableEntity` (422): verificar que esta constante existe en `MVCFramework.Commons` de esta versión (debería, es estándar) antes de compilar.
+- Todas las consultas van contra `GetBridgeQuery` (BRIDGE local, descartable) — ningún handler de esta sub-task toca Helisa.
+
+- [ ] **Step 2: Registrar el controller en el WebModule**
+
+Modificar `dmvc/DMVC.WebModule.Main.pas`: agregar `DMVC.Controllers.XmlController` al `uses` y `FEngine.AddController(TXmlController);` después de `TAuthController`.
+
+- [ ] **Step 3: Escribir los tests (RED → GREEN)**
+
+Crear `tests/DMVC/DMVC.XmlControllerReadTests.pas` con estos 11 tests (mismo patrón `TTestServerProcess` + `ObtenerTokenDePrueba` + `TIdHTTP` de tasks anteriores; todas contra BRIDGE local, ningún dato de Helisa involucrado):
+
+1. `GetFiles_ReturnsJsonArray` — 200, array JSON (vacío o no, sin asumir contenido — BRIDGE es compartida entre corridas de tests, igual criterio que la Task 1 con Helisa).
+2. `GetFiles_WithoutToken_Returns401`.
+3. `GetFileById_WithInvalidId_Returns400` (usar `"0"` o `"abc"`).
+4. `GetFileById_WithNonexistentId_Returns404` (un ID grande, ej. `999999999`).
+5. `Parse_WithoutFileName_Returns400`.
+6. `Parse_WithNonexistentFile_Returns404` (mismo criterio de nombre ficticio que Task 3).
+7. `Parse_WithoutToken_Returns401`.
+8. `GetProductosPendientes_WithoutFileName_Returns400`.
+9. `GetProductosPendientes_WithNonexistentFileName_Returns404`.
+10. `GetProductosDocumento_WithoutFileName_Returns400`.
+11. `GetProductosDocumento_WithNonexistentFileName_Returns404`.
+12. `GetDashboardMetrics_ReturnsJsonWithCounts` — 200, verificar que el JSON tiene los 8 campos numéricos esperados (`total`, `cargados`, `pendientes`, `listos`, `procesados`, `errores`, `procesadosHoy`, `erroresHoy`), sin asumir valores exactos.
+
+(12 tests en total — se listaron como "11" en el resumen de arriba antes de contar `GetDashboardMetrics`; el número real a implementar es 12, ajustar el conteo de la suite en consecuencia: 34 anteriores + 12 = 46).
+
+Modificar `tests/PurchaseBridge.Tests.dpr`: agregar `DMVC.XmlControllerReadTests in 'DMVC\DMVC.XmlControllerReadTests.pas';`.
+
+Compilar servidor + tests. Correr la suite completa — deben pasar 46/46.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add dmvc/Controllers/DMVC.Controllers.XmlController.pas dmvc/DMVC.WebModule.Main.pas tests/DMVC/DMVC.XmlControllerReadTests.pas tests/PurchaseBridge.Tests.dpr
+git commit -m "feat: migrate XmlController read-only routes to DMVCFramework (Task 6a)"
+```
+
+Sin gate de aprobación — seguir directo a escribir el detalle completo de la Task 6b (agrega Upload/ProcesarBatch/Homologar al MISMO archivo `DMVC.Controllers.XmlController.pas`).
 
 #### Task 6b: XmlController — rutas de escritura (3 handlers, 6 registros de ruta)
 
@@ -2019,6 +2701,435 @@ Sin gate de aprobación — seguir directo a escribir el detalle de la Task 6.
 **Punto a verificar empíricamente antes de escribir el detalle completo (no asumir):** cómo `Upload` recibe el archivo multipart en DMVCFramework — el Horse original usa `Req.RawWebRequest.Files` (WebBroker `TAbstractWebRequestFile`, vía el módulo `horse-octet-stream`/WebBroker subyacente). Dado que este proyecto hostea DMVC sobre el mismo `TIdHTTPWebBrokerBridge`+`TWebModule` (confirmado en `PurchaseBridgeDMVC.dpr`, Fases 1-3), es razonable esperar que `Context.Request.RawWebRequest.Files` esté igualmente disponible en un controller DMVC (mismo `TWebRequest` subyacente) — pero esto debe confirmarse leyendo `MVCFramework.pas` (`TMVCWebRequest`/`RawWebRequest`) y/o probándolo antes de dar el código por bueno, no asumirlo por analogía.
 
 **Archivos:** Modify `dmvc/Controllers/DMVC.Controllers.XmlController.pas` (agregar las 3 acciones), modify `dmvc/DMVC.WebModule.Main.pas` (ya registrado desde 6a, no requiere segundo `AddController`), create `tests/DMVC/DMVC.XmlControllerWriteTests.pas`, modify `tests/PurchaseBridge.Tests.dpr`.
+
+**Precondición: la Task 6a debe estar mergeada primero** (este archivo agrega métodos al MISMO `dmvc/Controllers/DMVC.Controllers.XmlController.pas` que crea la Task 6a).
+
+**Decisión de testing:** a diferencia de `LicenciaController`/`DocumentosController`, las 3 escrituras de esta task van a BRIDGE (local, descartable) — SÍ se automatiza el camino feliz completo con limpieza posterior (`finally` + `DELETE` crudo, patrón ya usado en la Fase 2 para Equivalencia). La única llamada a Helisa real es de solo lectura (`HelisaService.ObtenerSiglaUnidad`, para convertir un código de unidad a sigla) — segura incluso con un código ficticio (si no existe, la función simplemente no modifica el valor original, ver código).
+
+- [ ] **Step 1: Agregar las 3 acciones al controller**
+
+Agregar a `dmvc/Controllers/DMVC.Controllers.XmlController.pas` (mismo archivo de la Task 6a):
+
+En la sección `type` de `TXmlController`, agregar:
+
+```pascal
+    [MVCPath('/xml/upload')]
+    [MVCPath('/api/xml/upload')]
+    [MVCHTTPMethod([httpPOST])]
+    procedure Upload;
+
+    [MVCPath('/xml/procesar')]
+    [MVCPath('/api/xml/procesar')]
+    [MVCHTTPMethod([httpPOST])]
+    procedure ProcesarBatch;
+
+    [MVCPath('/xml/homologar')]
+    [MVCPath('/api/xml/homologar')]
+    [MVCHTTPMethod([httpPOST])]
+    procedure Homologar;
+```
+
+Agregar a la sección `implementation` (ampliar el `uses` con `System.Classes` para `TFileStream`, `EquivalenciaService`, `HelisaService`):
+
+```pascal
+procedure TXmlController.Upload;
+var
+  LFile: TAbstractWebRequestFile;
+  LPath, LFileName, LFullFile: string;
+  LResponse: TJSONObject;
+  I: Integer;
+  LFound: Boolean;
+  LFileStream: TFileStream;
+  Q: TFDQuery;
+begin
+  ContentType := TMVCMediaType.APPLICATION_JSON;
+  try
+    LFound := False;
+    LFile := nil;
+
+    for I := 0 to Context.Request.Files.Count - 1 do
+    begin
+      if SameText(Context.Request.Files[I].FieldName, 'file') then
+      begin
+        LFile := Context.Request.Files[I];
+        LFound := True;
+        Break;
+      end;
+    end;
+
+    if not LFound then
+      raise EMVCException.Create(HTTP_STATUS.BadRequest, 'No file uploaded with field name "file"');
+
+    LFileName := LFile.FileName;
+    if not SameText(ExtractFileExt(LFileName), '.xml') then
+      raise EMVCException.Create(HTTP_STATUS.BadRequest, 'The file must have a .xml extension');
+
+    LPath := GetInputPath;
+    if not TDirectory.Exists(LPath) then
+      TDirectory.CreateDirectory(LPath);
+
+    LFullFile := TPath.Combine(LPath, LFileName);
+
+    LFile.Stream.Position := 0;
+    LFileStream := TFileStream.Create(LFullFile, fmCreate);
+    try
+      LFileStream.CopyFrom(LFile.Stream, LFile.Stream.Size);
+    finally
+      LFileStream.Free;
+    end;
+
+    Q := GetBridgeQuery;
+    try
+      Q.SQL.Text := 'SELECT ID FROM XML_FILES WHERE FILE_NAME = :FNAME';
+      Q.ParamByName('FNAME').AsString := LFileName;
+      Q.Open;
+      if Q.IsEmpty then
+      begin
+        Q.Close;
+        Q.SQL.Text :=
+          'INSERT INTO XML_FILES (FILE_NAME, ESTADO, MENSAJE_ERROR, FECHA_CARGA) ' +
+          'VALUES (:FNAME, ''CARGADO'', NULL, CURRENT_TIMESTAMP)';
+        Q.ParamByName('FNAME').AsString := LFileName;
+        Q.ExecSQL;
+      end
+      else
+      begin
+        Q.Close;
+        Q.SQL.Text :=
+          'UPDATE XML_FILES SET ESTADO = ''CARGADO'', MENSAJE_ERROR = NULL, FECHA_CARGA = CURRENT_TIMESTAMP ' +
+          'WHERE FILE_NAME = :FNAME';
+        Q.ParamByName('FNAME').AsString := LFileName;
+        Q.ExecSQL;
+      end;
+    finally
+      Q.Free;
+    end;
+
+    LResponse := TJSONObject.Create;
+    try
+      LResponse.AddPair('success', TJSONBool.Create(True));
+      LResponse.AddPair('message', 'XML uploaded successfully');
+      LResponse.AddPair('fileName', LFileName);
+      LResponse.AddPair('path', LFullFile.Replace('\', '/'));
+      Render(LResponse.ToJSON);
+    finally
+      LResponse.Free;
+    end;
+  except
+    on E: EMVCException do
+      raise;
+    on E: Exception do
+      raise EMVCException.Create(HTTP_STATUS.InternalServerError, 'Error saving file: ' + E.Message);
+  end;
+end;
+
+procedure TXmlController.ProcesarBatch;
+var
+  Q: TFDQuery;
+  LBody: TJSONObject;
+  LIdsArr: TJSONArray;
+  LId: Integer;
+  I: Integer;
+  LResponse: TJSONObject;
+  LProcesadosArr, LRechazadosArr: TJSONArray;
+  LHasPendientes: Boolean;
+  LEstadoFinal: string;
+  LProcesadosCount, LRechazadosCount: Integer;
+  LRechazadosLabel: string;
+begin
+  ContentType := TMVCMediaType.APPLICATION_JSON;
+  LBody := TJSONObject.ParseJSONValue(Context.Request.Body) as TJSONObject;
+  try
+    if (LBody = nil) or not LBody.TryGetValue('ids', LIdsArr) then
+      raise EMVCException.Create(HTTP_STATUS.BadRequest, 'ids is required');
+  finally
+    LBody.Free;
+  end;
+
+  LProcesadosArr := TJSONArray.Create;
+  LRechazadosArr := TJSONArray.Create;
+  LProcesadosCount := 0;
+  LRechazadosCount := 0;
+
+  Q := GetBridgeQuery;
+  try
+    for I := 0 to LIdsArr.Count - 1 do
+    begin
+      LId := StrToIntDef(LIdsArr.Items[I].Value, 0);
+      if LId = 0 then Continue;
+
+      try
+        if not Q.Connection.InTransaction then
+          Q.Connection.StartTransaction;
+
+        Q.SQL.Text :=
+          'SELECT COUNT(*) as TOTAL ' +
+          'FROM XML_PRODUCTOS ' +
+          'WHERE XML_FILE_ID = :FILEID ' +
+          'AND COALESCE(ESTADO_VALIDACION, ''PENDIENTE'') <> ''HOMOLOGADO''';
+        Q.ParamByName('FILEID').AsInteger := LId;
+        Q.Open;
+        LHasPendientes := Q.FieldByName('TOTAL').AsInteger > 0;
+        Q.Close;
+
+        if LHasPendientes then
+        begin
+          Q.SQL.Text := 'UPDATE XML_FILES SET ESTADO = ''PENDIENTE'', MENSAJE_ERROR = :MSG WHERE ID = :ID';
+          Q.ParamByName('MSG').AsString := 'El documento contiene productos sin homologar y no puede ser procesado';
+          Q.ParamByName('ID').AsInteger := LId;
+          Q.ExecSQL;
+          Q.Connection.Commit;
+          LRechazadosArr.AddElement(TJSONNumber.Create(LId));
+          Inc(LRechazadosCount);
+          Continue;
+        end;
+
+        Q.SQL.Text := 'UPDATE XML_FILES SET ESTADO = ''PROCESADO'', MENSAJE_ERROR = NULL, FECHA_PROCESO = CURRENT_TIMESTAMP WHERE ID = :ID';
+        Q.ParamByName('ID').AsInteger := LId;
+        Q.ExecSQL;
+
+        Q.SQL.Text := 'SELECT ESTADO FROM XML_FILES WHERE ID = :ID';
+        Q.ParamByName('ID').AsInteger := LId;
+        Q.Open;
+        LEstadoFinal := UpperCase(Trim(Q.FieldByName('ESTADO').AsString));
+        Q.Close;
+        if LEstadoFinal <> 'PROCESADO' then
+          raise Exception.CreateFmt('Estado final inválido para ID %d. Estado actual: %s', [LId, LEstadoFinal]);
+
+        Q.Connection.Commit;
+
+        LProcesadosArr.AddElement(TJSONNumber.Create(LId));
+        Inc(LProcesadosCount);
+      except
+        on E: Exception do
+        begin
+          if Q.Connection.InTransaction then
+            Q.Connection.Rollback;
+          LRechazadosArr.AddElement(TJSONNumber.Create(LId));
+          Inc(LRechazadosCount);
+        end;
+      end;
+    end;
+
+    if LRechazadosCount = 1 then
+      LRechazadosLabel := 'rechazado'
+    else
+      LRechazadosLabel := 'rechazados';
+
+    LResponse := TJSONObject.Create;
+    try
+      LResponse.AddPair('success', TJSONBool.Create(True));
+      LResponse.AddPair('procesados', LProcesadosArr);
+      LProcesadosArr := nil;
+      LResponse.AddPair('rechazados', LRechazadosArr);
+      LRechazadosArr := nil;
+      LResponse.AddPair(
+        'mensaje',
+        Format('%d documentos procesados, %d %s por productos pendientes',
+          [LProcesadosCount, LRechazadosCount, LRechazadosLabel])
+      );
+      Render(LResponse.ToJSON);
+    finally
+      LResponse.Free;
+    end;
+  finally
+    Q.Free;
+  end;
+end;
+
+procedure TXmlController.Homologar;
+var
+  LBody, LResponse: TJSONObject;
+  LReferenciaXML, LUnidadXML, LReferenciaErp, LUnidadErp, LNombreH, LUnidadErpSigla: string;
+  LCodigoH, LSubCodigoH: Integer;
+  LFactor: Double;
+  LEquivalenciaID: Integer;
+  LXMLFileID, LPendientes: Integer;
+  LConn, LHelisaConn: TFDConnection;
+  Q: TFDQuery;
+begin
+  ContentType := TMVCMediaType.APPLICATION_JSON;
+  LConn := GetBridgeConnection;
+  try
+    try
+      LBody := TJSONObject.ParseJSONValue(Context.Request.Body) as TJSONObject;
+      try
+        if not Assigned(LBody) then
+          raise Exception.Create('JSON body inválido o vacío');
+
+        if not LBody.TryGetValue('referenciaXml', LReferenciaXML) then
+          if not LBody.TryGetValue('referenciaXML', LReferenciaXML) then
+            raise Exception.Create('referenciaXml es requerido');
+
+        if not LBody.TryGetValue('unidadXml', LUnidadXML) then
+          if not LBody.TryGetValue('unidadXML', LUnidadXML) then
+            raise Exception.Create('unidadXml es requerido');
+
+        if not LBody.TryGetValue('codigoH', LCodigoH) then
+          raise Exception.Create('codigoH (Código ERP) es requerido');
+
+        if not LBody.TryGetValue('nombreH', LNombreH) then
+          raise Exception.Create('nombreH (Nombre ERP) es requerido');
+
+        if not LBody.TryGetValue('subCodigoH', LSubCodigoH) then
+          LSubCodigoH := 0;
+
+        if not LBody.TryGetValue('referenciaErp', LReferenciaErp) then
+          if not LBody.TryGetValue('referenciaP', LReferenciaErp) then
+            raise Exception.Create('referenciaErp es requerido');
+
+        if not LBody.TryGetValue('unidadErp', LUnidadErp) then
+          if not LBody.TryGetValue('unidadP', LUnidadErp) then
+            raise Exception.Create('unidadErp es requerido');
+
+        if not LBody.TryGetValue('factor', LFactor) then
+        begin
+           if LBody.GetValue('factor') <> nil then
+             LFactor := StrToFloatDef(LBody.GetValue('factor').Value, 1)
+           else
+             LFactor := 1;
+        end;
+
+        if LReferenciaErp.Trim.IsEmpty then raise Exception.Create('Referencia ERP vacía');
+        if LUnidadErp.Trim.IsEmpty then raise Exception.Create('Unidad ERP vacía');
+
+        LConn.StartTransaction;
+        try
+          LHelisaConn := GetHelisaConnection;
+          try
+            LUnidadErpSigla := HelisaService.ObtenerSiglaUnidad(LHelisaConn, LUnidadErp);
+            if not LUnidadErpSigla.IsEmpty then
+              LUnidadErp := LUnidadErpSigla;
+          finally
+            LHelisaConn.Free;
+          end;
+
+          LEquivalenciaID := EquivalenciaService.GetIDEquivalencia(LConn, LReferenciaXML, LUnidadXML);
+
+          if LEquivalenciaID = 0 then
+          begin
+            LEquivalenciaID := EquivalenciaService.CrearEquivalencia(
+              LConn, LCodigoH, LSubCodigoH, LNombreH, LReferenciaXML, LUnidadXML, LUnidadErp, LReferenciaErp, LFactor
+            );
+          end;
+
+          Q := TFDQuery.Create(nil);
+          try
+            Q.Connection := LConn;
+            Q.SQL.Text :=
+              'UPDATE XML_PRODUCTOS SET EQUIVALENCIA_ID = :EID, ESTADO_VALIDACION = ''HOMOLOGADO'', MENSAJE_VALIDACION = NULL ' +
+              'WHERE REFERENCIA = :REF AND UNIDAD = :UNI AND EQUIVALENCIA_ID IS NULL';
+            Q.ParamByName('EID').AsInteger := LEquivalenciaID;
+            Q.ParamByName('REF').AsString := LReferenciaXML;
+            Q.ParamByName('UNI').AsString := LUnidadXML;
+            Q.ExecSQL;
+
+            Q.SQL.Text :=
+              'SELECT FIRST 1 XML_FILE_ID AS XML_FILE_ID ' +
+              'FROM XML_PRODUCTOS ' +
+              'WHERE REFERENCIA = :REF AND UNIDAD = :UNI';
+            Q.ParamByName('REF').AsString := LReferenciaXML;
+            Q.ParamByName('UNI').AsString := LUnidadXML;
+            Q.Open;
+            if not Q.IsEmpty then
+            begin
+              LXMLFileID := Q.FieldByName('XML_FILE_ID').AsInteger;
+              Q.Close;
+
+              Q.SQL.Text :=
+                'SELECT COUNT(*) AS TOTAL ' +
+                'FROM XML_PRODUCTOS ' +
+                'WHERE XML_FILE_ID = :XML_FILE_ID ' +
+                'AND EQUIVALENCIA_ID IS NULL';
+              Q.ParamByName('XML_FILE_ID').AsInteger := LXMLFileID;
+              Q.Open;
+              LPendientes := Q.FieldByName('TOTAL').AsInteger;
+              Q.Close;
+
+              if LPendientes = 0 then
+                Q.SQL.Text := 'UPDATE XML_FILES SET ESTADO = ''VALIDADO'' WHERE ID = :XML_FILE_ID'
+              else
+                Q.SQL.Text := 'UPDATE XML_FILES SET ESTADO = ''PENDIENTE'' WHERE ID = :XML_FILE_ID';
+              Q.ParamByName('XML_FILE_ID').AsInteger := LXMLFileID;
+              Q.ExecSQL;
+            end
+            else
+              Q.Close;
+          finally
+            Q.Free;
+          end;
+
+          LConn.Commit;
+
+          LResponse := TJSONObject.Create;
+          try
+            LResponse.AddPair('success', TJSONBool.Create(True));
+            LResponse.AddPair('message', 'Homologación guardada correctamente');
+            Render(LResponse.ToJSON);
+          finally
+            LResponse.Free;
+          end;
+        except
+          on E: Exception do
+          begin
+            LConn.Rollback;
+            raise;
+          end;
+        end;
+      finally
+        LBody.Free;
+      end;
+    except
+      on E: EMVCException do
+        raise;
+      on E: Exception do
+        raise EMVCException.Create(HTTP_STATUS.InternalServerError, E.Message);
+    end;
+  finally
+    LConn.Free;
+  end;
+end;
+```
+
+Notas de fidelidad y ajustes:
+- `Homologar` preserva un comportamiento peculiar del Horse original A PROPÓSITO: los campos faltantes (`referenciaXml`, `codigoH`, etc.) generan `Exception.Create(...)` genéricas que terminan como **500**, no 400 — no es un error de la migración, es el comportamiento ya existente en Horse (`except on E: Exception do ... Res.Status(500).Send(...)` sin distinguir validación de error real). Se preserva igual, no se "corrige" a 400 sin que el usuario lo pida explícitamente.
+- `Upload`: usa `Context.Request.Files` (propiedad de conveniencia de `TMVCWebRequest`, confirmada en `MVCFramework.pas`) en vez de `Req.RawWebRequest.Files` de Horse — mismo `TAbstractWebRequestFiles` subyacente. Verificar empíricamente con un upload real de prueba antes de dar el código por bueno (esta fase no tiene otro ejemplo de subida de archivos binarios todavía).
+- `ProcesarBatch`: aplica el mismo patrón de ownership `:= nil` tras `AddPair` ya usado y revisado en la Task 5, para no reintroducir la misma ventana de doble-free en el `except` (aunque aquí el `except` de la Task 5 no existe explícitamente como tal — de todas formas, aplicar el patrón `:= nil` inmediatamente después de cada `AddPair`, no antes ni todos juntos al final, como ya quedó documentado).
+- Los `Log(...)` de auditoría del Horse original (varios `Log(Format(...), llWarn/llInfo/llError)` dentro de `ProcesarBatch`) se omiten en este borrador por brevedad — el implementador debe agregarlos de vuelta usando `uLogger.Log` (agregar `uLogger` al `uses`), preservando los mismos mensajes y niveles, ya que son parte del comportamiento observable (auditoría) y no hay razón para quitarlos.
+
+- [ ] **Step 2: Escribir los tests (RED → GREEN)**
+
+Crear `tests/DMVC/DMVC.XmlControllerWriteTests.pas`. Todas las escrituras van contra BRIDGE (descartable) — usar SIEMPRE un `finally` con `DELETE` crudo para limpiar lo creado, mismo patrón que la Fase 2:
+
+1. `Upload_WithoutFile_Returns400` (POST multipart sin campo `file`).
+2. `Upload_WithNonXmlExtension_Returns400` (subir un `.txt`).
+3. `Upload_WithValidXmlFile_UpsertsStaging` — subir un archivo con nombre único ficticio (ej. `__phase4test_upload__.xml`, contenido trivial, no necesita ser XML válido porque `Upload` no lo parsea) vía `TIdMultiPartFormDataStream` (Indy) con campo `file`; verificar `success:true` y `fileName` en la respuesta; en el `finally`: borrar el archivo físico de `GetInputPath` (mismo path que usa el server bajo prueba) y `DELETE FROM XML_FILES WHERE FILE_NAME = '__phase4test_upload__.xml'` crudo contra BRIDGE.
+4. `Upload_WithoutToken_Returns401`.
+5. `ProcesarBatch_WithoutIds_Returns400`.
+6. `ProcesarBatch_WithFicticiousId_MarksProcesado` — insertar una fila ficticia en `XML_FILES` (sin productos asociados, así `LHasPendientes` da `False`) vía SQL crudo, llamar `ProcesarBatch` con ese ID, verificar que aparece en `procesados`; limpiar el `XML_FILES` insertado en el `finally`.
+7. `ProcesarBatch_WithoutToken_Returns401`.
+8. `Homologar_WithMissingReferenciaXml_Returns500` (preserva el quirk documentado arriba — NO esperar 400).
+9. `Homologar_WithValidFicticiousMapping_CreatesEquivalencia` — llamar con `referenciaXml`/`unidadXml`/`codigoH`/`nombreH`/`referenciaErp`/`unidadErp` todos claramente ficticios (ej. prefijo `__PHASE4TEST__`); verificar `success:true`; limpiar en el `finally` con `DELETE FROM EQUIVALENCIA WHERE REFERENCIAP = '...'` (o el campo que corresponda) crudo contra BRIDGE.
+10. `Homologar_WithoutToken_Returns401`.
+
+Modificar `tests/PurchaseBridge.Tests.dpr`: agregar `DMVC.XmlControllerWriteTests in 'DMVC\DMVC.XmlControllerWriteTests.pas';`.
+
+Compilar servidor + tests. Correr la suite completa — deben pasar 46 anteriores (tras 6a) + 10 nuevos = 56.
+
+- [ ] **Step 3: Verificación manual del Fase 4 completa (opcional pero recomendada dado el tamaño)**
+
+Con el server corriendo: hacer un smoke test manual de al menos `POST /api/xml/upload` con un archivo real y `POST /api/xml/homologar` con datos reales si el usuario lo pide explícitamente, para confirmar el camino feliz end-to-end antes de cerrar la Fase 4 — no obligatorio si los 56 tests automatizados ya pasan.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add dmvc/Controllers/DMVC.Controllers.XmlController.pas tests/DMVC/DMVC.XmlControllerWriteTests.pas tests/PurchaseBridge.Tests.dpr
+git commit -m "feat: migrate XmlController write routes to DMVCFramework (Task 6b)"
+```
+
+## Fin de la Fase 4
+
+Con la Task 6b commiteada, los 6 controllers restantes quedan migrados (56 tests totales). Siguiente paso: revisión final de toda la rama (whole-branch review, mismo patrón que Fases 1-3) y luego `superpowers:finishing-a-development-branch` para decidir merge/push — preguntar al usuario en ese punto, no asumir push automático a `origin/main`.
 
 **Archivos (ambas sub-tareas):** `dmvc/Controllers/DMVC.Controllers.XmlController.pas`, tests correspondientes.
 
