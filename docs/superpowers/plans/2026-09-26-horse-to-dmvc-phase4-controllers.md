@@ -2002,9 +2002,25 @@ Sin gate de aprobación — seguir directo a escribir el detalle de la Task 6.
 
 ### Task 6: XmlController (9 rutas — la más grande, 1176 líneas en Horse)
 
-**Objetivo:** `GET /xml/list` y `/xml/files` (mismo handler), `POST /xml/upload` (binario, `horse-octet-stream` en Horse → `TMVCWebRequest`/body crudo en DMVC), `POST /xml/parse`, `GET /xml/files/:id`, `POST /xml/procesar` (batch JSON), `GET /xml/productos/pendientes`, `GET /xml/productos/documento`, `POST /xml/homologar`, `GET /dashboard/metrics`. Dado el tamaño, evaluar al llegar a esta task si conviene partirla en 2 (rutas de lectura vs. upload/escritura).
+**Decisión (tomada tras leer el archivo completo, 2026-09-28): se divide en dos sub-tareas**, 6a y 6b, por tamaño/riesgo — el detalle TDD completo de cada una se escribe justo antes de despacharla (mismo criterio just-in-time del resto de esta fase), no ambas de una vez. Comparten el mismo `dmvc/Controllers/DMVC.Controllers.XmlController.pas` (un solo controller con las 9 acciones, igual que el Horse original agrupa todo en una unidad) — 6a agrega las acciones de solo lectura primero, 6b agrega las de escritura al mismo archivo después.
 
-**Archivos:** `dmvc/DTOs/DMVC.DTOs.Xml.pas`, `dmvc/Controllers/DMVC.Controllers.XmlController.pas`, tests correspondientes.
+**Hallazgo importante de la lectura completa:** a diferencia de `LicenciaController`/`DocumentosController` (que tocan sistemas EXTERNOS reales — servidor de licencias, ERP Helisa), las 3 rutas de escritura de `XmlController` (`Upload`, `ProcesarBatch`, `Homologar`) escriben en la base **BRIDGE local** (`purchasebridge.fdb`), que es la base de pruebas descartable de este proyecto (mismo criterio ya usado en la Fase 2 para crear/borrar registros de Equivalencia) — el único toque a Helisa real en todo el controller es una lectura de sigla de unidad en `Homologar` (`HelisaService.ObtenerSiglaUnidad`, solo lectura). Esto significa que 6b SÍ puede automatizar su camino feliz completo con limpieza posterior (patrón `finally` + DELETE crudo, como en la Fase 2), a diferencia de Tasks 2 y 5 de esta fase.
+
+#### Task 6a: XmlController — rutas de solo lectura (6 handlers, 7 registros de ruta)
+
+**Objetivo:** `GET /xml/list` + `/xml/files` (mismo handler `GetFiles`, alias — Horse marca `/xml/list` como deprecado en un comentario, preservar igual), `GET /xml/files/:id` (`GetFileById`, path param), `POST /xml/parse` (`Parse` — lee un archivo YA existente en Input/Processed y lo parsea, sin escribir nada), `GET /xml/productos/pendientes` (`GetProductosPendientes`), `GET /xml/productos/documento` (`GetProductosDocumento`), `GET /dashboard/metrics` (`GetDashboardMetrics`). Todas consultan `GetBridgeQuery` (BRIDGE local) y opcionalmente `TDianUnits.GetUnitName`/`ResolveUnidadSigla` (tablas/diccionario locales, sin red). Ninguna escribe nada — se puede automatizar el camino feliz completo sembrando filas de prueba en BRIDGE dentro del propio test (mismo patrón ya usado en la Fase 2).
+
+**Archivos:** Create `dmvc/Controllers/DMVC.Controllers.XmlController.pas` (arranca con estas 6 acciones), modify `dmvc/DMVC.WebModule.Main.pas`, create `tests/DMVC/DMVC.XmlControllerReadTests.pas`, modify `tests/PurchaseBridge.Tests.dpr`.
+
+#### Task 6b: XmlController — rutas de escritura (3 handlers, 6 registros de ruta)
+
+**Objetivo:** `POST /xml/upload` (`Upload` — recibe un archivo `multipart/form-data` con campo `file`, lo guarda en `GetInputPath` y hace upsert en `XML_FILES` de BRIDGE), `POST /xml/procesar` (`ProcesarBatch` — recibe `{ids:[...]}`, transacción por ID sobre BRIDGE), `POST /xml/homologar` (`Homologar` — recibe mapeo XML→ERP, crea/reutiliza una `Equivalencia` en BRIDGE vía `EquivalenciaService.GetIDEquivalencia`/`CrearEquivalencia`, actualiza `XML_PRODUCTOS`/`XML_FILES`, con UNA lectura real a Helisa vía `HelisaService.ObtenerSiglaUnidad` para convertir código de unidad a sigla). Se agregan al MISMO `dmvc/Controllers/DMVC.Controllers.XmlController.pas` de la Task 6a.
+
+**Punto a verificar empíricamente antes de escribir el detalle completo (no asumir):** cómo `Upload` recibe el archivo multipart en DMVCFramework — el Horse original usa `Req.RawWebRequest.Files` (WebBroker `TAbstractWebRequestFile`, vía el módulo `horse-octet-stream`/WebBroker subyacente). Dado que este proyecto hostea DMVC sobre el mismo `TIdHTTPWebBrokerBridge`+`TWebModule` (confirmado en `PurchaseBridgeDMVC.dpr`, Fases 1-3), es razonable esperar que `Context.Request.RawWebRequest.Files` esté igualmente disponible en un controller DMVC (mismo `TWebRequest` subyacente) — pero esto debe confirmarse leyendo `MVCFramework.pas` (`TMVCWebRequest`/`RawWebRequest`) y/o probándolo antes de dar el código por bueno, no asumirlo por analogía.
+
+**Archivos:** Modify `dmvc/Controllers/DMVC.Controllers.XmlController.pas` (agregar las 3 acciones), modify `dmvc/DMVC.WebModule.Main.pas` (ya registrado desde 6a, no requiere segundo `AddController`), create `tests/DMVC/DMVC.XmlControllerWriteTests.pas`, modify `tests/PurchaseBridge.Tests.dpr`.
+
+**Archivos (ambas sub-tareas):** `dmvc/Controllers/DMVC.Controllers.XmlController.pas`, tests correspondientes.
 
 ---
 
