@@ -46,6 +46,10 @@ begin
             LPath.StartsWith('/factura') or
             LPath.StartsWith('/documentos') or
             LPath.StartsWith('/xml') or
+            LPath.StartsWith('/dashboard') or
+            LPath.StartsWith('/proveedor') or
+            LPath.StartsWith('/erp') or
+            LPath.StartsWith('/equivalencia') or
             (LPath = '/ping');
 end;
 
