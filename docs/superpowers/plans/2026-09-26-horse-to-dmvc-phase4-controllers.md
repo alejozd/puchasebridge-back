@@ -1952,9 +1952,9 @@ begin
     LResponse := TJSONObject.Create;
     try
       LResponse.AddPair('procesados', LProcesadosArr);
+      LProcesadosArr := nil; // ownership transferido a LResponse (inmediato, evita doble-free si el AddPair de errores fallara)
       LResponse.AddPair('errores', LErroresArr);
-      LProcesadosArr := nil; // ownership transferido a LResponse
-      LErroresArr := nil;
+      LErroresArr := nil; // ownership transferido a LResponse
       Render(LResponse.ToJSON);
     finally
       LResponse.Free;

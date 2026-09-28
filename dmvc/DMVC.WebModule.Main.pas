@@ -29,6 +29,8 @@ uses
   DMVC.Controllers.LicenciaController,
   DMVC.Controllers.XmlValidationController,
   DMVC.Controllers.ImportController,
+  DMVC.Controllers.DocumentosController,
+  DMVC.Controllers.AuthController,
   DMVC.Middleware.HttpLogger,
   DMVC.Middleware.CORS,
   DMVC.Middleware.License,
@@ -74,6 +76,8 @@ begin
   FEngine.AddController(TLicenciaController);
   FEngine.AddController(TXmlValidationController);
   FEngine.AddController(TImportController);
+  FEngine.AddController(TDocumentosController);
+  FEngine.AddController(TAuthController);
 end;
 
 destructor TPurchaseBridgeDMVCWebModule.Destroy;

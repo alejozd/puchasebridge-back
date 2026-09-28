@@ -44,6 +44,7 @@ begin
             LPath.StartsWith('/auth') or
             LPath.StartsWith('/licencia') or
             LPath.StartsWith('/factura') or
+            LPath.StartsWith('/documentos') or
             (LPath = '/ping');
 end;
 
