@@ -117,12 +117,34 @@ puntos NO puede declarar `unit DMVC.Middleware.AuthMiddleware;`).
 **Depende de:** Fase 2 (necesita al menos un controller protegido para probar
 auth end-to-end).
 
-## Fase 4 — Controllers de alto riesgo/volumen
+**Plan detallado:** `2026-09-26-horse-to-dmvc-phase3-middlewares.md` (completo, mergeado).
 
-**Objetivo:** Migrar `AuthController`, `HelisaController`, `DocumentosController`,
-`ImportController`, `XmlController` (9 rutas), `XmlValidationController` y
-`LicenciaController`. Incluye el caso especial de upload binario
-(`horse-octet-stream` → manejo nativo de `TMVCWebRequest` en DMVC).
+## Fase 4 — Controllers de alto riesgo/volumen (completa, mergeada 2026-09-28)
+
+**Objetivo:** Migrar `HelisaController`, `LicenciaController`,
+`XmlValidationController`, `ImportController`, `DocumentosController`,
+`XmlController` (9 rutas, dividido en Task 6a lectura / 6b escritura por
+tamaño). `AuthController` NO se migró como controller propio — su única ruta
+(`POST /auth/login`) ya estaba completamente superada por el middleware JWT de
+la Fase 3; en su lugar se agregó `GET /api/auth/me` (nuevo, Task 5) para
+reemplazar el payload `{usuario,empresa}` que el login de Horse solía incluir.
+
+**Incluye el caso especial de upload binario** (`horse-octet-stream` en Horse
+→ `Context.Request.Files` de `TMVCWebRequest` en DMVC, Task 6b).
+
+**6 tasks, ejecutadas una por una con commit + aprobación entre cada una** (a
+pedido del usuario, sesión con cuota semanal ajustada). Cada task pasó por
+implementador + revisor + fix antes de commitear. Revisión final de toda la
+rama confirmó cero archivos Horse tocados en las 6 tasks. Dos bugs reales
+encontrados en código Horse PREEXISTENTE (no tocados, fuera de alcance,
+documentados en memoria del proyecto para seguimiento aparte):
+`services/XMLFacturaService.pas` probablemente falla en silencio con facturas
+DIAN reales (no maneja el sobre `AttachedDocument` ni namespaces `cac`/`cbc`
+reales), y `services/HelisaService.pas`'s `ObtenerSiglaUnidad` dispara un bug
+real del driver FireDAC/Firebird ("Attempt to reclose a closed cursor") con
+códigos de unidad inexistentes.
+
+**Plan detallado:** `2026-09-26-horse-to-dmvc-phase4-controllers.md` (completo, mergeado).
 
 **Depende de:** Fase 3 (necesita todos los middlewares ya migrados).
 
@@ -156,6 +178,6 @@ orden de `ServerBootstrap.pas`.
 
 - [x] Fase 1 — Esqueleto DMVC en paralelo
 - [x] Fase 2 — Controllers de bajo riesgo
-- [ ] Fase 3 — Middlewares transversales
-- [ ] Fase 4 — Controllers de alto riesgo/volumen
+- [x] Fase 3 — Middlewares transversales
+- [x] Fase 4 — Controllers de alto riesgo/volumen
 - [ ] Fase 5 — Cutover
