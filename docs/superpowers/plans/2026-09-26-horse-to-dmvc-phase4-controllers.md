@@ -1324,9 +1324,296 @@ git commit -m "feat: migrate XmlValidationController to DMVCFramework"
 
 ### Task 4: ImportController (1 ruta)
 
-**Objetivo:** `POST /factura/xml` (sin alias `/api`) — recibe XML crudo en el body, usa `XMLFacturaService.Parsear`, `ProveedorRepository.ObtenerProveedorPorNit` (Helisa real, solo lectura), `ProductoRepository.ExisteProducto`. Responde JSON con proveedor+productos y si existen.
+**Files:**
+- Create: `dmvc/Controllers/DMVC.Controllers.ImportController.pas`
+- Modify: `dmvc/DMVC.WebModule.Main.pas`
+- Create: `tests/DMVC/DMVC.ImportControllerTests.pas`
+- Modify: `tests/PurchaseBridge.Tests.dpr`
 
-**Archivos:** `dmvc/DTOs/DMVC.DTOs.Import.pas`, `dmvc/Controllers/DMVC.Controllers.ImportController.pas`, tests correspondientes.
+**Interfaces:**
+- Consumes: `services/XMLFacturaService.pas` (`TXMLFacturaService.Parsear`, `TFacturaXML`, `TProductoXML`), `repositories/ProveedorRepository.pas` (`ObtenerProveedorPorNit`, `TProveedorInfo`), `repositories/ProductoRepository.pas` (`ExisteProducto`), `utils/uLogger.pas` (`LogError`) — todos sin cambios. NO se usa `utils/ErrorResponseUtils.pas` (depende de `THorseResponse`, es Horse-specific) — se reemplaza por el mismo patrón `raise EMVCException.Create(status, mensaje)` ya usado en Tasks 1-2 (normalización de shape de error `{success,message,detail}` → shape estándar de DMVC, ya aceptada desde la Fase 3).
+- Sin DTOs: el shape de respuesta (`proveedor`/`productos`) es simple pero con un campo condicional (`codigo` solo si `existe`) — se preserva igual que Horse con `TJSONObject` a mano.
+- Sin alias `/api` (a diferencia de casi todas las demás rutas de este proyecto) — el Horse original solo registra `/factura/xml`, sin duplicado. Preservar tal cual, no agregar el alias.
+
+**Decisión de testing:** a diferencia de `LicenciaController` (Task 2), esta ruta SÍ es segura de probar en su camino feliz completo: `ObtenerProveedorPorNit`/`ExisteProducto` son consultas de solo lectura contra la Helisa real (mismo patrón ya usado y aceptado en la Fase 2 para `ProveedorController`) — usando un NIT y una referencia de producto claramente ficticios (`'000000000-TEST'` — mismo NIT ficticio ya usado en la Fase 2, y una referencia con un sufijo `__PHASE4TEST__` que no debería existir), el test ejercita el parseo XML real + las dos consultas reales sin depender de que existan datos reales ni escribir nada.
+
+- [ ] **Step 1: Escribir el controller**
+
+Crear `dmvc/Controllers/DMVC.Controllers.ImportController.pas`:
+
+```pascal
+unit DMVC.Controllers.ImportController;
+
+interface
+
+uses
+  MVCFramework, MVCFramework.Commons;
+
+type
+  [MVCPath('/')]
+  TImportController = class(TMVCController)
+  public
+    [MVCPath('/factura/xml')]
+    [MVCHTTPMethod([httpPOST])]
+    procedure PostFacturaXML;
+  end;
+
+implementation
+
+uses
+  System.SysUtils, System.JSON,
+  XMLFacturaService, ProveedorRepository, ProductoRepository, uLogger;
+
+procedure TImportController.PostFacturaXML;
+var
+  LXMLContent: string;
+  LFactura: TFacturaXML;
+  LResponseJSON, LProveedorJSON, LProductoJSON: TJSONObject;
+  LProductosArray: TJSONArray;
+  I: Integer;
+  LProveedor: TProveedorInfo;
+  LExisteProducto: Boolean;
+begin
+  ContentType := TMVCMediaType.APPLICATION_JSON;
+  try
+    LXMLContent := Context.Request.Body;
+    if LXMLContent = '' then
+      raise EMVCException.Create(HTTP_STATUS.BadRequest, 'Cuerpo XML vacío');
+
+    LFactura := TXMLFacturaService.Parsear(LXMLContent);
+
+    LResponseJSON := TJSONObject.Create;
+    try
+      LProveedor := ObtenerProveedorPorNit(LFactura.NitProveedor, LFactura.Anio);
+      LProveedorJSON := TJSONObject.Create;
+      LProveedorJSON.AddPair('nit', LFactura.NitProveedor);
+      LProveedorJSON.AddPair('existe', TJSONBool.Create(LProveedor.Existe));
+      if LProveedor.Existe then
+        LProveedorJSON.AddPair('codigo', LProveedor.Codigo);
+      LResponseJSON.AddPair('proveedor', LProveedorJSON);
+
+      LProductosArray := TJSONArray.Create;
+      for I := 0 to Length(LFactura.Productos) - 1 do
+      begin
+        LExisteProducto := ExisteProducto(LFactura.Productos[I].Referencia, LFactura.Productos[I].Descripcion, LFactura.Anio);
+
+        LProductoJSON := TJSONObject.Create;
+        LProductoJSON.AddPair('referencia', LFactura.Productos[I].Referencia);
+        LProductoJSON.AddPair('descripcion', LFactura.Productos[I].Descripcion);
+        LProductoJSON.AddPair('existe', TJSONBool.Create(LExisteProducto));
+        LProductosArray.AddElement(LProductoJSON);
+      end;
+      LResponseJSON.AddPair('productos', LProductosArray);
+
+      Render(LResponseJSON.ToJSON);
+    finally
+      LResponseJSON.Free;
+    end;
+  except
+    on E: EMVCException do
+      raise;
+    on E: Exception do
+    begin
+      uLogger.LogError(E.Message, 'error_response');
+      raise EMVCException.Create(HTTP_STATUS.InternalServerError, 'Error interno del servidor: ' + E.Message);
+    end;
+  end;
+end;
+
+end.
+```
+
+Notas:
+- `on E: EMVCException do raise;` re-lanza sin envolver — así el 400 de "Cuerpo XML vacío" no cae en la rama genérica de 500.
+- El único `Render(LResponseJSON.ToJSON)` es de un solo argumento (sin `StatusCode`), así que NO aplica la gotcha de resolución de overloads encontrada en la Task 3 (`Render(Integer, X.ToJSON)`) — solo aplica si se agrega un `Render(statusCode, ...)` en algún punto; si el compilador da `E2250` en algún `Render`, aplicar el mismo fix (asignar `.ToJSON` a una variable local `string` antes de pasarla).
+
+- [ ] **Step 2: Registrar el controller en el WebModule**
+
+Modificar `dmvc/DMVC.WebModule.Main.pas`: agregar `DMVC.Controllers.ImportController` al `uses` y `FEngine.AddController(TImportController);` después de `TXmlValidationController`.
+
+- [ ] **Step 3: Escribir los tests (RED → GREEN)**
+
+Crear `tests/DMVC/DMVC.ImportControllerTests.pas`. Usar un XML de factura UBL mínimo pero válido para que `TXMLFacturaService.Parsear` no lance excepción — el parser busca literalmente los nodos `cac:AccountingSupplierParty` → `cac:Party` → `cac:PartyTaxScheme` → `cbc:CompanyID` (NIT), `cbc:IssueDate` (año), y cada `cac:InvoiceLine` → `cac:Item` → `cbc:Description` + `cac:SellersItemIdentification` → `cbc:ID` (por producto). Declarar los namespaces `cac`/`cbc` en el XML de prueba para evitar un error de "prefijo no declarado" al cargarlo con `LoadXMLData`:
+
+```pascal
+unit DMVC.ImportControllerTests;
+
+interface
+
+uses
+  DUnitX.TestFramework, DMVC.TestServerProcess;
+
+type
+  [TestFixture]
+  TImportControllerTests = class
+  private
+    FServer: TTestServerProcess;
+    FToken: string;
+  public
+    [Setup]
+    procedure Setup;
+    [TearDown]
+    procedure TearDown;
+
+    [Test]
+    procedure PostFacturaXML_WithEmptyBody_Returns400;
+
+    [Test]
+    procedure PostFacturaXML_WithValidXML_ReturnsProveedorYProductos;
+
+    [Test]
+    procedure PostFacturaXML_WithoutToken_Returns401;
+  end;
+
+implementation
+
+uses
+  System.SysUtils, System.IOUtils, System.JSON, System.Classes, IdHTTP, DMVC.TestAuthHelper;
+
+const
+  TEST_PORT = 9091;
+  TEST_XML =
+    '<?xml version="1.0" encoding="UTF-8"?>' +
+    '<Invoice xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2" ' +
+    'xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">' +
+    '<cbc:IssueDate>2024-05-22</cbc:IssueDate>' +
+    '<cac:AccountingSupplierParty>' +
+    '<cac:Party>' +
+    '<cac:PartyTaxScheme>' +
+    '<cbc:CompanyID>000000000-TEST</cbc:CompanyID>' +
+    '</cac:PartyTaxScheme>' +
+    '</cac:Party>' +
+    '</cac:AccountingSupplierParty>' +
+    '<cac:InvoiceLine>' +
+    '<cac:Item>' +
+    '<cbc:Description>Producto de prueba Fase 4</cbc:Description>' +
+    '<cac:SellersItemIdentification>' +
+    '<cbc:ID>__PHASE4TEST_REF__</cbc:ID>' +
+    '</cac:SellersItemIdentification>' +
+    '</cac:Item>' +
+    '</cac:InvoiceLine>' +
+    '</Invoice>';
+
+function ServerExePath: string;
+begin
+  Result := TPath.GetFullPath(TPath.Combine(TPath.GetDirectoryName(ParamStr(0)), '..\..\bin\PurchaseBridgeDMVC.exe'));
+end;
+
+procedure TImportControllerTests.Setup;
+begin
+  FServer := TTestServerProcess.Create;
+  FServer.Start(ServerExePath, TEST_PORT);
+  Assert.IsTrue(FServer.WaitForReady(TEST_PORT), 'El servidor DMVC no respondió a tiempo en /ping');
+  FToken := ObtenerTokenDePrueba(TEST_PORT);
+end;
+
+procedure TImportControllerTests.TearDown;
+begin
+  FServer.Stop;
+  FServer.Free;
+end;
+
+procedure TImportControllerTests.PostFacturaXML_WithEmptyBody_Returns400;
+var
+  LHttp: TIdHTTP;
+  LRequest, LResponse: TStringStream;
+begin
+  LHttp := TIdHTTP.Create(nil);
+  LRequest := TStringStream.Create('', TEncoding.UTF8);
+  LResponse := TStringStream.Create;
+  try
+    LHttp.Request.CustomHeaders.AddValue('Authorization', 'Bearer ' + FToken);
+    LHttp.Request.ContentType := 'application/xml';
+    try
+      LHttp.Post(Format('http://localhost:%d/factura/xml', [TEST_PORT]), LRequest, LResponse);
+      Assert.Fail('Se esperaba una excepcion HTTP 400');
+    except
+      on E: EIdHTTPProtocolException do
+        Assert.AreEqual(400, E.ErrorCode);
+    end;
+  finally
+    LRequest.Free;
+    LResponse.Free;
+    LHttp.Free;
+  end;
+end;
+
+procedure TImportControllerTests.PostFacturaXML_WithValidXML_ReturnsProveedorYProductos;
+var
+  LHttp: TIdHTTP;
+  LRequest, LResponse: TStringStream;
+  LJson: TJSONObject;
+  LProveedor: TJSONObject;
+  LProductos: TJSONArray;
+begin
+  LHttp := TIdHTTP.Create(nil);
+  LRequest := TStringStream.Create(TEST_XML, TEncoding.UTF8);
+  LResponse := TStringStream.Create;
+  try
+    LHttp.Request.CustomHeaders.AddValue('Authorization', 'Bearer ' + FToken);
+    LHttp.Request.ContentType := 'application/xml';
+    LHttp.Post(Format('http://localhost:%d/factura/xml', [TEST_PORT]), LRequest, LResponse);
+    Assert.AreEqual(200, LHttp.ResponseCode);
+    LJson := TJSONObject.ParseJSONValue(LResponse.DataString) as TJSONObject;
+    try
+      Assert.IsNotNull(LJson);
+      LProveedor := LJson.GetValue('proveedor') as TJSONObject;
+      Assert.AreEqual('000000000-TEST', LProveedor.GetValue('nit').Value);
+      Assert.IsFalse((LProveedor.GetValue('existe') as TJSONBool).AsBoolean);
+      LProductos := LJson.GetValue('productos') as TJSONArray;
+      Assert.AreEqual(1, LProductos.Count);
+      Assert.IsFalse(((LProductos.Items[0] as TJSONObject).GetValue('existe') as TJSONBool).AsBoolean);
+    finally
+      LJson.Free;
+    end;
+  finally
+    LRequest.Free;
+    LResponse.Free;
+    LHttp.Free;
+  end;
+end;
+
+procedure TImportControllerTests.PostFacturaXML_WithoutToken_Returns401;
+var
+  LHttp: TIdHTTP;
+  LRequest, LResponse: TStringStream;
+begin
+  LHttp := TIdHTTP.Create(nil);
+  LRequest := TStringStream.Create(TEST_XML, TEncoding.UTF8);
+  LResponse := TStringStream.Create;
+  try
+    LHttp.Request.ContentType := 'application/xml';
+    try
+      LHttp.Post(Format('http://localhost:%d/factura/xml', [TEST_PORT]), LRequest, LResponse);
+      Assert.Fail('Se esperaba una excepcion HTTP 401');
+    except
+      on E: EIdHTTPProtocolException do
+        Assert.AreEqual(401, E.ErrorCode);
+    end;
+  finally
+    LRequest.Free;
+    LResponse.Free;
+    LHttp.Free;
+  end;
+end;
+
+end.
+```
+
+**Antes de dar por bueno el test 2, quien implemente debe verificar empíricamente que `TEST_XML` es parseado sin excepción por `TXmlFacturaService.Parsear`** (correrlo una vez y confirmar 200, no asumir que el XML de arriba es perfecto a la primera — si `Parsear` lanza una excepción por algún nodo faltante/mal formado, ajustar el XML de prueba, NO el código del controller ni del servicio).
+
+Modificar `tests/PurchaseBridge.Tests.dpr`: agregar `DMVC.ImportControllerTests in 'DMVC\DMVC.ImportControllerTests.pas';`.
+
+Compilar servidor + tests. Correr la suite completa — deben pasar los 26 anteriores + 3 nuevos = 29.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add dmvc/Controllers/DMVC.Controllers.ImportController.pas dmvc/DMVC.WebModule.Main.pas tests/DMVC/DMVC.ImportControllerTests.pas tests/PurchaseBridge.Tests.dpr
+git commit -m "feat: migrate ImportController to DMVCFramework"
+```
+
+Sin gate de aprobación después de esta task — el usuario autorizó continuar con las tareas restantes (4, 5, 6) sin pausas intermedias; seguir directo a escribir el detalle de la Task 5.
 
 ### Task 5: DocumentosController (1 ruta) + endpoint /api/auth/me
 
