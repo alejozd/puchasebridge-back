@@ -31,6 +31,7 @@ uses
   DMVC.Controllers.ImportController,
   DMVC.Controllers.DocumentosController,
   DMVC.Controllers.AuthController,
+  DMVC.Controllers.XmlController,
   DMVC.Middleware.HttpLogger,
   DMVC.Middleware.CORS,
   DMVC.Middleware.License,
@@ -78,6 +79,7 @@ begin
   FEngine.AddController(TImportController);
   FEngine.AddController(TDocumentosController);
   FEngine.AddController(TAuthController);
+  FEngine.AddController(TXmlController);
 end;
 
 destructor TPurchaseBridgeDMVCWebModule.Destroy;

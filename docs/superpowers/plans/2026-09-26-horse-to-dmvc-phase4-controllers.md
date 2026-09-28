@@ -2400,6 +2400,8 @@ begin
 
   LResponse := TJSONObject.Create;
   try
+    LResponse.AddPair('success', TJSONBool.Create(True));
+
     LProveedorObj := TJSONObject.Create;
     LProveedorObj.AddPair('nit', LParsedInvoice.Provider.NIT);
     LProveedorObj.AddPair('nombre', LParsedInvoice.Provider.Nombre);
@@ -2657,6 +2659,7 @@ Notas:
 - El path param `($id)` se tipó como `string` (no `Integer`) a propósito: así se preserva EXACTAMENTE el comportamiento original de `StrToIntDef(Req.Params['id'], 0)` (un id no-numérico o `"0"` cae igual en el branch de 400) — si se tipara como `Integer` directamente en la firma del método, DMVCFramework intentaría bindear el segmento de URL como entero ANTES de que el código del controller corra, cambiando el comportamiento para valores no numéricos (probablemente un 400/404 del framework en vez del mensaje "ID inválido" propio). Verificar empíricamente que el binding de `($id)` a un parámetro `string` funciona como se espera (la Fase 4 no tiene otro ejemplo de path param todavía) — si no, ajustar según lo que el compilador/framework exija, pero mantener el chequeo manual de "ID inválido"/"Archivo no encontrado" tal cual.
 - `HTTP_STATUS.UnprocessableEntity` (422): verificar que esta constante existe en `MVCFramework.Commons` de esta versión (debería, es estándar) antes de compilar.
 - Todas las consultas van contra `GetBridgeQuery` (BRIDGE local, descartable) — ningún handler de esta sub-task toca Helisa.
+- **ADVERTENCIA (hallazgo de review, corregido):** el código de `Parse` de arriba YA incluye `LResponse.AddPair('success', TJSONBool.Create(True));` como primera línea dentro del `try` — esto faltaba en un borrador anterior de este mismo plan (el Horse original SÍ lo incluye, ver `controllers/XmlController.pas` línea 265) y se coló sin que ningún test lo detectara porque ningún test automatizado ejercitaba el camino 200 de `Parse`. Si se reescribe este handler desde cero, no omitir ese campo, y agregar al menos un test que llegue al 200 con un XML de prueba válido (ver Step 3).
 
 - [ ] **Step 2: Registrar el controller en el WebModule**
 
@@ -2672,18 +2675,19 @@ Crear `tests/DMVC/DMVC.XmlControllerReadTests.pas` con estos 11 tests (mismo pat
 4. `GetFileById_WithNonexistentId_Returns404` (un ID grande, ej. `999999999`).
 5. `Parse_WithoutFileName_Returns400`.
 6. `Parse_WithNonexistentFile_Returns404` (mismo criterio de nombre ficticio que Task 3).
-7. `Parse_WithoutToken_Returns401`.
-8. `GetProductosPendientes_WithoutFileName_Returns400`.
-9. `GetProductosPendientes_WithNonexistentFileName_Returns404`.
-10. `GetProductosDocumento_WithoutFileName_Returns400`.
-11. `GetProductosDocumento_WithNonexistentFileName_Returns404`.
-12. `GetDashboardMetrics_ReturnsJsonWithCounts` — 200, verificar que el JSON tiene los 8 campos numéricos esperados (`total`, `cargados`, `pendientes`, `listos`, `procesados`, `errores`, `procesadosHoy`, `erroresHoy`), sin asumir valores exactos.
+7. `Parse_WithValidXml_ReturnsSuccessAndParsedData` — escribe un XML de prueba mínimo (sin namespaces, ya que `TXmlParserService` busca nodos por `LocalName` sin importar el prefijo/URI — a diferencia de la `XMLFacturaService` con bug de la Task 4) directamente en la carpeta `Input` que usa el PROCESO SERVIDOR (`TPath.Combine(TPath.GetDirectoryName(ServerExePath), 'Input')` — OJO: NO `uPaths.GetInputPath` llamado desde el propio test, porque `GetBasePath` resuelve relativo a `ParamStr(0)` del proceso que lo llama, y el test corre en un `.exe` distinto al del servidor), llama al endpoint, verifica `success:true` + `proveedor.nit` + 1 producto, y borra el archivo en el `finally`. Este test es el que habría detectado el bug de la Task 6a Task 6a (ver advertencia arriba: al `Parse` original le faltaba el campo `success` en la respuesta 200).
+8. `Parse_WithoutToken_Returns401`.
+9. `GetProductosPendientes_WithoutFileName_Returns400`.
+10. `GetProductosPendientes_WithNonexistentFileName_Returns404`.
+11. `GetProductosDocumento_WithoutFileName_Returns400`.
+12. `GetProductosDocumento_WithNonexistentFileName_Returns404`.
+13. `GetDashboardMetrics_ReturnsJsonWithCounts` — 200, verificar que el JSON tiene los 8 campos numéricos esperados (`total`, `cargados`, `pendientes`, `listos`, `procesados`, `errores`, `procesadosHoy`, `erroresHoy`), sin asumir valores exactos.
 
-(12 tests en total — se listaron como "11" en el resumen de arriba antes de contar `GetDashboardMetrics`; el número real a implementar es 12, ajustar el conteo de la suite en consecuencia: 34 anteriores + 12 = 46).
+(13 tests en total. Conteo de la suite: 34 anteriores + 13 = 47).
 
 Modificar `tests/PurchaseBridge.Tests.dpr`: agregar `DMVC.XmlControllerReadTests in 'DMVC\DMVC.XmlControllerReadTests.pas';`.
 
-Compilar servidor + tests. Correr la suite completa — deben pasar 46/46.
+Compilar servidor + tests. Correr la suite completa — deben pasar 47/47.
 
 - [ ] **Step 4: Commit**
 
@@ -3114,11 +3118,11 @@ Crear `tests/DMVC/DMVC.XmlControllerWriteTests.pas`. Todas las escrituras van co
 
 Modificar `tests/PurchaseBridge.Tests.dpr`: agregar `DMVC.XmlControllerWriteTests in 'DMVC\DMVC.XmlControllerWriteTests.pas';`.
 
-Compilar servidor + tests. Correr la suite completa — deben pasar 46 anteriores (tras 6a) + 10 nuevos = 56.
+Compilar servidor + tests. Correr la suite completa — deben pasar 47 anteriores (tras 6a) + 10 nuevos = 57.
 
 - [ ] **Step 3: Verificación manual del Fase 4 completa (opcional pero recomendada dado el tamaño)**
 
-Con el server corriendo: hacer un smoke test manual de al menos `POST /api/xml/upload` con un archivo real y `POST /api/xml/homologar` con datos reales si el usuario lo pide explícitamente, para confirmar el camino feliz end-to-end antes de cerrar la Fase 4 — no obligatorio si los 56 tests automatizados ya pasan.
+Con el server corriendo: hacer un smoke test manual de al menos `POST /api/xml/upload` con un archivo real y `POST /api/xml/homologar` con datos reales si el usuario lo pide explícitamente, para confirmar el camino feliz end-to-end antes de cerrar la Fase 4 — no obligatorio si los 57 tests automatizados ya pasan.
 
 - [ ] **Step 4: Commit**
 
@@ -3129,7 +3133,7 @@ git commit -m "feat: migrate XmlController write routes to DMVCFramework (Task 6
 
 ## Fin de la Fase 4
 
-Con la Task 6b commiteada, los 6 controllers restantes quedan migrados (56 tests totales). Siguiente paso: revisión final de toda la rama (whole-branch review, mismo patrón que Fases 1-3) y luego `superpowers:finishing-a-development-branch` para decidir merge/push — preguntar al usuario en ese punto, no asumir push automático a `origin/main`.
+Con la Task 6b commiteada, los 6 controllers restantes quedan migrados (57 tests totales). Siguiente paso: revisión final de toda la rama (whole-branch review, mismo patrón que Fases 1-3) y luego `superpowers:finishing-a-development-branch` para decidir merge/push — preguntar al usuario en ese punto, no asumir push automático a `origin/main`.
 
 **Archivos (ambas sub-tareas):** `dmvc/Controllers/DMVC.Controllers.XmlController.pas`, tests correspondientes.
 

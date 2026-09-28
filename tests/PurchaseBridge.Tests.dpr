@@ -29,7 +29,8 @@ uses
   DMVC.XmlValidationControllerTests in 'DMVC\DMVC.XmlValidationControllerTests.pas',
   DMVC.ImportControllerTests in 'DMVC\DMVC.ImportControllerTests.pas',
   DMVC.DocumentosControllerTests in 'DMVC\DMVC.DocumentosControllerTests.pas',
-  DMVC.AuthMeTests in 'DMVC\DMVC.AuthMeTests.pas';
+  DMVC.AuthMeTests in 'DMVC\DMVC.AuthMeTests.pas',
+  DMVC.XmlControllerReadTests in 'DMVC\DMVC.XmlControllerReadTests.pas';
 
 var
   runner: ITestRunner;
