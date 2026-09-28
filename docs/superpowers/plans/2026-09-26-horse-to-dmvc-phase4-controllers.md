@@ -1617,9 +1617,388 @@ Sin gate de aprobación después de esta task — el usuario autorizó continuar
 
 ### Task 5: DocumentosController (1 ruta) + endpoint /api/auth/me
 
-**Objetivo:** `POST /documentos/procesar` — usa `Req.Session<TSessionInfoObj>.Data` en Horse (sesión GUID en memoria, ya obsoleta desde la Fase 3). En DMVC el equivalente es leer `Context.LoggedUser`/sus custom claims (`codigo`, `nombre`, seteados en `OnAuthentication` de `DMVC.Security.AuthHandler.pas`, Fase 3). Este task establece el patrón "leer usuario actual desde el JWT" y lo reusa para agregar `GET /api/auth/me` (controller nuevo o el mismo), reemplazando el payload de usuario/empresa que el login de Horse solía devolver (ver nota de la Fase 3 sobre el contrato de login cambiado).
+**Files:**
+- Create: `dmvc/Controllers/DMVC.Controllers.DocumentosController.pas`
+- Create: `dmvc/Controllers/DMVC.Controllers.AuthController.pas` (solo `GET /api/auth/me`)
+- Modify: `dmvc/DMVC.WebModule.Main.pas`
+- Create: `tests/DMVC/DMVC.DocumentosControllerTests.pas`
+- Create: `tests/DMVC/DMVC.AuthMeTests.pas`
+- Modify: `tests/PurchaseBridge.Tests.dpr`
 
-**Archivos:** `dmvc/Controllers/DMVC.Controllers.DocumentosController.pas`, posiblemente `dmvc/Controllers/DMVC.Controllers.AuthController.pas` (solo `/me`), tests correspondientes.
+**Interfaces:**
+- Consumes (sin cambios): `services/XmlParserService.pas` (`TXmlParserService.Parse`, `TParsedInvoice`), `services/ValidationService.pas` (`ValidarDocumentoDesdeXML`), `services/DocumentoService.pas` (`TDocumentoHeader`, `TDocumentoDetalle`, `GuardarDocumento`, `DocumentoExiste`), `services/EquivalenciaService.pas` (`BuscarEquivalencia(AReferenciaH, AUnidadH): TFDQuery` overload de 2 argumentos), `utils/uPaths.pas` (`GetInputPath`, `GetProcessedPath`).
+- **Reemplazo de sesión Horse → JWT claims (confirmado leyendo el framework, no adivinado):** `Req.Session<TSessionInfoObj>.Data` (GUID-sesión en memoria de Horse) se reemplaza por `Context.LoggedUser.CustomData['codigo']` / `Context.LoggedUser.CustomData['nombre']`. Verificado en `MVCFramework.Middleware.JWT.pas` (líneas ~403/463/602-607): los pares que `OnAuthentication` escribe en `ASessionData` (ya hoy `'codigo'`/`'nombre'`, ver `DMVC.Security.AuthHandler.pas` de la Fase 3) se guardan como custom claims del JWT en el login, y el middleware los reconstruye automáticamente en `Context.LoggedUser.CustomData` en CADA request subsecuente que traiga ese token — no hace falta ningún cambio en el auth handler existente para que esto funcione.
+- Sin DTOs: mismo criterio que Tasks 2-4, respuesta dinámica vía `TJSONObject` a mano.
+
+**Decisión de testing (mismo criterio de riesgo que Tasks 2 y 3, aplicado aquí con MÁS cuidado porque el riesgo es mayor):** `GuardarDocumento` escribe un documento contable REAL en el ERP Helisa y `TFile.Move` mueve un archivo real de `Input` a `Processed` — ambos son efectos de escritura reales e irreversibles fácilmente, más sensibles que cualquier otra ruta migrada hasta ahora en esta fase. Los tests automatizados de esta task se limitan ESTRICTAMENTE a las ramas que ocurren ANTES de tocar `GuardarDocumento`/`TFile.Move`/`DocumentoExiste`-con-datos-reales:
+1. `files` vacío o ausente en el body → 200 con `procesados:[]`, `errores:[]` (el `for` nunca ejecuta, cero I/O).
+2. Un nombre de archivo que NO existe en el disco → entrada en `errores` con `"Archivo no encontrado"` (primera guarda de la ruta, antes de leer/parsear/persistir nada).
+3. Protección JWT (401 sin token) en ambas rutas nuevas (`/documentos/procesar` y `/api/auth/me`).
+4. `/api/auth/me` con token válido → 200 con `codigo`/`nombre` presentes y no vacíos (esto SÍ es 100% seguro de probar: es una simple lectura de los claims del JWT ya emitido, sin tocar ninguna base de datos).
+
+NO se automatiza: el camino feliz completo de `Procesar` (XML real parseado + `BuscarEquivalencia` + `GuardarDocumento` + `TFile.Move`) ni el caso "documento ya procesado" (`DocumentoExiste=True`, que requeriría un XML real ya guardado). Verificación manual únicamente, y solo si el usuario lo pide explícitamente con un XML de prueba real — igual criterio que `LicenciaController.Registrar`/`ActivarOnline` en la Task 2.
+
+- [ ] **Step 1: Escribir el controller de auth/me**
+
+Crear `dmvc/Controllers/DMVC.Controllers.AuthController.pas`:
+
+```pascal
+unit DMVC.Controllers.AuthController;
+
+interface
+
+uses
+  MVCFramework, MVCFramework.Commons;
+
+type
+  [MVCPath('/')]
+  TAuthController = class(TMVCController)
+  public
+    [MVCPath('/api/auth/me')]
+    [MVCHTTPMethod([httpGET])]
+    procedure GetMe;
+  end;
+
+implementation
+
+uses
+  System.JSON;
+
+procedure TAuthController.GetMe;
+var
+  LResponse: TJSONObject;
+begin
+  ContentType := TMVCMediaType.APPLICATION_JSON;
+  LResponse := TJSONObject.Create;
+  try
+    LResponse.AddPair('codigo', Context.LoggedUser.CustomData['codigo']);
+    LResponse.AddPair('nombre', Context.LoggedUser.CustomData['nombre']);
+    Render(LResponse.ToJSON);
+  finally
+    LResponse.Free;
+  end;
+end;
+
+end.
+```
+
+- [ ] **Step 2: Escribir el controller de documentos**
+
+Crear `dmvc/Controllers/DMVC.Controllers.DocumentosController.pas`:
+
+```pascal
+unit DMVC.Controllers.DocumentosController;
+
+interface
+
+uses
+  MVCFramework, MVCFramework.Commons;
+
+type
+  [MVCPath('/')]
+  TDocumentosController = class(TMVCController)
+  public
+    [MVCPath('/documentos/procesar')]
+    [MVCPath('/api/documentos/procesar')]
+    [MVCHTTPMethod([httpPOST])]
+    procedure Procesar;
+  end;
+
+implementation
+
+uses
+  System.SysUtils, System.JSON, System.IOUtils, System.Classes,
+  FireDAC.Comp.Client,
+  XmlParserService, ValidationService, DocumentoService, EquivalenciaService, uPaths;
+
+function ParsedInvoiceToJSONObject(const AParsedInvoice: TParsedInvoice): TJSONObject;
+var
+  LProveedor, LTotales, LProducto: TJSONObject;
+  LProductosArr: TJSONArray;
+  I: Integer;
+begin
+  Result := TJSONObject.Create;
+  try
+    LProveedor := TJSONObject.Create;
+    LProveedor.AddPair('nit', AParsedInvoice.Provider.NIT);
+    LProveedor.AddPair('nombre', AParsedInvoice.Provider.Nombre);
+    LProveedor.AddPair('nombreLegal', AParsedInvoice.Provider.NombreLegal);
+    LProveedor.AddPair('tipoIdentificacion', AParsedInvoice.Provider.TipoIdentificacion);
+    LProveedor.AddPair('direccion', AParsedInvoice.Provider.Direccion);
+    Result.AddPair('proveedor', LProveedor);
+
+    LProductosArr := TJSONArray.Create;
+    for I := 0 to Length(AParsedInvoice.Products) - 1 do
+    begin
+      LProducto := TJSONObject.Create;
+      LProducto.AddPair('idLinea', AParsedInvoice.Products[I].IDLinea);
+      LProducto.AddPair('descripcion', AParsedInvoice.Products[I].Descripcion);
+      LProducto.AddPair('referencia', AParsedInvoice.Products[I].Referencia);
+      LProducto.AddPair('referenciaEstandar', AParsedInvoice.Products[I].ReferenciaEstandar);
+      LProducto.AddPair('cantidad', TJSONNumber.Create(AParsedInvoice.Products[I].Cantidad));
+      LProducto.AddPair('unidad', AParsedInvoice.Products[I].Unidad);
+      LProducto.AddPair('precioBase', TJSONNumber.Create(AParsedInvoice.Products[I].PrecioBase));
+      LProducto.AddPair('valorUnitario', TJSONNumber.Create(AParsedInvoice.Products[I].ValorUnitario));
+      LProducto.AddPair('valorTotal', TJSONNumber.Create(AParsedInvoice.Products[I].ValorTotal));
+      LProducto.AddPair('impuesto', TJSONNumber.Create(AParsedInvoice.Products[I].Impuesto));
+      LProducto.AddPair('porcentajeImpuesto', TJSONNumber.Create(AParsedInvoice.Products[I].ImpuestoPorcentaje));
+      LProductosArr.Add(LProducto);
+    end;
+    Result.AddPair('productos', LProductosArr);
+
+    LTotales := TJSONObject.Create;
+    LTotales.AddPair('subtotal', TJSONNumber.Create(AParsedInvoice.Totals.Subtotal));
+    LTotales.AddPair('taxExclusiveAmount', TJSONNumber.Create(AParsedInvoice.Totals.TaxExclusiveAmount));
+    LTotales.AddPair('taxInclusiveAmount', TJSONNumber.Create(AParsedInvoice.Totals.TaxInclusiveAmount));
+    LTotales.AddPair('impuestoTotal', TJSONNumber.Create(AParsedInvoice.Totals.ImpuestoTotal));
+    LTotales.AddPair('total', TJSONNumber.Create(AParsedInvoice.Totals.Total));
+    Result.AddPair('totales', LTotales);
+  except
+    Result.Free;
+    raise;
+  end;
+end;
+
+procedure TDocumentosController.Procesar;
+var
+  LBody: TJSONObject;
+  LFilesArr: TJSONArray;
+  LFileName, LPath, LProcessedPath, LXMLContent, LParsedJSONStr, LValidationResult: string;
+  LParsedInvoice: TParsedInvoice;
+  LValidationObj, LProcesadoObj, LErrorObj, LResponse, LParsedObj: TJSONObject;
+  LProcesadosArr, LErroresArr: TJSONArray;
+  LHeader: TDocumentoHeader;
+  LDetalles: TArray<TDocumentoDetalle>;
+  I, J: Integer;
+  LValido, LRequiereHomologacion: Boolean;
+  LEquivalencia: TFDQuery;
+  LFactor: Double;
+  LFilesValue, LValidoVal: TJSONValue;
+  LDocumentoERP, LAnio, LCodigoUsuario, LNombreUsuario: string;
+begin
+  ContentType := TMVCMediaType.APPLICATION_JSON;
+  LProcesadosArr := TJSONArray.Create;
+  LErroresArr := TJSONArray.Create;
+  try
+    LBody := TJSONObject.ParseJSONValue(Context.Request.Body) as TJSONObject;
+    try
+      if Assigned(LBody) then
+      begin
+        LFilesValue := LBody.GetValue('files');
+        if (LFilesValue <> nil) and (LFilesValue is TJSONArray) then
+        begin
+          LFilesArr := LFilesValue as TJSONArray;
+          for I := 0 to LFilesArr.Count - 1 do
+          begin
+            LFileName := TPath.GetFileName(LFilesArr.Items[I].Value);
+            LPath := GetInputPath;
+            LProcessedPath := GetProcessedPath;
+
+            if not TDirectory.Exists(LProcessedPath) then
+              TDirectory.CreateDirectory(LProcessedPath);
+
+            if not TFile.Exists(TPath.Combine(LPath, LFileName)) then
+            begin
+              LErrorObj := TJSONObject.Create;
+              LErrorObj.AddPair('fileName', LFileName);
+              LErrorObj.AddPair('error', 'Archivo no encontrado');
+              LErroresArr.Add(LErrorObj);
+              Continue;
+            end;
+
+            if DocumentoExiste(LFileName) then
+            begin
+              LErrorObj := TJSONObject.Create;
+              LErrorObj.AddPair('fileName', LFileName);
+              LErrorObj.AddPair('error', 'El documento ya fue procesado anteriormente');
+              LErroresArr.Add(LErrorObj);
+              Continue;
+            end;
+
+            try
+              LXMLContent := TFile.ReadAllText(TPath.Combine(LPath, LFileName), TEncoding.UTF8);
+              LParsedInvoice := TXmlParserService.Parse(LXMLContent);
+
+              LParsedObj := ParsedInvoiceToJSONObject(LParsedInvoice);
+              try
+                LParsedJSONStr := LParsedObj.ToJSON;
+              finally
+                LParsedObj.Free;
+              end;
+
+              LValidationResult := ValidarDocumentoDesdeXML(LParsedJSONStr);
+              LValidationObj := TJSONObject.ParseJSONValue(LValidationResult) as TJSONObject;
+              if not Assigned(LValidationObj) then
+                 raise Exception.Create('Error parseando resultado de validación');
+              try
+                LValido := False;
+                LValidoVal := LValidationObj.GetValue('valido');
+                if (LValidoVal <> nil) and (LValidoVal is TJSONBool) then
+                  LValido := (LValidoVal as TJSONBool).AsBoolean;
+
+                LRequiereHomologacion := False;
+                LValidoVal := LValidationObj.GetValue('requiereHomologacion');
+                if (LValidoVal <> nil) and (LValidoVal is TJSONBool) then
+                  LRequiereHomologacion := (LValidoVal as TJSONBool).AsBoolean;
+
+                if LValido and not LRequiereHomologacion then
+                begin
+                  LAnio := FormatDateTime('yyyy', LParsedInvoice.FechaEmision);
+
+                  LCodigoUsuario := Context.LoggedUser.CustomData['codigo'];
+                  LNombreUsuario := Context.LoggedUser.CustomData['nombre'];
+
+                  LHeader.Proveedor := LParsedInvoice.Provider.NIT;
+                  LHeader.CodigoTercero := LValidationObj.GetValue('codigoTercero').Value;
+                  LHeader.Fecha := LParsedInvoice.FechaEmision;
+                  LHeader.Total := LParsedInvoice.Totals.Total;
+                  LHeader.Estado := 'PROCESADO';
+                  LHeader.XMLFileName := LFileName;
+                  LHeader.NombreUsuario := LNombreUsuario;
+                  LHeader.CodigoUsuario := LCodigoUsuario;
+                  LHeader.Anio := LAnio;
+
+                  SetLength(LDetalles, Length(LParsedInvoice.Products));
+                  for J := 0 to Length(LParsedInvoice.Products) - 1 do
+                  begin
+                    LDetalles[J].CodigoProducto := LParsedInvoice.Products[J].Referencia;
+                    LDetalles[J].Cantidad := LParsedInvoice.Products[J].Cantidad;
+                    LDetalles[J].Precio := LParsedInvoice.Products[J].ValorUnitario;
+                    LDetalles[J].TfIva := LParsedInvoice.Products[J].ImpuestoPorcentaje;
+                    LDetalles[J].VrIva := LParsedInvoice.Products[J].Impuesto;
+                    LDetalles[J].TfDescuento := LParsedInvoice.Products[J].DescuentoPorcentaje;
+                    LDetalles[J].VrDescuento := LParsedInvoice.Products[J].Descuento;
+                    LDetalles[J].VrIca := 0;
+                    LDetalles[J].VrReteIca := 0;
+                    LDetalles[J].VrReteIva := 0;
+                    LDetalles[J].VrReteFuente := 0;
+                    LDetalles[J].Total := LDetalles[J].Cantidad * LDetalles[J].Precio;
+
+                    LEquivalencia := BuscarEquivalencia(LParsedInvoice.Products[J].Referencia, LParsedInvoice.Products[J].Unidad);
+                    try
+                      if LEquivalencia.IsEmpty then
+                      begin
+                        raise Exception.Create(
+                          Format('No existe equivalencia para la referencia "%s" con unidad "%s"',
+                            [LParsedInvoice.Products[J].Referencia, LParsedInvoice.Products[J].Unidad])
+                        );
+                      end;
+
+                      LFactor := LEquivalencia.FieldByName('FACTOR').AsFloat;
+                      if LFactor = 0 then LFactor := 1;
+
+                      LDetalles[J].Texto := LEquivalencia.FieldByName('NOMBREH').AsString + ' (' + LEquivalencia.FieldByName('REFERENCIAH').AsString + ')';
+                      LDetalles[J].CodigoProducto := LEquivalencia.FieldByName('REFERENCIAH').AsString;
+                      LDetalles[J].Cantidad := LDetalles[J].Cantidad * LFactor;
+                      LDetalles[J].CodigoConcepto := LEquivalencia.FieldByName('CODIGOH').AsInteger;
+                      LDetalles[J].Subcodigo := LEquivalencia.FieldByName('SUBCODIGOH').AsInteger;
+                    finally
+                      LEquivalencia.Free;
+                    end;
+
+                    LDetalles[J].Total := LDetalles[J].Cantidad * LDetalles[J].Precio;
+                  end;
+
+                  try
+                    LDocumentoERP := GuardarDocumento(LHeader, LDetalles);
+
+                    TFile.Move(TPath.Combine(LPath, LFileName), TPath.Combine(LProcessedPath, LFileName));
+
+                    LProcesadoObj := TJSONObject.Create;
+                    LProcesadoObj.AddPair('fileName', LFileName);
+                    LProcesadoObj.AddPair('status', 'OK');
+                    LProcesadoObj.AddPair('documento', LDocumentoERP);
+                    LProcesadosArr.Add(LProcesadoObj);
+                  except
+                    on E: Exception do
+                    begin
+                      LErrorObj := TJSONObject.Create;
+                      LErrorObj.AddPair('fileName', LFileName);
+                      LErrorObj.AddPair('error', 'Error al guardar en BD: ' + E.Message);
+                      LErroresArr.Add(LErrorObj);
+                    end;
+                  end;
+                end
+                else
+                begin
+                  LErrorObj := TJSONObject.Create;
+                  LErrorObj.AddPair('fileName', LFileName);
+                  if LRequiereHomologacion then
+                    LErrorObj.AddPair('error', 'Requiere homologación de productos')
+                  else
+                    LErrorObj.AddPair('error', 'Documento inválido para procesar');
+                  LErroresArr.Add(LErrorObj);
+                end;
+              finally
+                LValidationObj.Free;
+              end;
+
+            except
+              on E: Exception do
+              begin
+                LErrorObj := TJSONObject.Create;
+                LErrorObj.AddPair('fileName', LFileName);
+                LErrorObj.AddPair('error', E.Message);
+                LErroresArr.Add(LErrorObj);
+              end;
+            end;
+          end;
+        end;
+      end;
+    finally
+      LBody.Free;
+    end;
+
+    LResponse := TJSONObject.Create;
+    try
+      LResponse.AddPair('procesados', LProcesadosArr);
+      LResponse.AddPair('errores', LErroresArr);
+      LProcesadosArr := nil; // ownership transferido a LResponse
+      LErroresArr := nil;
+      Render(LResponse.ToJSON);
+    finally
+      LResponse.Free;
+    end;
+  except
+    on E: Exception do
+    begin
+      LProcesadosArr.Free; // no-op si ya es nil (ownership ya transferido)
+      LErroresArr.Free;
+      raise EMVCException.Create(HTTP_STATUS.InternalServerError, 'Error interno: ' + E.Message);
+    end;
+  end;
+end;
+
+end.
+```
+
+Notas de fidelidad y cambios deliberados:
+- `LSession := Req.Session<TSessionInfoObj>.Data; ... LSession.Nombre; ... LSession.Codigo.ToString;` → `Context.LoggedUser.CustomData['nombre']` / `Context.LoggedUser.CustomData['codigo']` (ver justificación arriba). `CustomData['codigo']` ya es `string` (así se guardó en `ASessionData.AddOrSetValue('codigo', LQuery.FieldByName('CODIGO').AsString)` en la Fase 3) — NO hace falta `.ToString`, a diferencia del original que convertía un `Integer`.
+- El leak preexistente de Horse (si la request completa falla ANTES de construir `LResponse`, `LProcesadosArr`/`LErroresArr` quedaban sin liberar) se corrige de forma mecánica con el patrón `:= nil` tras la transferencia de ownership + `.Free` (no-op sobre `nil`) en el `except` — mismo espíritu que el fix `try/except Result.Free; raise;` ya aplicado en Tasks 1 y 3, no es una reescritura de la lógica de negocio.
+- El resto de la lógica de negocio (parseo, validación, cálculo de equivalencias, construcción de `TDocumentoHeader`/`TDocumentoDetalle`) es copia EXACTA del Horse original, literal por literal.
+
+- [ ] **Step 3: Registrar ambos controllers en el WebModule**
+
+Modificar `dmvc/DMVC.WebModule.Main.pas`: agregar `DMVC.Controllers.DocumentosController` y `DMVC.Controllers.AuthController` al `uses`, y `FEngine.AddController(TDocumentosController);` + `FEngine.AddController(TAuthController);` después de `TImportController`.
+
+- [ ] **Step 4: Escribir los tests (RED → GREEN)**
+
+Crear `tests/DMVC/DMVC.AuthMeTests.pas` (2 tests: `GetMe_WithValidToken_ReturnsCodigoYNombre`, `GetMe_WithoutToken_Returns401`) y `tests/DMVC/DMVC.DocumentosControllerTests.pas` (3 tests: `Procesar_WithEmptyFiles_ReturnsEmptyArrays`, `Procesar_WithNonexistentFile_ReturnsArchivoNoEncontrado`, `Procesar_WithoutToken_Returns401`), mismo patrón `TTestServerProcess` + `ObtenerTokenDePrueba` + `TIdHTTP`/`TStringStream` de las tasks anteriores. Para `GetMe_WithValidToken_...`, NO asumir el valor exacto de `codigo`/`nombre` (son datos reales de Helisa) — solo verificar que ambos campos existen y no están vacíos.
+
+Modificar `tests/PurchaseBridge.Tests.dpr`: agregar ambas unidades nuevas al `uses`.
+
+Compilar servidor + tests. Correr la suite completa — deben pasar los 29 anteriores (tras la Task 4) + 5 nuevos = 34.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add dmvc/Controllers/DMVC.Controllers.DocumentosController.pas dmvc/Controllers/DMVC.Controllers.AuthController.pas dmvc/DMVC.WebModule.Main.pas tests/DMVC/DMVC.DocumentosControllerTests.pas tests/DMVC/DMVC.AuthMeTests.pas tests/PurchaseBridge.Tests.dpr
+git commit -m "feat: migrate DocumentosController to DMVCFramework, add /api/auth/me"
+```
+
+Sin gate de aprobación — seguir directo a escribir el detalle de la Task 6.
+
+**Archivos:** `dmvc/Controllers/DMVC.Controllers.DocumentosController.pas`, `dmvc/Controllers/DMVC.Controllers.AuthController.pas`, tests correspondientes.
 
 ### Task 6: XmlController (9 rutas — la más grande, 1176 líneas en Horse)
 
